@@ -1,0 +1,31 @@
+{
+  "name": "lovefield-playground",
+  "version": "1.0.0",
+  "description": "lovefield playground",
+  "main": "index.js",
+  "scripts": {
+    "start": "webpack-dev-server --inline --colors --progress --display-error-details --display-cached --port 3000  --content-base src",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "lovefield"
+  ],
+  "author": "lynweklm@gmail.com",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/lovefield": "^2.0.31",
+    "extract-text-webpack-plugin": "^1.0.1",
+    "html-webpack-plugin": "^2.24.1",
+    "raw-loader": "^0.5.1",
+    "source-map-loader": "^0.1.5",
+    "ts-loader": "^1.2.0",
+    "ts-node": "^1.7.0",
+    "typescript": "^2.0.9",
+    "webpack": "^1.13.3",
+    "webpack-merge": "^0.15.0"
+  },
+  "dependencies": {
+    "lovefield": "^2.1.10",
+    "rxjs": "^5.0.0-rc.2"
+  }
+}
