@@ -45,15 +45,14 @@ export function forEach (target: any, eachFunc: (val: any, key: any) => any, inv
   return target
 }
 
-export const clone = <T>(origin: T, old?: any): T => {
-  old = old || origin
+export const clone = <T>(origin: T): T | null => {
   /* istanbul ignore if */
   if (origin === null) {
     return null
   }
   /* istanbul ignore if */
   if (!origin || typeof origin !== 'object') {
-    return void 0
+    return null
   }
   let target: any
   if (origin instanceof Array) {
@@ -64,8 +63,12 @@ export const clone = <T>(origin: T, old?: any): T => {
   forEach(origin, (val: any, key: string) => {
     if (typeof val === 'object') {
       // null
-      if (val && val !== old) {
-        target[key] = clone(val, old)
+      if (val) {
+        if (val instanceof Date) {
+          target[key] = new Date(val.toISOString())
+        } else {
+          target[key] = clone(val)
+        }
       } else {
         target[key] = val
       }
@@ -76,61 +79,22 @@ export const clone = <T>(origin: T, old?: any): T => {
   return target
 }
 
-export const concat = <T>(target: T[], patch: T[]): T[] => {
-  if (!(patch instanceof Array)) {
-    return target
-  }
-  forEach(patch, ele => {
-    target.push(ele)
-  })
-  return target
-}
-
 const s4 = () => Math.floor(
   (1 + Math.random()) * 0x10000
 )
   .toString(16)
   .substring(1)
 
-const uuidStack: string[] = []
+const uuidStack = new Set<string>()
 
 export const uuid = () => {
   let UUID = s4() + s4()
   /* istanbul ignore next */
-  while (uuidStack.indexOf(UUID) !== -1) {
+  while (uuidStack.has(UUID)) {
     UUID = s4() + s4()
   }
-  uuidStack.push(UUID)
+  uuidStack.add(UUID)
   return UUID
 }
 
-export function capitalizeFirstLetter(str: string) {
-  const upper = str[0].toUpperCase()
-  if (str[0] === upper) {
-    return str
-  }
-  return upper + str.slice(1)
-}
-
-/**
- * refer to https://github.com/github/fetch/blob/v1.0.0/fetch.js#L313
- * XmlHttpRequest's getAllResponseHeaders() method returns a string of response
- * headers according to the format described here:
- * http://www.w3.org/TR/XMLHttpRequest/#the-getallresponseheaders-method
- * This method parses that string into a user-friendly key/value pair object.
- */
-export function parseHeaders(rawHeader: string) {
-  const head = Object.create(null)
-  const pairs = rawHeader.trim().split('\n')
-  pairs.forEach(function(header) {
-    const split = header.trim().split(':')
-    const key = split.shift().trim()
-    const value = split.join(':').trim()
-    head[key] = value
-  })
-  return head
-}
-
-export function isObject(obj: any): boolean {
-  return typeof obj === 'object'
-}
+export function flat (r: any) { return r }
