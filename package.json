@@ -1,31 +1,50 @@
 {
-  "name": "lovefield-playground",
-  "version": "1.0.0",
-  "description": "lovefield playground",
+  "name": "reactive-database",
+  "version": "0.7.0",
+  "description": "Reactive ORM for Lovefield",
   "main": "index.js",
   "scripts": {
     "start": "webpack-dev-server --inline --colors --progress --display-error-details --display-cached --port 3000  --content-base src",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build_cjs": "rm -rf dist/cjs && tsc src/index.ts -m commonjs --outDir dist/cjs --sourcemap --sourceRoot src --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --noImplicitThis --noUnusedLocals --noUnusedParameters --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
+    "build_test": "rm -rf spec-js && tsc test/run.ts -m commonjs --outDir spec-js --sourcemap  --target ES2015 --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node",
+    "cover": "npm run build_test &&  nyc --reporter=html --exclude=node_modules --exclude=spec-js/test --exclude=spec-js/src/storage/lovefield tman --mocha spec-js/test/run.js",
+    "lint": "tslint ./src/**/*.ts ./test/**/*.ts",
+    "test": "npm run lint && tman --mocha spec-js/test/run.js",
+    "watch_cjs": "tsc src/index.ts -m commonjs --outDir dist/cjs --sourcemap --sourceRoot src --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom -w",
+    "watch_test": "tsc test/run.ts -m commonjs --outDir spec-js --sourcemap  --target ES2015 --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node -w & ts-node ./tools/watch.ts"
   },
   "keywords": [
-    "lovefield"
+    "lovefield",
+    "RxJS"
   ],
   "author": "lynweklm@gmail.com",
   "license": "MIT",
   "devDependencies": {
+    "@types/chai": "^3.4.34",
     "@types/lovefield": "^2.0.31",
+    "@types/node": "^6.0.51",
+    "@types/sinon": "^1.16.32",
+    "@types/sinon-chai": "^2.7.27",
+    "chai": "^3.5.0",
     "extract-text-webpack-plugin": "^1.0.1",
     "html-webpack-plugin": "^2.24.1",
+    "moment": "^2.17.1",
+    "nyc": "^10.0.0",
     "raw-loader": "^0.5.1",
+    "sinon": "^1.17.6",
+    "sinon-chai": "^2.8.0",
     "source-map-loader": "^0.1.5",
-    "ts-loader": "^1.2.0",
+    "tman": "^1.6.3",
+    "ts-loader": "^1.2.2",
     "ts-node": "^1.7.0",
-    "typescript": "^2.0.9",
+    "tslint": "^4.0.2",
+    "typescript": "^2.0.10",
     "webpack": "^1.13.3",
-    "webpack-merge": "^0.15.0"
+    "webpack-dev-server": "^1.16.2",
+    "webpack-merge": "^0.17.0"
   },
   "dependencies": {
     "lovefield": "^2.1.10",
-    "rxjs": "^5.0.0-rc.2"
+    "rxjs": "^5.0.0-rc.4"
   }
 }

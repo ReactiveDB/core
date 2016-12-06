@@ -1,11 +1,17 @@
 {
   "compilerOptions": {
-    "target": "es6",
+    "target": "ES2015",
     "experimentalDecorators": true,
     "sourceMap": true,
     "module": "commonjs",
     "emitDecoratorMetadata": true,
     "suppressImplicitAnyIndexErrors": true,
+    "noImplicitThis": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noImplicitReturns": true,
+    "noUnusedParameters": true,
+    "noEmitHelpers": true,
     "typeRoots": [
       "node_modules/@types"
     ]

@@ -1,0 +1,13 @@
+machine:
+  node:
+    version: 6.9.1
+
+test:
+  override:
+    - npm run cover
+  post:
+    - cp ./.nyc_output/*.json $CIRCLE_ARTIFACTS
+
+notify:
+  webhooks:
+    - url: http://teambition.vvlyn.com/api/circle
