@@ -1,6 +1,7 @@
 import 'rxjs/observable/dom/ajax'
-import { Observable } from 'rxjs/Observable'
+import { Observable, Scheduler } from 'rxjs'
 import { database } from './database'
+import { TaskSchema } from '../schemas/Task'
 
 Observable.ajax({
   url: `http://project.ci/api/v2/tasks/me/?count=500&isDone=false&page=1`,
@@ -22,9 +23,18 @@ Observable.ajax({
   })
   .map(r => r.response)
   .concatMap(r => database.insert('Subtask', r))
+  .do(() => {
+    database.update('Project', '584172991548501c664fb6e2', {
+      name: 'updated task project'
+    })
+    .subscribeOn(Scheduler.asap, 2000)
+    .subscribe()
+  })
   .concatMap(() => {
     console.time('Task get')
-    return database.get('Task').value()
+    return database.get<TaskSchema>('Task', {
+      primaryValue: '584173011548501c664fc6e6'
+    }).changes()
   })
   .subscribe(r => {
     console.timeEnd('Task get')

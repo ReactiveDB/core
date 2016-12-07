@@ -95,7 +95,9 @@ export default describe('Database public Method', () => {
           })
           .toPromise()
 
-        await database.get<SubtaskSchema>('Subtask', subtask._id)
+        await database.get<SubtaskSchema>('Subtask', {
+          primaryValue: subtask._id as string
+        })
           .value()
           .do(([r]) => {
             expect(r._id).to.equal(subtask._id)

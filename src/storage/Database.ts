@@ -801,6 +801,8 @@ export class Database {
 
   /**
    * 将 hiddenValue 还原到原来的字段
+   * 比如 created 存储的时候是将数据存储为 new Date(created).valueOf()
+   * 取这条数据的时候需要将它转变成原来的值
    */
   private restoreRaw<T>(value: T): T {
     forEach(value, (_val, key) => {
