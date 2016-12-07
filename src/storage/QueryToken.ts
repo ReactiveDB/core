@@ -77,11 +77,13 @@ export class QueryToken<T> {
           selectMeta.getValue()
             .then(first => observer.next(first as T[]))
           db.observe(query, this.observe(query, observer, selectMeta))
+
+          return () => this.dispose()
         })
       })
   }
 
-  dispose(): Observable<any> | void {
+  private dispose(): Observable<any> | void {
     if (this.query) {
       return this.db$
         .do(db => db.unobserve(this.query, this.dbObserve))
