@@ -21,7 +21,9 @@ export class QueryToken<T> {
     .map(meta => meta.select.clone())
 
   private predicate$ = this.selectMeta$
-    .map(meta => meta.predicate.copy())
+    .map(meta => {
+      return meta.predicate ? meta.predicate.copy() : null
+    })
 
   private dbObserve: () => Promise<void> | null
   private query: lf.query.Select
