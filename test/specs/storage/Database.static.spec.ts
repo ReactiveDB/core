@@ -52,7 +52,6 @@ export default describe('Database static Method', () => {
           type: RDBType.OBJECT,
           virtual: {
             name: 'JuJu',
-            fields: ['_id', 'name', 'age'],
             where: (table: lf.schema.Table, data: any) => {
               return table['name'].eq(data.name)
             }

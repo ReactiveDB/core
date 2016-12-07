@@ -34,7 +34,6 @@ export interface SchemaMetadata {
    */
   virtual?: {
     name: string
-    fields: string[]
     where<T> (table: lf.schema.Table, data: T): lf.Predicate
   }
   // 被 Database.prototype.createRow 动态挂上去的
@@ -64,7 +63,6 @@ export interface HooksDef {
 export interface VirtualMetadata {
   // table name
   name: string
-  fields: Set<string>
   resultType?: 'Collection' | 'Model'
   where(table: lf.schema.Table, targetTable: lf.schema.Table): lf.Predicate
 }
@@ -75,8 +73,10 @@ export interface SelectMetadata {
   mapper: Map<string, Function>
 }
 
+type FieldsValue = string | { [index: string]: string[] }
+
 export interface GetQuery {
-  fields?: string[]
+  fields?: FieldsValue []
   primaryValue?: string
   where? (table: lf.schema.Table): lf.Predicate
 }
@@ -103,7 +103,6 @@ export class Database {
   private static readonly hn = '__hidden__'
 
   database$: Observable<lf.Database>
-  schemaBuilder: lf.schema.Builder
 
   private primaryKeysMap = new Map<string, string>()
   private selectMetaData = new Map<string, SelectMetadata>()
@@ -136,6 +135,7 @@ export class Database {
       insert: [],
       destroy: []
     })
+    return Database
   }
 
   /**
@@ -161,13 +161,13 @@ export class Database {
     storeType: lf.schema.DataStoreType = lf.schema.DataStoreType.MEMORY,
     enableInspector: boolean = false,
     // database name
-    name = 'teambition',
+    name = 'ReactiveDB',
     // database version
     version = 1
   ) {
-    this.schemaBuilder = lf.schema.create(name, version)
-    this.database$ = lfFactory(this.schemaBuilder, { storeType, enableInspector })
-    this.buildTables()
+    const schemaBuilder = lf.schema.create(name, version)
+    this.database$ = lfFactory(schemaBuilder, { storeType, enableInspector })
+    this.buildTables(schemaBuilder)
   }
 
   insert<T>(tableName: string, data: T[]): Observable<T[]>
@@ -264,14 +264,14 @@ export class Database {
   /**
    * 只可以更新单条数据
    */
-  update<T>(tableName: string, primaryValue: string, patch: T) {
+  update(tableName: string, primaryValue: string, patch: any) {
     const primaryKey = this.primaryKeysMap.get(tableName)
     if (!primaryKey) {
       return Observable.throw(new TypeError(`table not exist: ${tableName}`))
     }
     const selectMetadata = this.selectMetaData.get(tableName)
     return this.database$
-      .concatMap(db => {
+      .concatMap<any, any>(db => {
         const table = db.getSchema().table(tableName)
         let updateQuery: lf.query.Update | TypeError | undefined
         forEach(patch, (val, key) => {
@@ -384,9 +384,9 @@ export class Database {
       })
   }
 
-  private buildTables() {
+  private buildTables(builder: lf.schema.Builder) {
     Database.schemaMetaData.forEach((schemaDef, tableName) => {
-      const tableBuilder = this.schemaBuilder.createTable(tableName)
+      const tableBuilder = builder.createTable(tableName)
       this.buildTableRows(tableName, schemaDef, tableBuilder)
     })
     delete Database.schemaMetaData
@@ -427,8 +427,7 @@ export class Database {
         fields.delete(key)
         virtualMeta.set(key, {
           where: def.virtual.where,
-          name: def.virtual.name,
-          fields: new Set(def.virtual.fields)
+          name: def.virtual.name
         })
         Database.defineHook(tableName, {
           insert: (db: lf.Database, entity: any) => {
@@ -436,6 +435,7 @@ export class Database {
           }
         })
       }
+      // dirty
       if (def['isHidden']) {
         Database.defineHook(tableName, {
           insert: (_db: lf.Database, entity: any) => {
@@ -618,33 +618,14 @@ export class Database {
     const virtualMap = new Map<string, VirtualTableMetadataDescription>()
     let mainPredicate: lf.Predicate | null
     const mainTable = db.getSchema().table(tableName)
-    const colums: lf.schema.Column[] = []
     const hasQueryFields = !!getQuery.fields
-    const fields = hasQueryFields ? new Set(getQuery.fields) : selectMetadata.fields
-    fields.forEach(field => {
-      const colum = mainTable[field]
-      if (colum) {
-        colums.push(colum)
-        const hiddenName = `${Database.hn}${field}`
-        const hiddenRow = mainTable[hiddenName]
-        if (hiddenRow) {
-          colums.push(hiddenRow)
-        }
-      }
-    })
+    const fields: Set<FieldsValue> = hasQueryFields ? new Set(getQuery.fields) : selectMetadata.fields
+    const { colums, allFields } = this.buildColums(db, tableName, fields)
+
     virtualMetadatas.forEach((virtualMetadata, key) => {
-      if ((hasQueryFields && fields.has(key)) || !hasQueryFields) {
+      if ((hasQueryFields && allFields.has(key)) || !hasQueryFields) {
         const table = db.getSchema().table(virtualMetadata.name)
         uniqueKeysMap.set(virtualMetadata.name, new Set())
-        virtualMetadata.fields
-          .forEach(field => {
-            const colum = table[field]
-            if (colum) {
-              colums.push(colum)
-            } else {
-              console.warn(`field: ${field} in ${tableName}Schema's VirtualMetadata is not exist in table ${virtualMetadata.name}`)
-            }
-          })
         virtualMap.set(virtualMetadata.name, {
           key, resultType: virtualMetadata.resultType
         })
@@ -797,6 +778,59 @@ export class Database {
       default:
         throw new TypeError(`not a valid type`)
     }
+  }
+
+  private buildColums(
+    db: lf.Database,
+    tableName: string,
+    fields: Set<FieldsValue>
+  ) {
+    const mainTable = db.getSchema().table(tableName)
+    const colums: lf.schema.Column[] = []
+    const allFields = new Set<string>()
+    fields.forEach(field => {
+      if (typeof field === 'string') {
+        const colum = mainTable[field]
+        if (colum) {
+          colums.push(colum)
+          const hiddenName = `${Database.hn}${field}`
+          const hiddenRow = mainTable[hiddenName]
+          if (hiddenRow) {
+            colums.push(hiddenRow)
+          }
+        }
+        allFields.add(field)
+      } else {
+        forEach(field, (_fields, propsName) => {
+          let virtualTableName: string
+          try {
+            virtualTableName = this.selectMetaData
+              .get(tableName)
+              .virtualMeta
+              .get(propsName)
+              .name
+          } catch (e) {
+            console.warn(`Property is not defined: ${propsName}`)
+          }
+          const virtualTable = db.getSchema().table(virtualTableName)
+          allFields.add(propsName)
+          forEach(_fields, _field => {
+            const colum = virtualTable[_field]
+            if (colum) {
+              colums.push(colum)
+              const hiddenName = `${Database.hn}${_field}`
+              const hiddenRow = mainTable[hiddenName]
+              if (hiddenRow) {
+                colums.push(hiddenRow)
+              }
+            } else {
+              console.warn(`field: ${_field} is not exist in table ${virtualTableName}`)
+            }
+          })
+        })
+      }
+    })
+    return { colums, allFields }
   }
 
   /**

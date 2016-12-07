@@ -55,7 +55,6 @@ export default describe('Database public Method', () => {
       const taskSelectMetaData = database['selectMetaData'].get('Task')
       expect(taskSelectMetaData.fields).to.deep.equal(new Set(['_id', 'content', 'note', '_projectId']))
       expect(taskSelectMetaData.virtualMeta.get('project').name).to.equal('Project')
-      expect(taskSelectMetaData.virtualMeta.get('project').fields).to.deep.equal(new Set(['_id', 'name']))
       assert.isFunction(taskSelectMetaData.virtualMeta.get('project').where)
     })
   })
@@ -195,7 +194,13 @@ export default describe('Database public Method', () => {
           .do(r => expect(r).to.be.null)
 
         yield database.get<TaskSchema>('Task', {
-          fields: ['_id', 'project'], primaryValue: taskData._id as string
+          fields: [
+            '_id', {
+              project: ['_id', 'name'],
+              subtasks: ['_id', 'name']
+            }
+          ],
+          primaryValue: taskData._id as string
         })
           .value()
           .do(([{ project }]) => expect(project).to.deep.equal({
