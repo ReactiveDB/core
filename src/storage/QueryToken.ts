@@ -18,10 +18,10 @@ export class QueryToken<T> {
     .map(meta => meta.db)
 
   private select$ = this.selectMeta$
-    .map(meta => meta.select)
+    .map(meta => meta.select.clone())
 
   private predicate$ = this.selectMeta$
-    .map(meta => meta.predicate)
+    .map(meta => meta.predicate.copy())
 
   private dbObserve: () => Promise<void> | null
   private query: lf.query.Select
@@ -70,11 +70,13 @@ export class QueryToken<T> {
       return Observable.throw(`QueryToken consumed`)
     }
     this.cousumed = true
-    return this.db$.combineLatest(this.select$, this.predicate$)
-      .concatMap(([db, select, predicate]) => {
+    return this.db$.combineLatest(this.select$, this.predicate$, this.selectMeta$)
+      .concatMap(([db, select, predicate, selectMeta]) => {
         return Observable.create((observer: Observer<T[]>) => {
           const query = predicate ? select.where(predicate) : select
-          db.observe(query, this.observe(query, observer))
+          selectMeta.getValue()
+            .then(first => observer.next(first as T[]))
+          db.observe(query, this.observe(query, observer, selectMeta))
         })
       })
   }
@@ -86,9 +88,9 @@ export class QueryToken<T> {
     }
   }
 
-  private observe(query: lf.query.Select, observer: Observer<T[]>) {
+  private observe(query: lf.query.Select, observer: Observer<T[]>, selectMeta: SelectMeta<T>) {
     this.dbObserve = () => {
-      return query.exec()
+      return selectMeta.getValue()
         .then(r => observer.next(r as T[]))
         .catch(e => observer.error(e))
     }

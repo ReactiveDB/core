@@ -17,9 +17,11 @@ export class SelectMeta <T> {
     let select: lf.query.Builder
     if (this.predicate) {
       select = this.select
-        .where(this.predicate)
+        .clone()
+        .where(this.predicate.copy())
     } else {
       select = this.select
+        .clone()
     }
     return select.exec()
       .then(values => this.fold(<T[]>values))
