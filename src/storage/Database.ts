@@ -89,8 +89,9 @@ export interface SelectMetadata {
 
 type FieldsValue = string | { [index: string]: string[] }
 
+// todo primary是optional？？？
 export interface GetQuery {
-  fields?: FieldsValue []
+  fields?: FieldsValue[]
   primaryValue?: string
   where? (table: lf.schema.Table): lf.Predicate
 }
@@ -296,7 +297,7 @@ export class Database {
   /**
    * 只可以更新单条数据
    */
-  update(tableName: string, primaryValue: string, patch: any) {
+  update(tableName: string, primaryValue: string, patch: Object) {
     const primaryKey = this.primaryKeysMap.get(tableName)
     if (!primaryKey) {
       return Observable.throw(NON_EXISTENT_TABLE_ERR(tableName))
@@ -420,9 +421,10 @@ export class Database {
     return Promise.all(disposeQueue)
       .then(() => {
         // restore hooks
-        Database.hooks.forEach(hookDef => {
-          hookDef.insert = []
-          hookDef.destroy = []
+        // 歧义，hooks似乎应该是跟随database实例更好？
+        Database.hooks.forEach(tableHookDef => {
+          tableHookDef.insert = []
+          tableHookDef.destroy = []
         })
       })
   }

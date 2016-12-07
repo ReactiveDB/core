@@ -40,6 +40,7 @@ export const INVALID_FIELD_DES_ERR =
 /**
  * QueryToken Error
  */
+
 export const TOKEN_CONSUMED_ERR =
   () => ReactiveDBError('QueryToken was already consumed.')
 
