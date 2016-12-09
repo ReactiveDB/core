@@ -7,7 +7,8 @@ import {
   ProjectSchema,
   SubtaskSchema,
   TaskSchema,
-  clone
+  clone,
+  INVALID_FIELD_DES_ERR
 } from '../../index'
 import taskGenerator from '../../utils/taskGenerator'
 
@@ -37,7 +38,7 @@ export default describe('Database public Method', () => {
       expect(database.database$).to.be.instanceof(Observable)
       yield database.database$
         .do(db => {
-          expect(db.getSchema().name()).to.equal('teambition')
+          expect(db.getSchema().name()).to.equal('ReactiveDB')
         })
     })
 
@@ -156,7 +157,8 @@ export default describe('Database public Method', () => {
         yield database.get('Task', { fields: ['project'] })
           .value()
           .catch(err => {
-            expect(err.message).to.equal(`Couldn't only select VirtualProp in a Table`)
+            const standardErr = INVALID_FIELD_DES_ERR()
+            expect(err.message).to.equal(standardErr.message)
             return Observable.of(null)
           })
       })

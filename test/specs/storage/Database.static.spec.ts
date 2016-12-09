@@ -1,7 +1,13 @@
 import * as lf from 'lovefield'
 import { describe, it, beforeEach } from 'tman'
 import { expect } from 'chai'
-import { Database, RDBType } from '../../index'
+import {
+  Database,
+  RDBType,
+  NON_EXISTENT_PRIMARY_KEY_ERR,
+  UNMODIFIABLE_TABLE_SCHEMA_ERR,
+  DEFINE_HOOK_ERR
+} from '../../index'
 
 export default describe('Database static Method', () => {
 
@@ -22,7 +28,8 @@ export default describe('Database static Method', () => {
       const define = () => {
         Database.defineSchema(tablename, metaData)
       }
-      expect(define).to.throw(`No primaryKey key give in schemaMetaData: ${JSON.stringify(metaData, null, 2)}`)
+      const err = NON_EXISTENT_PRIMARY_KEY_ERR(metaData)
+      expect(define).to.throw(err.message)
     })
 
     it('should throw when redefine a table', () => {
@@ -36,7 +43,8 @@ export default describe('Database static Method', () => {
         Database.defineSchema(tablename, metaData)
         Database.defineSchema(tablename, metaData)
       }
-      expect(define).to.throw(`Can not redefine table: ${tablename}`)
+      const err = UNMODIFIABLE_TABLE_SCHEMA_ERR(tablename)
+      expect(define).to.throw(err.message)
     })
 
     it('should store in Database.schemaMetaData', () => {
@@ -101,7 +109,8 @@ export default describe('Database static Method', () => {
       const define = () => {
         Database.defineHook(tablename, {})
       }
-      expect(define).to.throw(`you should defineSchema before you defineHook: ${tablename}`)
+      const err = DEFINE_HOOK_ERR(tablename)
+      expect(define).to.throw(err.message)
     })
   })
 })
