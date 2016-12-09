@@ -23,6 +23,20 @@ import { SelectMeta } from './SelectMeta'
 import { QueryToken } from './QueryToken'
 import { forEach, flat } from '../utils'
 
+import {
+  DEFINE_HOOK_ERR,
+  NON_EXISTENT_TABLE_ERR,
+  UNMODIFIABLE_TABLE_SCHEMA_ERR,
+  UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR,
+  NON_EXISTENT_PRIMARY_KEY_ERR,
+  UNMODIFIABLE_PRIMARYKEY_ERR,
+  NON_EXISTENT_COLUMN_ERR,
+  INVALID_RESULT_TYPE_ERR,
+  INVALID_ROW_TYPE_ERR,
+  INVALID_VIRTUAL_VALUE_ERR,
+  INVALID_FIELD_DES_ERR
+} from './RuntimeError'
+
 export interface SchemaMetadata {
   type: RDBType
   primaryKey?: boolean
@@ -34,7 +48,7 @@ export interface SchemaMetadata {
    */
   virtual?: {
     name: string
-    where<T> (table: lf.schema.Table, data: T): lf.Predicate
+    where(table: lf.schema.Table, data: lf.schema.Table): lf.Predicate
   }
   // 被 Database.prototype.createRow 动态挂上去的
   // readonly isHidden?: boolean
@@ -114,11 +128,13 @@ export class Database {
    */
   static defineSchema(tableName: string, schemaMetaData: SchemaDef) {
     if (!Database.schemaMetaData) {
-      throw new TypeError(`Can not defineSchema after Database initialized`)
+      throw UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR()
     }
+
     if (Database.schemaMetaData.has(tableName)) {
-      throw new TypeError(`Can not redefine table: ${tableName}`)
+      throw UNMODIFIABLE_TABLE_SCHEMA_ERR(tableName)
     }
+
     let hasPrimaryKey = false
     forEach(schemaMetaData, meta => {
       if (meta.primaryKey) {
@@ -127,14 +143,17 @@ export class Database {
       }
       return true
     })
+
     if (!hasPrimaryKey) {
-      throw new TypeError(`No primaryKey key give in schemaMetaData: ${JSON.stringify(schemaMetaData, null, 2)}`)
+      throw NON_EXISTENT_PRIMARY_KEY_ERR(schemaMetaData)
     }
+
     Database.schemaMetaData.set(tableName, schemaMetaData)
     Database.hooks.set(tableName, {
       insert: [],
       destroy: []
     })
+
     return Database
   }
 
@@ -144,17 +163,20 @@ export class Database {
    */
   static defineHook(tableName: string, hookDef: HookDef) {
     const hooks = Database.hooks.get(tableName)
-    if (hooks) {
-      if (hookDef.insert) {
-        hooks.insert.push(hookDef.insert)
-      }
-      if (hookDef.destroy) {
-        hooks.destroy.push(hookDef.destroy)
-      }
-      return hookDef
-    } else {
-      throw new TypeError(`you should defineSchema before you defineHook: ${tableName}`)
+
+    if (!hooks) {
+      throw DEFINE_HOOK_ERR(tableName)
     }
+
+    if (hookDef.insert) {
+      hooks.insert.push(hookDef.insert)
+    }
+
+    if (hookDef.destroy) {
+      hooks.destroy.push(hookDef.destroy)
+    }
+
+    return hookDef
   }
 
   constructor(
@@ -188,30 +210,38 @@ export class Database {
         const table = db.getSchema().table(tableName)
         let hook: Observable<any> = Observable.of(null)
         const rows: lf.Row[] = []
+
         if (data instanceof Array) {
           const hookObservables: Observable<lf.Transaction>[] = []
+
           data.forEach(r => {
             rows.push(table.createRow(r))
             const hooks = Database.hooks.get(tableName)
-            if (hooks) {
-              const hookStream = Observable.from(hooks.insert)
-                .concatMap(fn => fn(db, r))
-                .skip(hooks.insert.length - 1)
-              hookObservables.push(hookStream)
+            if (!hooks) {
+              return null
             }
+
+            const hookStream = Observable.from(hooks.insert)
+              .concatMap(fn => fn(db, r))
+              .skip(hooks.insert.length - 1)
+
+            hookObservables.push(hookStream)
           })
+
           hook = Observable.from(hookObservables)
             .concatAll()
             .skip(hookObservables.length - 1)
         } else {
           rows.push(table.createRow(data))
           const hooks = Database.hooks.get(tableName)
+
           if (hooks && hooks.insert) {
             hook = Observable.from(hooks.insert)
               .concatMap(fn => fn(db, data))
               .skip(hooks.insert.length - 1)
           }
         }
+
         return hook.concatMap(() => {
           return db.insertOrReplace()
             .into(table)
@@ -251,13 +281,15 @@ export class Database {
   get<T>(tableName: string, getQuery: GetQuery = Object.create(null)): QueryToken<T> {
     const primaryKey = this.primaryKeysMap.get(tableName)
     if (!primaryKey) {
-      throw new TypeError(`table not exist: ${tableName}`)
+      throw NON_EXISTENT_TABLE_ERR(tableName)
     }
+
     // tableName => Set<uniqueKeys>
     const uniqueKeysMap = new Map<string, Set<string>>()
     const leftJoinQueue: LeftJoinMetadata[] = []
     const selectMeta$ = this.database$
       .map(db => this.buildLeftjoinQuery<T>(db, tableName, getQuery, uniqueKeysMap, leftJoinQueue))
+
     return new QueryToken(selectMeta$)
   }
 
@@ -267,20 +299,22 @@ export class Database {
   update(tableName: string, primaryValue: string, patch: any) {
     const primaryKey = this.primaryKeysMap.get(tableName)
     if (!primaryKey) {
-      return Observable.throw(new TypeError(`table not exist: ${tableName}`))
+      return Observable.throw(NON_EXISTENT_TABLE_ERR(tableName))
     }
+
     const selectMetadata = this.selectMetaData.get(tableName)
     return this.database$
       .concatMap<any, any>(db => {
         const table = db.getSchema().table(tableName)
         let updateQuery: lf.query.Update | TypeError | undefined
+
         forEach(patch, (val, key) => {
           const row = table[key]
           const virtualMeta = selectMetadata.virtualMeta.get(key)
           if (typeof row === 'undefined') {
-            console.warn(`patch key is not defined in table: ${key}`)
+            console.warn(NON_EXISTENT_COLUMN_ERR(key, tableName))
           } else if (key === primaryKey) {
-            updateQuery = new TypeError(`Can not update primaryKey`)
+            updateQuery = UNMODIFIABLE_PRIMARYKEY_ERR()
           } else if (!virtualMeta) {
             const hiddenRow = table[`${Database.hn}${key}`]
             if (hiddenRow) {
@@ -294,6 +328,7 @@ export class Database {
             }
           }
         })
+
         if (updateQuery instanceof TypeError) {
           return Promise.reject(updateQuery)
         } else if (updateQuery) {
@@ -317,11 +352,13 @@ export class Database {
   } = Object.create(null)) {
     const primaryKey = this.primaryKeysMap.get(tableName)
     if (!primaryKey) {
-      return Observable.throw(new TypeError(`table not exist: ${tableName}`))
+      return Observable.throw(NON_EXISTENT_TABLE_ERR(tableName))
     }
+
     return this.database$
       .concatMap(db => {
         const table = db.getSchema().table(tableName)
+
         let predicate: lf.Predicate
         if (deleteQuery.primaryValue) {
           predicate = table[primaryKey].eq(deleteQuery.primaryValue)
@@ -332,11 +369,13 @@ export class Database {
             return Observable.throw(e)
           }
         }
+
         const hooks = Database.hooks.get(tableName)
         let hookStream = Observable.of(db)
         const getQuery = deleteQuery.primaryValue ? { primaryValue: deleteQuery.primaryValue } : {
           where: deleteQuery.where
         }
+
         if (hooks.destroy && hooks.destroy.length) {
           const tx = db.createTransaction()
           hookStream = this.get(tableName, getQuery)
@@ -352,6 +391,7 @@ export class Database {
             )
             .mapTo(db)
         }
+
         return hookStream.concatMap(() => {
           let query = db.delete()
             .from(table)
@@ -365,6 +405,7 @@ export class Database {
 
   dispose() {
     const disposeQueue: Promise<any>[] = []
+
     this.primaryKeysMap.forEach((_, tableName) => {
       const deleteQuery = this.database$
         .concatMap(db => {
@@ -372,14 +413,16 @@ export class Database {
           return db.delete().from(table).exec()
         })
         .toPromise()
+
       disposeQueue.push(deleteQuery)
     })
+
     return Promise.all(disposeQueue)
       .then(() => {
         // restore hooks
-        Database.hooks.forEach(hooksDef => {
-          hooksDef.insert = []
-          hooksDef.destroy = []
+        Database.hooks.forEach(hookDef => {
+          hookDef.insert = []
+          hookDef.destroy = []
         })
       })
   }
@@ -389,6 +432,7 @@ export class Database {
       const tableBuilder = builder.createTable(tableName)
       this.buildTableRows(tableName, schemaDef, tableBuilder)
     })
+
     delete Database.schemaMetaData
   }
 
@@ -409,60 +453,82 @@ export class Database {
     const fields = new Set<string>()
     const virtualMeta = new Map<string, VirtualMetadata>()
     const mapper = new Map<string, Function>()
+
     forEach(schemaMetaData, (def, key) => {
       if (!def.virtual) {
         tableBuilder = this.addRow(tableBuilder, key, def.type, nullable, def)
         fields.add(key)
+
+        let tags: boolean[] = []
+
         if (def.primaryKey) {
           primaryKey.push(key)
           this.primaryKeysMap.set(tableName, key)
-        } else if (def.unique != null) {
+          tags.push(true)
+        }
+
+        if (def.unique != null) {
           uniques.push(key)
-        } else if (def.index) {
+          tags.push(true)
+        }
+
+        if (def.index) {
           indexes.push(key)
-        } else {
+          tags.push(true)
+        }
+
+        if (tags.length === 0) {
           nullable.push(key)
         }
+
       } else {
         fields.delete(key)
         virtualMeta.set(key, {
           where: def.virtual.where,
           name: def.virtual.name
         })
+
         Database.defineHook(tableName, {
           insert: (db: lf.Database, entity: any) => {
             return this.createInsertHook(db, tableName, key, def, entity)
           }
         })
       }
-      // dirty
-      if (def['isHidden']) {
-        Database.defineHook(tableName, {
-          insert: (_db: lf.Database, entity: any) => {
-            return new Promise(resolve => {
-              const hiddenVal = entity[key]
-              const mapFn = def['hiddenMapper']
-              entity[`${Database.hn}${key}`] = hiddenVal
-              entity[key] = mapFn(hiddenVal)
-              mapper.set(key, mapFn)
-              resolve()
-            })
-          }
-        })
+
+      if (!def['isHidden']) {
+        return null
       }
+      // dirty below
+      Database.defineHook(tableName, {
+        insert: (_db: lf.Database, entity: any) => {
+          return new Promise(resolve => {
+            const hiddenVal = entity[key]
+            const mapFn = def['hiddenMapper']
+            entity[`${Database.hn}${key}`] = hiddenVal
+            entity[key] = mapFn(hiddenVal)
+            mapper.set(key, mapFn)
+            resolve()
+          })
+        }
+      })
     })
+
     const selectResult = { fields, virtualMeta, mapper }
     this.selectMetaData.set(tableName, selectResult)
     tableBuilder = tableBuilder.addPrimaryKey(primaryKey)
+
     if (indexes.length) {
       tableBuilder.addIndex('index', indexes)
     }
+
     if (uniques.length) {
       tableBuilder.addUnique('unique', uniques)
     }
+
     if (nullable.length) {
       tableBuilder.addNullable(nullable)
     }
+
     return selectResult
   }
 
@@ -489,76 +555,73 @@ export class Database {
     entity: any
   ) {
     const virtualProp: any = entity[key]
-    if (virtualProp) {
-      const primaryKey = this.primaryKeysMap.get(def.virtual.name)
-      const virtualTable = db.getSchema().table(def.virtual.name)
-      const virtualMetadata = this.selectMetaData
-            .get(tableName)
-            .virtualMeta
-      const resultType = virtualMetadata.get(key)
-            .resultType
-      const tx = db.createTransaction()
-      if (typeof virtualProp === 'object') {
-        if (virtualProp instanceof Array) {
-          if (resultType) {
-            if (resultType !== 'Collection') {
-              return Promise.reject(new TypeError(`Invalid resultType ${key}`))
-            }
-          } else {
-            virtualMetadata.get(key)
-              .resultType = 'Collection'
-            let virtualTableMetadataDescription = this.virtualTableMetadataDescription.get(tableName)
-            if (!virtualTableMetadataDescription) {
-              virtualTableMetadataDescription = new Map<string, VirtualTableMetadataDescription>()
-            }
-            virtualTableMetadataDescription.set(def.virtual.name, {
-              resultType: 'Collection', key
-            })
-            this.virtualTableMetadataDescription.set(tableName, virtualTableMetadataDescription)
-          }
-          const inertQueue = Promise.all(virtualProp.map(_virtualProp => {
-            return this.insertOrUpdateVirtualProp(db, primaryKey, virtualTable, _virtualProp)
-          }))
-          return Observable.fromPromise(inertQueue)
-            .concatMap(querys => {
-              if (querys.length) {
-                return tx.exec(querys)
-              } else {
-                return Observable.empty()
-              }
-            })
-            .catch(e => tx.rollback()
-              .then(() => Promise.reject(e))
-            )
-            .do(() => delete entity[key])
-            .toPromise()
-        } else {
-          if (resultType) {
-            if (resultType !== 'Model') {
-              return Promise.reject(new TypeError(`Invalid resultType ${key}`))
-            }
-          } else {
-            virtualMetadata.get(key)
-              .resultType = 'Model'
-            const virtualTableMetadataDescription = new Map<string, VirtualTableMetadataDescription>()
-            virtualTableMetadataDescription.set(def.virtual.name, {
-              resultType: 'Model', key
-            })
-            this.virtualTableMetadataDescription.set(tableName, virtualTableMetadataDescription)
-          }
-          return this.insertOrUpdateVirtualProp(db, primaryKey, virtualTable, virtualProp)
-            .then(query => tx.exec([query]))
-            .then(() => delete entity[key])
-            .catch(e => tx.rollback()
-              .then(() => Promise.reject(e))
-            )
-        }
-      } else {
-        return Promise.reject( new TypeError(`Invalid value ${virtualProp}, expect it is Object or Array`) )
-      }
-    } else {
+    if (!virtualProp) {
       return Promise.resolve()
     }
+
+    if (typeof virtualProp !== 'object') {
+      return Promise.reject(INVALID_VIRTUAL_VALUE_ERR(virtualProp))
+    }
+
+    const primaryKey = this.primaryKeysMap.get(def.virtual.name)
+    const virtualTable = db.getSchema().table(def.virtual.name)
+    const virtualMetadata = this.selectMetaData
+          .get(tableName)
+          .virtualMeta
+    const resultType = virtualMetadata.get(key).resultType
+    const tx = db.createTransaction()
+
+    if (virtualProp instanceof Array) {
+      if (resultType && resultType !== 'Collection') {
+        return Promise.reject(INVALID_RESULT_TYPE_ERR(key))
+      } else {
+        virtualMetadata.get(key).resultType = 'Collection'
+        let virtualTableMetadataDescription = this.virtualTableMetadataDescription.get(tableName)
+
+        if (!virtualTableMetadataDescription) {
+          virtualTableMetadataDescription = new Map<string, VirtualTableMetadataDescription>()
+        }
+
+        virtualTableMetadataDescription.set(def.virtual.name, {
+          resultType: 'Collection', key
+        })
+
+        this.virtualTableMetadataDescription.set(tableName, virtualTableMetadataDescription)
+      }
+
+      const inertQueue = Promise.all(virtualProp.map(_virtualProp => {
+        return this.insertOrUpdateVirtualProp(db, primaryKey, virtualTable, _virtualProp)
+      }))
+
+      return Observable.fromPromise(inertQueue)
+        .concatMap(querys => querys.length ? tx.exec(querys) : Observable.empty())
+        .catch(e => tx.rollback()
+          .then(() => Promise.reject(e))
+        )
+        .do(() => delete entity[key])
+        .toPromise()
+    } else {
+      if (resultType && resultType !== 'Model') {
+        return Promise.reject(INVALID_RESULT_TYPE_ERR(key))
+      } else {
+        virtualMetadata.get(key).resultType = 'Model'
+        const virtualTableMetadataDescription = new Map<string, VirtualTableMetadataDescription>()
+
+        virtualTableMetadataDescription.set(def.virtual.name, {
+          resultType: 'Model', key
+        })
+
+        this.virtualTableMetadataDescription.set(tableName, virtualTableMetadataDescription)
+      }
+
+      return this.insertOrUpdateVirtualProp(db, primaryKey, virtualTable, virtualProp)
+        .then(query => tx.exec([query]))
+        .then(() => delete entity[key])
+        .catch(e => tx.rollback()
+          .then(() => Promise.reject(e))
+        )
+      }
+
   }
 
   /**
@@ -589,11 +652,13 @@ export class Database {
         if (result.length) {
           const updateQuery = db.update(virtualTable)
             .where(virtualTable[primaryKey].eq(virtualProp[primaryKey]))
+
           forEach(virtualProp, (prop, propName) => {
             if (propName !== primaryKey) {
               updateQuery.set(virtualTable[propName], prop)
             }
           })
+
           return updateQuery
         } else {
           const row = virtualTable.createRow(virtualProp)
@@ -620,7 +685,7 @@ export class Database {
     const mainTable = db.getSchema().table(tableName)
     const hasQueryFields = !!getQuery.fields
     const fields: Set<FieldsValue> = hasQueryFields ? new Set(getQuery.fields) : selectMetadata.fields
-    const { colums, allFields } = this.buildColums(db, tableName, fields)
+    const { columns, allFields } = this.buildColums(db, tableName, fields)
 
     virtualMetadatas.forEach((virtualMetadata, key) => {
       if ((hasQueryFields && allFields.has(key)) || !hasQueryFields) {
@@ -629,6 +694,7 @@ export class Database {
         virtualMap.set(virtualMetadata.name, {
           key, resultType: virtualMetadata.resultType
         })
+
         let predicate: lf.Predicate
         try {
           predicate = virtualMetadata.where(table, mainTable)
@@ -638,11 +704,13 @@ export class Database {
         }
       }
     })
-    let query = (<lf.query.Select>db.select.apply(db, colums))
-      .from(mainTable)
+
+    let query = (<lf.query.Select>db.select.apply(db, columns)).from(mainTable)
+
     leftJoinQueue.forEach(val => {
       query = query.leftOuterJoin(val.table, val.predicate)
     })
+
     if (getQuery.where) {
       try {
         mainPredicate = getQuery.where(mainTable)
@@ -650,6 +718,7 @@ export class Database {
         console.error(`Build predicate error: ${e.message}`)
       }
     }
+
     if (getQuery.primaryValue) {
       const primaryValueMatch = mainTable[primaryKey].eq(getQuery.primaryValue)
       if (mainPredicate) {
@@ -658,6 +727,7 @@ export class Database {
         mainPredicate = primaryValueMatch
       }
     }
+
     return new SelectMeta<T>(db, query, (values: T[]) => {
       return this.fold<T>(tableName, values, uniqueKeysMap, leftJoinQueue)
     }, mainPredicate)
@@ -689,61 +759,67 @@ export class Database {
   ): T[] | null {
     const primaryKey = this.primaryKeysMap.get(tableName)
     const virtualMap = this.virtualTableMetadataDescription.get(tableName)
-    if (values.length) {
-      /**
-       * 没有 leftJoin 直接获取结果
-       * 有 leftJoin 需要先 fold 结果
-       */
-      if (leftJoinQueue.length) {
-        const resultTable = new Map<string, Object[]>()
-        forEach(values, value => {
-          const mainResult = value[tableName] || Object.create(null)
-          const primaryValue = mainResult[primaryKey]
-          if (!primaryValue) {
-            throw new TypeError(`Couldn't only select VirtualProp in a Table`)
-          }
-          const resultSet = resultTable.get(mainResult[primaryValue])
-          if (!resultSet) {
-            resultTable.set(mainResult[primaryKey], [value])
-          } else {
-            resultSet.push(value)
-          }
-        })
-        const results: T[] = []
-        resultTable.forEach(rows => {
-          const result: T = rows[0][tableName]
-          forEach(rows, row => {
-            forEach(row, (value: any, key: string) => {
-              const primaryValue = value[this.primaryKeysMap.get(key)]
-              // leftOuterJoin 的值可能是 { _id: undefined, xxx: undefined }
-              if (primaryValue) {
-                const meta = virtualMap.get(key)
-                const uniqueKeys = uniqueKeysMap.get(key)
-                if (meta) {
-                  if (meta.resultType === 'Model') {
-                    result[meta.key] = value
-                  } else {
-                    if (result[meta.key] instanceof Array) {
-                      if (!uniqueKeys.has(primaryValue)) {
-                        result[meta.key].push(value)
-                      }
-                    } else {
-                      result[meta.key] = [value]
-                    }
-                  }
-                  uniqueKeys.add(primaryValue)
-                }
-              }
-            })
-          })
-          results.push(this.restoreRaw(result))
-        })
-        return results
-      } else {
-        return values
-      }
+
+    if (!values.length) {
+      return null
     }
-    return null
+
+    if (!leftJoinQueue.length) {
+      return values
+    }
+
+    /**
+     * 没有 leftJoin 直接获取结果
+     * 有 leftJoin 需要先 fold 结果
+     */
+    const resultTable = new Map<string, Object[]>()
+
+    forEach(values, value => {
+      const mainResult = value[tableName] || Object.create(null)
+      const primaryValue = mainResult[primaryKey]
+      if (!primaryValue) {
+        throw INVALID_FIELD_DES_ERR()
+      }
+
+      const resultSet = resultTable.get(mainResult[primaryValue])
+      if (!resultSet) {
+        resultTable.set(mainResult[primaryKey], [value])
+      } else {
+        resultSet.push(value)
+      }
+    })
+
+    const results: T[] = []
+    resultTable.forEach(rows => {
+      const result: T = rows[0][tableName]
+
+      forEach(rows, row => {
+        forEach(row, (value: any, key: string) => {
+          const primaryValue = value[this.primaryKeysMap.get(key)]
+          const meta = virtualMap.get(key)
+          const uniqueKeys = uniqueKeysMap.get(key)
+          // leftOuterJoin 的值可能是 { _id: undefined, xxx: undefined }
+          if (!primaryValue || !meta) {
+            return null
+          }
+
+          if (meta.resultType === 'Model') {
+            result[meta.key] = value
+          } else {
+            if ((result[meta.key] instanceof Array) && !uniqueKeys.has(primaryValue)) {
+              result[meta.key].push(value)
+            } else {
+              result[meta.key] = [value]
+            }
+          }
+
+          uniqueKeys.add(primaryValue)
+        })
+      })
+
+      results.push(this.restoreRaw(result))
+    })
+    return results
   }
 
   private addRow(
@@ -776,7 +852,7 @@ export class Database {
       case RDBType.STRING:
         return tableBuilder.addColumn(rowName, lf.Type.STRING)
       default:
-        throw new TypeError(`not a valid type`)
+        throw INVALID_ROW_TYPE_ERR()
     }
   }
 
@@ -786,51 +862,59 @@ export class Database {
     fields: Set<FieldsValue>
   ) {
     const mainTable = db.getSchema().table(tableName)
-    const colums: lf.schema.Column[] = []
+    const columns: lf.schema.Column[] = []
     const allFields = new Set<string>()
+
     fields.forEach(field => {
       if (typeof field === 'string') {
         const colum = mainTable[field]
+
         if (colum) {
-          colums.push(colum)
+          columns.push(colum)
           const hiddenName = `${Database.hn}${field}`
           const hiddenRow = mainTable[hiddenName]
           if (hiddenRow) {
-            colums.push(hiddenRow)
+            columns.push(hiddenRow)
           }
         }
+
         allFields.add(field)
       } else {
-        forEach(field, (_fields, propsName) => {
+        const description = field
+        forEach(description, (innerFields, propName) => {
           let virtualTableName: string
           try {
             virtualTableName = this.selectMetaData
               .get(tableName)
               .virtualMeta
-              .get(propsName)
+              .get(propName)
               .name
           } catch (e) {
-            console.warn(`Property is not defined: ${propsName}`)
+            console.warn(`Property is not defined: ${propName}`)
           }
+
           const virtualTable = db.getSchema().table(virtualTableName)
-          allFields.add(propsName)
-          forEach(_fields, _field => {
-            const colum = virtualTable[_field]
-            if (colum) {
-              colums.push(colum)
-              const hiddenName = `${Database.hn}${_field}`
-              const hiddenRow = mainTable[hiddenName]
-              if (hiddenRow) {
-                colums.push(hiddenRow)
-              }
-            } else {
-              console.warn(`field: ${_field} is not exist in table ${virtualTableName}`)
+          allFields.add(propName)
+
+          forEach(innerFields, field => {
+            const column = virtualTable[field]
+            if (!column) {
+              console.warn(`field: ${field} is not exist in table ${virtualTableName}`)
+              return null
+            }
+
+            columns.push(column)
+            const hiddenName = `${Database.hn}${field}`
+            const hiddenRow = mainTable[hiddenName]
+            if (hiddenRow) {
+              columns.push(hiddenRow)
             }
           })
         })
       }
     })
-    return { colums, allFields }
+
+    return { columns, allFields }
   }
 
   /**
@@ -838,15 +922,17 @@ export class Database {
    * 比如 created 存储的时候是将数据存储为 new Date(created).valueOf()
    * 取这条数据的时候需要将它转变成原来的值
    */
-  private restoreRaw<T>(value: T): T {
-    forEach(value, (_val, key) => {
+  private restoreRaw<T>(entity: T): T {
+    forEach(entity, (_, key) => {
       const hiddenName = `${Database.hn}${key}`
-      const hiddenValue = value[hiddenName]
+      const hiddenValue = entity[hiddenName]
+
       if (hiddenValue) {
-        delete value[hiddenName]
-        value[key] = hiddenValue
+        delete entity[hiddenName]
+        entity[key] = hiddenValue
       }
     })
-    return value
+
+    return entity
   }
 }
