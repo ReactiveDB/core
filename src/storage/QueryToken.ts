@@ -6,7 +6,10 @@ import { Observable } from 'rxjs/Observable'
 import { Observer } from 'rxjs/Observer'
 import * as lf from 'lovefield'
 import { SelectMeta } from './SelectMeta'
-
+import {
+  TOKEN_INVALID_ERR,
+  TOKEN_CONSUMED_ERR
+} from './RuntimeError'
 export class QueryToken<T> {
   cousumed = false
 
@@ -21,7 +24,9 @@ export class QueryToken<T> {
     .map(meta => meta.select.clone())
 
   private predicate$ = this.selectMeta$
-    .map(meta => meta.predicate.copy())
+    .map(meta => {
+      return meta.predicate ? meta.predicate.copy() : null
+    })
 
   private dbObserve: () => Promise<void> | null
   private query: lf.query.Select
@@ -32,29 +37,34 @@ export class QueryToken<T> {
 
   value(): Observable<T[]> {
     if (this.cousumed) {
-      return Observable.throw(new TypeError(`QueryToken consumed`))
+      return Observable.throw(TOKEN_CONSUMED_ERR())
     }
     this.cousumed = true
     return this.selectMeta$
       .concatMap(meta => meta.getValue())
   }
 
-  combine(otherResult: QueryToken<T>) {
+  combine(...tokens: QueryToken<T>[]) {
     if (this.cousumed) {
-      throw new TypeError(`QueryToken consumed`)
+      throw TOKEN_CONSUMED_ERR()
     }
     this.cousumed = true
-    const selectMeta$ = this.select$.combineLatest(otherResult.select$)
-      .map(([select1, select2]) => {
-        return select1.toSql() === select2.toSql()
+    const selectMeta$ =
+      this.select$
+      .combineLatest(tokens.map((item) => item.select$))
+      .map((selectQuery) => {
+        return selectQuery.every((query: any) => query.toSql() === selectQuery[0].toSql())
       })
       .concatMap(isEqual => {
         if (!isEqual) {
-          return Observable.throw(new TypeError(`Could not combine`))
+          return Observable.throw(TOKEN_INVALID_ERR())
         } else {
           const dispose$ = this.dispose()
-          const meta$ = this.selectMeta$.combineLatest(this.predicate$, otherResult.predicate$)
-            .map(([meta, pred1, pred2]) => SelectMeta.replacePredicate(meta, lf.op.or(pred1, pred2)))
+          const meta$ = this.selectMeta$
+            .combineLatest([this.predicate$]
+              .concat(tokens.map((query) => query.predicate$)))
+            .map(([meta, ...preds]) =>
+              SelectMeta.replacePredicate(meta, lf.op.or.apply(lf.op, preds)))
           if (dispose$) {
             return dispose$.concatMapTo(meta$)
           } else {
@@ -67,7 +77,7 @@ export class QueryToken<T> {
 
   changes(): Observable<T[]> {
     if (this.cousumed) {
-      return Observable.throw(`QueryToken consumed`)
+      return Observable.throw(TOKEN_CONSUMED_ERR())
     }
     this.cousumed = true
     return this.db$.combineLatest(this.select$, this.predicate$, this.selectMeta$)
@@ -77,11 +87,13 @@ export class QueryToken<T> {
           selectMeta.getValue()
             .then(first => observer.next(first as T[]))
           db.observe(query, this.observe(query, observer, selectMeta))
+
+          return () => this.dispose()
         })
       })
   }
 
-  dispose(): Observable<any> | void {
+  private dispose(): Observable<any> | void {
     if (this.query) {
       return this.db$
         .do(db => db.unobserve(this.query, this.dbObserve))
@@ -91,8 +103,8 @@ export class QueryToken<T> {
   private observe(query: lf.query.Select, observer: Observer<T[]>, selectMeta: SelectMeta<T>) {
     this.dbObserve = () => {
       return selectMeta.getValue()
-        .then(r => observer.next(r as T[]))
-        .catch(e => observer.error(e))
+        .then(ret => observer.next(ret as T[]))
+        .catch(err => observer.error(err))
     }
     this.query = query
     return this.dbObserve

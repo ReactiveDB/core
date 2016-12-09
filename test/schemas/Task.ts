@@ -58,7 +58,6 @@ export default Database.defineSchema('Task', {
     type: RDBType.OBJECT,
     virtual: {
       name: 'Project',
-      fields: ['_id', 'name'],
       where: (
         projectTable: lf.schema.Table,
         taskTable: lf.schema.Table
@@ -71,7 +70,6 @@ export default Database.defineSchema('Task', {
     type: RDBType.OBJECT,
     virtual: {
       name: 'Subtask',
-      fields: ['_id', 'content', '_taskId', 'isDone'],
       where: (subtaskTable: lf.schema.Table, taskTable: lf.schema.Table) => {
         return subtaskTable['_taskId'].eq(taskTable['_id'])
       }
@@ -93,3 +91,4 @@ Database.defineHook('Task', {
       .where(subtaskTable['taskId'].eq(entity._id))
   }
 })
+

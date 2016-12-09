@@ -28,16 +28,15 @@ Observable.ajax({
       name: 'updated task project'
     })
     .subscribeOn(Scheduler.asap, 2000)
-    .subscribe()
+    .subscribe(() => {
+      console.time('Tasks change notify')
+    })
   })
   .concatMap(() => {
-    console.time('Task get')
-    return database.get<TaskSchema>('Task', {
-      primaryValue: '584173011548501c664fc6e6'
-    }).changes()
+    return database.get<TaskSchema>('Task').changes()
   })
   .subscribe(r => {
-    console.timeEnd('Task get')
+    console.timeEnd('Tasks change notify')
     console.log(r)
   }, err => {
     console.error(err)

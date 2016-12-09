@@ -7,7 +7,8 @@ import {
   ProjectSchema,
   SubtaskSchema,
   TaskSchema,
-  clone
+  clone,
+  INVALID_FIELD_DES_ERR
 } from '../../index'
 import taskGenerator from '../../utils/taskGenerator'
 
@@ -37,7 +38,7 @@ export default describe('Database public Method', () => {
       expect(database.database$).to.be.instanceof(Observable)
       yield database.database$
         .do(db => {
-          expect(db.getSchema().name()).to.equal('teambition')
+          expect(db.getSchema().name()).to.equal('ReactiveDB')
         })
     })
 
@@ -55,7 +56,6 @@ export default describe('Database public Method', () => {
       const taskSelectMetaData = database['selectMetaData'].get('Task')
       expect(taskSelectMetaData.fields).to.deep.equal(new Set(['_id', 'content', 'note', '_projectId']))
       expect(taskSelectMetaData.virtualMeta.get('project').name).to.equal('Project')
-      expect(taskSelectMetaData.virtualMeta.get('project').fields).to.deep.equal(new Set(['_id', 'name']))
       assert.isFunction(taskSelectMetaData.virtualMeta.get('project').where)
     })
   })
@@ -157,7 +157,8 @@ export default describe('Database public Method', () => {
         yield database.get('Task', { fields: ['project'] })
           .value()
           .catch(err => {
-            expect(err.message).to.equal(`Couldn't only select VirtualProp in a Table`)
+            const standardErr = INVALID_FIELD_DES_ERR()
+            expect(err.message).to.equal(standardErr.message)
             return Observable.of(null)
           })
       })
@@ -195,7 +196,13 @@ export default describe('Database public Method', () => {
           .do(r => expect(r).to.be.null)
 
         yield database.get<TaskSchema>('Task', {
-          fields: ['_id', 'project'], primaryValue: taskData._id as string
+          fields: [
+            '_id', {
+              project: ['_id', 'name'],
+              subtasks: ['_id', 'name']
+            }
+          ],
+          primaryValue: taskData._id as string
         })
           .value()
           .do(([{ project }]) => expect(project).to.deep.equal({
