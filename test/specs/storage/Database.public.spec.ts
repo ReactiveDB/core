@@ -164,7 +164,14 @@ export default describe('Database public Method', () => {
       })
     })
 
+
     describe('Database.prototype.update', () => {
+      const tasks = taskGenerator(10)
+
+      beforeEach(async function () {
+        await database.insert('Task', tasks).toPromise()
+      })
+
       it('should not update primaryKey', function *() {
         yield database.update('Task', taskData._id as string, {
           _id: 'fuck'
@@ -209,6 +216,28 @@ export default describe('Database public Method', () => {
             _id: taskData.project._id,
             name: taskData.project.name
           }))
+      })
+
+      it('bulk update should be ok', function* () {
+        const newCreated = new Date(2017, 1, 1)
+        const data = {
+          created: newCreated.toISOString()
+        }
+
+        yield database.update('Task', {
+          where: (table) => table['created'].isNotNull()
+        }, data)
+
+        yield database.get<TaskSchema>('Task', {
+          fields: ['created', '__hidden__created']
+        })
+          .value()
+          .do(([...rets]) => {
+            rets.forEach((r) => {
+              expect(r.created).to.deep.equal(newCreated)
+              expect(r['__hidden__created']).to.deep.equal(newCreated.toISOString())
+            })
+          })
       })
 
       it('update hidden property should ok', function *() {
