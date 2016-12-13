@@ -1,5 +1,6 @@
 import * as moment from 'moment'
-import { TaskSchema, uuid } from '../index'
+import { TaskSchema } from '../index'
+import { uuid } from './uuid'
 import subtaskGenerator from './subtaskGenerator'
 import { randomNumber } from './random'
 
