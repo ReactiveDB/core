@@ -11,7 +11,7 @@ declare module 'lovefield' {
 
   namespace query {
     export interface Select extends lf.query.Builder {
-      clone(): Select
+      clone(): lf.query.Select
     }
   }
 }
