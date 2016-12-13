@@ -40,8 +40,28 @@ export const INVALID_FIELD_DES_ERR =
 /**
  * QueryToken Error
  */
+
 export const TOKEN_CONSUMED_ERR =
   () => ReactiveDBError('QueryToken was already consumed.')
 
 export const TOKEN_INVALID_ERR =
   () => ReactiveDBError(`Token cannot be combined.`)
+
+/**
+ * Warning
+ */
+
+export const NON_DEFINED_PROPERTY_WARN =
+ (prop: string) => console.warn(`WARNING: Property is not defined: ${prop}`)
+
+export const NON_EXISTENT_FIELD_WARN =
+  (field: string, virtualProp: string) => console.warn(`Field: ${field} is not exist in table ${virtualProp}`)
+
+export const BUILD_PREDICATE_FAILED_WARN =
+  (e: Error, tableName?: string, key?: string) => {
+    let message = `Build predicate faild due to: ${e.message}, `
+    if (tableName && key) {
+      message += `error was in ${tableName}, ${key}`
+    }
+    console.warn(message)
+  }

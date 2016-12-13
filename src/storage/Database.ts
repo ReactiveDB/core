@@ -1,20 +1,4 @@
-'use strict'
-import 'rxjs/add/observable/from'
-import 'rxjs/add/observable/fromPromise'
-import 'rxjs/add/observable/of'
-import 'rxjs/add/observable/empty'
-import 'rxjs/add/observable/throw'
-import 'rxjs/add/operator/switchMap'
-import 'rxjs/add/operator/concatMap'
-import 'rxjs/add/operator/mergeMap'
-import 'rxjs/add/operator/concatAll'
-import 'rxjs/add/operator/catch'
-import 'rxjs/add/operator/skip'
-import 'rxjs/add/operator/do'
-import 'rxjs/add/operator/map'
-import 'rxjs/add/operator/mapTo'
-import 'rxjs/add/operator/toPromise'
-import 'rxjs/add/operator/toArray'
+import './RxOperator'
 import { Observable } from 'rxjs/Observable'
 import * as lf from 'lovefield'
 import { lfFactory } from './lovefield'
@@ -34,7 +18,10 @@ import {
   INVALID_RESULT_TYPE_ERR,
   INVALID_ROW_TYPE_ERR,
   INVALID_VIRTUAL_VALUE_ERR,
-  INVALID_FIELD_DES_ERR
+  INVALID_FIELD_DES_ERR,
+  NON_DEFINED_PROPERTY_WARN,
+  NON_EXISTENT_FIELD_WARN,
+  BUILD_PREDICATE_FAILED_WARN
 } from './RuntimeError'
 
 export interface SchemaMetadata {
@@ -89,15 +76,25 @@ export interface SelectMetadata {
 
 type FieldsValue = string | { [index: string]: string[] }
 
+// todo primary是optional？？？
 export interface GetQuery {
-  fields?: FieldsValue []
-  primaryValue?: string
+  fields?: FieldsValue[]
+  primaryValue?: string | number
   where? (table: lf.schema.Table): lf.Predicate
 }
 
 export interface VirtualTableMetadataDescription {
   key: string
   resultType: 'Model' | 'Collection'
+}
+
+export interface ClauseDescription {
+  where?(table: lf.schema.Table): lf.Predicate
+  primaryValue?: string | number
+}
+
+export interface QueryDescription extends ClauseDescription {
+  fields?: FieldsValue[]
 }
 
 export interface LeftJoinMetadata { table: lf.schema.Table, predicate: lf.Predicate }
@@ -278,7 +275,7 @@ export class Database {
    *   }[]
    * }
    */
-  get<T>(tableName: string, getQuery: GetQuery = Object.create(null)): QueryToken<T> {
+  get<T>(tableName: string, query: QueryDescription = {}): QueryToken<T> {
     const primaryKey = this.primaryKeysMap.get(tableName)
     if (!primaryKey) {
       throw NON_EXISTENT_TABLE_ERR(tableName)
@@ -286,17 +283,13 @@ export class Database {
 
     // tableName => Set<uniqueKeys>
     const uniqueKeysMap = new Map<string, Set<string>>()
-    const leftJoinQueue: LeftJoinMetadata[] = []
     const selectMeta$ = this.database$
-      .map(db => this.buildLeftjoinQuery<T>(db, tableName, getQuery, uniqueKeysMap, leftJoinQueue))
+      .map(db => this.buildLeftjoinQuery<T>(db, tableName, query, uniqueKeysMap))
 
     return new QueryToken(selectMeta$)
   }
 
-  /**
-   * 只可以更新单条数据
-   */
-  update(tableName: string, primaryValue: string, patch: any) {
+  update(tableName: string, clause: ClauseDescription, patch: Object) {
     const primaryKey = this.primaryKeysMap.get(tableName)
     if (!primaryKey) {
       return Observable.throw(NON_EXISTENT_TABLE_ERR(tableName))
@@ -307,6 +300,18 @@ export class Database {
       .concatMap<any, any>(db => {
         const table = db.getSchema().table(tableName)
         let updateQuery: lf.query.Update | TypeError | undefined
+
+        let predicate: lf.Predicate
+
+        if (clause.primaryValue !== undefined) {
+          predicate = table[primaryKey].eq(clause.primaryValue)
+        } else if (clause.where) {
+          try {
+            predicate = clause.where(table)
+          } catch (e) {
+            return Observable.throw(e)
+          }
+        }
 
         forEach(patch, (val, key) => {
           const row = table[key]
@@ -333,7 +338,7 @@ export class Database {
           return Promise.reject(updateQuery)
         } else if (updateQuery) {
           return updateQuery
-            .where(table[primaryKey].eq(primaryValue))
+            .where(predicate)
             .exec()
         } else {
           return Promise.resolve()
@@ -346,10 +351,7 @@ export class Database {
    * 如果没有则直接删除
    * hook 中任意一个执行失败即会回滚，并抛出异常
    */
-  delete(tableName: string, deleteQuery: {
-    where?: (table: lf.schema.Table) => lf.Predicate
-    primaryValue?: string
-  } = Object.create(null)) {
+  delete(tableName: string, clause: ClauseDescription = {}) {
     const primaryKey = this.primaryKeysMap.get(tableName)
     if (!primaryKey) {
       return Observable.throw(NON_EXISTENT_TABLE_ERR(tableName))
@@ -360,11 +362,11 @@ export class Database {
         const table = db.getSchema().table(tableName)
 
         let predicate: lf.Predicate
-        if (deleteQuery.primaryValue) {
-          predicate = table[primaryKey].eq(deleteQuery.primaryValue)
-        } else if (deleteQuery.where) {
+        if (clause.primaryValue) {
+          predicate = table[primaryKey].eq(clause.primaryValue)
+        } else if (clause.where) {
           try {
-            predicate = deleteQuery.where(table)
+            predicate = clause.where(table)
           } catch (e) {
             return Observable.throw(e)
           }
@@ -372,13 +374,13 @@ export class Database {
 
         const hooks = Database.hooks.get(tableName)
         let hookStream = Observable.of(db)
-        const getQuery = deleteQuery.primaryValue ? { primaryValue: deleteQuery.primaryValue } : {
-          where: deleteQuery.where
+        const query = clause.primaryValue ? { primaryValue: clause.primaryValue } : {
+          where: clause.where
         }
 
         if (hooks.destroy && hooks.destroy.length) {
           const tx = db.createTransaction()
-          hookStream = this.get(tableName, getQuery)
+          hookStream = this.get(tableName, query)
             .value()
             .flatMap(flat)
             .concatMap(r => Observable.from(hooks.destroy)
@@ -393,12 +395,12 @@ export class Database {
         }
 
         return hookStream.concatMap(() => {
-          let query = db.delete()
+          let _query = db.delete()
             .from(table)
           if (predicate) {
-            query = query.where(predicate)
+            _query = _query.where(predicate)
           }
-          return query.exec()
+          return _query.exec()
         })
       })
   }
@@ -420,9 +422,10 @@ export class Database {
     return Promise.all(disposeQueue)
       .then(() => {
         // restore hooks
-        Database.hooks.forEach(hookDef => {
-          hookDef.insert = []
-          hookDef.destroy = []
+        // To Reviewer: hooks似乎应该是跟随database实例更好？
+        Database.hooks.forEach(tableHookDef => {
+          tableHookDef.insert = []
+          tableHookDef.destroy = []
         })
       })
   }
@@ -672,19 +675,19 @@ export class Database {
   private buildLeftjoinQuery<T>(
     db: lf.Database,
     tableName: string,
-    getQuery: GetQuery,
-    uniqueKeysMap: Map<string, Set<string>>,
-    leftJoinQueue: LeftJoinMetadata[]
+    queryClause: QueryDescription,
+    uniqueKeysMap: Map<string, Set<string>>
   ) {
     const primaryKey = this.primaryKeysMap.get(tableName)
     const selectMetadata = this.selectMetaData.get(tableName)
     const virtualMetadatas = selectMetadata.virtualMeta
     // tableName => metaData
     const virtualMap = new Map<string, VirtualTableMetadataDescription>()
+    const leftJoinQueue: LeftJoinMetadata[] = []
     let mainPredicate: lf.Predicate | null
     const mainTable = db.getSchema().table(tableName)
-    const hasQueryFields = !!getQuery.fields
-    const fields: Set<FieldsValue> = hasQueryFields ? new Set(getQuery.fields) : selectMetadata.fields
+    const hasQueryFields = !!queryClause.fields
+    const fields: Set<FieldsValue> = hasQueryFields ? new Set(queryClause.fields) : selectMetadata.fields
     const { columns, allFields } = this.buildColums(db, tableName, fields)
 
     virtualMetadatas.forEach((virtualMetadata, key) => {
@@ -700,7 +703,7 @@ export class Database {
           predicate = virtualMetadata.where(table, mainTable)
           leftJoinQueue.push({ table, predicate })
         } catch (e) {
-          console.warn(`Build Predicate Faild in ${virtualMetadata.name}, ${key}`, e)
+          BUILD_PREDICATE_FAILED_WARN(e, virtualMetadata.name, key)
         }
       }
     })
@@ -711,16 +714,16 @@ export class Database {
       query = query.leftOuterJoin(val.table, val.predicate)
     })
 
-    if (getQuery.where) {
+    if (queryClause.where) {
       try {
-        mainPredicate = getQuery.where(mainTable)
+        mainPredicate = queryClause.where(mainTable)
       } catch (e) {
-        console.error(`Build predicate error: ${e.message}`)
+        BUILD_PREDICATE_FAILED_WARN(e)
       }
     }
 
-    if (getQuery.primaryValue) {
-      const primaryValueMatch = mainTable[primaryKey].eq(getQuery.primaryValue)
+    if (queryClause.primaryValue) {
+      const primaryValueMatch = mainTable[primaryKey].eq(queryClause.primaryValue)
       if (mainPredicate) {
         mainPredicate = lf.op.and(mainPredicate, primaryValueMatch)
       } else {
@@ -890,16 +893,16 @@ export class Database {
               .get(propName)
               .name
           } catch (e) {
-            console.warn(`Property is not defined: ${propName}`)
+            NON_DEFINED_PROPERTY_WARN(propName)
           }
 
           const virtualTable = db.getSchema().table(virtualTableName)
           allFields.add(propName)
 
-          forEach(innerFields, field => {
-            const column = virtualTable[field]
+          forEach(innerFields, _field => {
+            const column = virtualTable[_field]
             if (!column) {
-              console.warn(`field: ${field} is not exist in table ${virtualTableName}`)
+              NON_EXISTENT_FIELD_WARN(propName, virtualTableName)
               return null
             }
 
