@@ -283,9 +283,8 @@ export class Database {
 
     // tableName => Set<uniqueKeys>
     const uniqueKeysMap = new Map<string, Set<string>>()
-    const leftJoinQueue: LeftJoinMetadata[] = []
     const selectMeta$ = this.database$
-      .map(db => this.buildLeftjoinQuery<T>(db, tableName, query, uniqueKeysMap, leftJoinQueue))
+      .map(db => this.buildLeftjoinQuery<T>(db, tableName, query, uniqueKeysMap))
 
     return new QueryToken(selectMeta$)
   }
@@ -396,12 +395,12 @@ export class Database {
         }
 
         return hookStream.concatMap(() => {
-          let query = db.delete()
+          let _query = db.delete()
             .from(table)
           if (predicate) {
-            query = query.where(predicate)
+            _query = _query.where(predicate)
           }
-          return query.exec()
+          return _query.exec()
         })
       })
   }
@@ -677,14 +676,14 @@ export class Database {
     db: lf.Database,
     tableName: string,
     queryClause: QueryDescription,
-    uniqueKeysMap: Map<string, Set<string>>,
-    leftJoinQueue: LeftJoinMetadata[]
+    uniqueKeysMap: Map<string, Set<string>>
   ) {
     const primaryKey = this.primaryKeysMap.get(tableName)
     const selectMetadata = this.selectMetaData.get(tableName)
     const virtualMetadatas = selectMetadata.virtualMeta
     // tableName => metaData
     const virtualMap = new Map<string, VirtualTableMetadataDescription>()
+    const leftJoinQueue: LeftJoinMetadata[] = []
     let mainPredicate: lf.Predicate | null
     const mainTable = db.getSchema().table(tableName)
     const hasQueryFields = !!queryClause.fields
@@ -900,8 +899,8 @@ export class Database {
           const virtualTable = db.getSchema().table(virtualTableName)
           allFields.add(propName)
 
-          forEach(innerFields, field => {
-            const column = virtualTable[field]
+          forEach(innerFields, _field => {
+            const column = virtualTable[_field]
             if (!column) {
               NON_EXISTENT_FIELD_WARN(propName, virtualTableName)
               return null
