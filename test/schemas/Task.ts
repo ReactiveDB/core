@@ -91,4 +91,3 @@ Database.defineHook('Task', {
       .where(subtaskTable['taskId'].eq(entity._id))
   }
 })
-
