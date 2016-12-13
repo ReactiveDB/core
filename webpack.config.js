@@ -42,6 +42,7 @@ module.exports = {
   plugins: [
     new webpack.optimize.OccurenceOrderPlugin(true),
     new webpack.optimize.CommonsChunkPlugin({ name: ['main', 'vendor'], minChunks: Infinity }),
+    new ExtractTextPlugin('style.css'),
     new webpack.HotModuleReplacementPlugin(),
     new webpack.NoErrorsPlugin(),
     new HtmlWebpackPlugin({
@@ -52,11 +53,13 @@ module.exports = {
   ],
 
   module: {
+    noParse: /tman\/browser\/tman\.js/,
     preLoaders: [
       { test: /\.js$/, loader: 'source-map-loader', include: /rxjs/ }
     ],
     loaders: [
       { test: /\.ts$/, loader: 'ts' },
+      { test: /\.css$/, loader: ExtractTextPlugin.extract('style-loader', 'css-loader') },
       { test: /\.html$/, loader: 'raw-loader' }
     ]
   }
