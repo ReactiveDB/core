@@ -7,7 +7,9 @@
 Database.defineSchema(tableName: string, schemaDef: SchemaDef): Database
 ```
 定义库中表的数据结构 / 形态
+
 - ```Method: Database.defineSchema(tableName: string, schemaDef: SchemaDef)```
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -30,6 +32,7 @@ Database.defineSchema(tableName: string, schemaDef: SchemaDef): Database
 </table>
 
 - ```Interface: SchemaDef```
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -46,6 +49,7 @@ Database.defineSchema(tableName: string, schemaDef: SchemaDef): Database
 </table>
 
 - ```Interface: SchemaMetadata```
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -86,6 +90,7 @@ Database.defineSchema(tableName: string, schemaDef: SchemaDef): Database
 </table>
 
 - ```Enum: RDBType```
+
 <table>
   <tr>
     <td>Value</td>
@@ -125,7 +130,8 @@ Database.defineSchema(tableName: string, schemaDef: SchemaDef): Database
   </tr>
 </table>
 
-- ```VirtualDef```
+- ```Interface: VirtualDef```
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -152,7 +158,9 @@ Database.defineSchema(tableName: string, schemaDef: SchemaDef): Database
 Database.defineHook(tableName: string, hookDef: HookDef): HookDef
 ```
 对已有的表定义hook, hook将会在数据插入或删除时被执行, 可以用于保证单个实体上多个关联数据的一致性.
+
 - ```Method: Database.defineHook(tableName: string, hookDef: HookDef)```
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -175,6 +183,7 @@ Database.defineHook(tableName: string, hookDef: HookDef): HookDef
 </table>
 
 - ```Interface: HookDef```
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -213,7 +222,9 @@ constructor(
 )
 ```
 构造函数
+
 - ```Enum: DataStoreType```
+
 <table>
   <tr>
     <td>Value</td>
@@ -242,7 +253,9 @@ constructor(
   database.get<T>(tableName: string, clause: QueryDescription = {}): QueryToken<T>
 ```
 对指定的表进行查询操作.
+
 - ```Method: database.get(tableName: string, clause: QueryDescription)```
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -265,7 +278,9 @@ constructor(
 </table>
 
 - ```Interface: QueryDescription```
+
 继承自ClauseDescription接口
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -298,7 +313,9 @@ constructor(
   database.insert(tableName: string, data: T | T[]): Observable<T> | Observable<T[]>
 ```
 对指定的数据表进行插入操作. 若table上存在insert hook, 则先执行hook再进行插入操作。
+
 - ```Method: database.insert(tableName: string, data: T | T[])```
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -325,7 +342,9 @@ constructor(
   database.update(tableName: string, clause: ClauseDescription, patch): void
 ```
 对表中的指定的数据进行更新操作.
+
 - ```Method: database.update(tableName: string, clause: ClauseDescription, patch: any)```
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -354,6 +373,7 @@ constructor(
 </table>
 
 - ```Interface: ClauseDescription```
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -374,7 +394,9 @@ constructor(
   database.delete(tableName: string, clause: ClauseDescription): void
 ```
 对表中符合条件的数据进行删除操作. 若表中存在delete hook, 则先执行hook再进行删除.
+
 - ```Method: database.delete(tableName: string, clause: ClauseDescription)```
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -401,7 +423,9 @@ constructor(
   database.dispose()
 ```
 重置Database, 清空所有数据.
+
 - ```Method: database.dispose()```
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -427,6 +451,7 @@ constructor(
 对已定义的query条件做单次求值操作. (complete immediately stream)
 
 - ```Method: queryToken.values()```
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -446,6 +471,7 @@ constructor(
 对已定义的query条件做持续求值操作, 每当监听的query匹配的集合数据发生变化, 数据都将从该接口被推送出来. (live stream)
 
 - ```Method: queryToken.changes()```
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -463,7 +489,9 @@ constructor(
   queryToken<T>.combine(...tokens: QueryToken[]): QueryToken
 ```
 对已有的单个或多个QueryToken进行合并操作.
+
 - ```Method: queryToken.combine(...tokens: QueryToken[]) ```
+
 <table>
   <tr>
     <td>Parameter</td>
@@ -477,7 +505,7 @@ constructor(
     <td>required</td>
     <td>QueryToken实例</td>
   </tr>
-  <tr colspan='4'>
-    ...
+  <tr>
+    <td colspan='4'>...</td>
   </tr>
 </table>

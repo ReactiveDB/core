@@ -18,7 +18,10 @@ import {
   INVALID_RESULT_TYPE_ERR,
   INVALID_ROW_TYPE_ERR,
   INVALID_VIRTUAL_VALUE_ERR,
-  INVALID_FIELD_DES_ERR
+  INVALID_FIELD_DES_ERR,
+  NON_DEFINED_PROPERTY_WARN,
+  NON_EXISTENT_FIELD_WARN,
+  BUILD_PREDICATE_FAILED_WARN
 } from './RuntimeError'
 
 export interface SchemaMetadata {
@@ -420,7 +423,7 @@ export class Database {
     return Promise.all(disposeQueue)
       .then(() => {
         // restore hooks
-        // 歧义，hooks似乎应该是跟随database实例更好？
+        // To Reviewer: hooks似乎应该是跟随database实例更好？
         Database.hooks.forEach(tableHookDef => {
           tableHookDef.insert = []
           tableHookDef.destroy = []
@@ -701,7 +704,7 @@ export class Database {
           predicate = virtualMetadata.where(table, mainTable)
           leftJoinQueue.push({ table, predicate })
         } catch (e) {
-          console.warn(`Build Predicate Faild in ${virtualMetadata.name}, ${key}`, e)
+          BUILD_PREDICATE_FAILED_WARN(e, virtualMetadata.name, key)
         }
       }
     })
@@ -716,7 +719,7 @@ export class Database {
       try {
         mainPredicate = queryClause.where(mainTable)
       } catch (e) {
-        console.error(`Build predicate error: ${e.message}`)
+        BUILD_PREDICATE_FAILED_WARN(e)
       }
     }
 
@@ -891,7 +894,7 @@ export class Database {
               .get(propName)
               .name
           } catch (e) {
-            console.warn(`Property is not defined: ${propName}`)
+            NON_DEFINED_PROPERTY_WARN(propName)
           }
 
           const virtualTable = db.getSchema().table(virtualTableName)
@@ -900,7 +903,7 @@ export class Database {
           forEach(innerFields, field => {
             const column = virtualTable[field]
             if (!column) {
-              console.warn(`field: ${field} is not exist in table ${virtualTableName}`)
+              NON_EXISTENT_FIELD_WARN(propName, virtualTableName)
               return null
             }
 
