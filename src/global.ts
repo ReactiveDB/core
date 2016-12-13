@@ -1,7 +1,11 @@
-import * as lf from 'lovefield'
+// lovefield nodejs polyfill
 if (typeof global !== 'undefined') {
   global['self'] = global
+  // shim for SinonJS
+  global['location'] = Object.create(null)
 }
+
+import * as lf from 'lovefield'
 
 // lovefield declare merge
 declare module 'lovefield' {
