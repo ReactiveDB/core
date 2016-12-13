@@ -8,7 +8,9 @@ import {
   SubtaskSchema,
   TaskSchema,
   clone,
-  INVALID_FIELD_DES_ERR
+  INVALID_FIELD_DES_ERR,
+  UNMODIFIABLE_PRIMARYKEY_ERR,
+  NON_EXISTENT_TABLE_ERR
 } from '../../index'
 import taskGenerator from '../../utils/taskGenerator'
 
@@ -88,7 +90,7 @@ export default describe('Database public Method', () => {
         await database.get<ProjectSchema>('Project', {
           primaryValue: taskData.project._id as string
         })
-          .value()
+          .values()
           .do(([r]) => {
             expect(r._id).to.equal(taskData.project._id)
             expect(r.name).to.equal(taskData.project.name)
@@ -98,7 +100,7 @@ export default describe('Database public Method', () => {
         await database.get<SubtaskSchema>('Subtask', {
           primaryValue: subtask._id as string
         })
-          .value()
+          .values()
           .do(([r]) => {
             expect(r._id).to.equal(subtask._id)
             expect(r.content).to.equal(subtask.content)
@@ -122,7 +124,7 @@ export default describe('Database public Method', () => {
         await database.get<TaskSchema>('Task', {
           primaryValue: '1112'
         })
-          .value()
+          .values()
           .do(r => {
             expect(r['xxx']).to.be.undefined
           })
@@ -131,7 +133,7 @@ export default describe('Database public Method', () => {
 
       it('should get current fields when get with query', function *() {
         yield database.get<TaskSchema>('Task', { fields: ['note'], primaryValue: taskData._id as string })
-          .value()
+          .values()
           .do(([r]) => {
             expect(r.note).to.equal(taskData.note)
             expect(r._id).to.be.undefined
@@ -140,7 +142,7 @@ export default describe('Database public Method', () => {
 
       it('should be ok when fileds include not exist field', function *() {
         yield database.get<TaskSchema>('Task', { fields: ['xxx', 'note'], primaryValue: taskData._id as string })
-          .value()
+          .values()
           .do(([r]) => {
             expect(r.note).to.equal(taskData.note)
             expect((<any>r).xxx).to.be.undefined
@@ -149,13 +151,13 @@ export default describe('Database public Method', () => {
 
       it('should get null when query is not match any result', function *() {
         yield database.get<TaskSchema>('Task', { primaryValue: 'testtask' })
-          .value()
+          .values()
           .do((r) => expect(r).to.be.null)
       })
 
       it('should throw when fields only include virtual field', function *() {
         yield database.get('Task', { fields: ['project'] })
-          .value()
+          .values()
           .catch(err => {
             const standardErr = INVALID_FIELD_DES_ERR()
             expect(err.message).to.equal(standardErr.message)
@@ -176,10 +178,9 @@ export default describe('Database public Method', () => {
         yield database.update('Task', taskData._id as string, {
           _id: 'fuck'
         })
-          .do(null, (e: any) => {
-            expect(e.message).to.equal('Can not update primaryKey')
-          })
-          .catch(() => {
+          .catch(e => {
+            const err = UNMODIFIABLE_PRIMARYKEY_ERR()
+            expect(e.message).to.equal(err.message)
             return Observable.of(null)
           })
 
@@ -199,7 +200,7 @@ export default describe('Database public Method', () => {
         yield database.get<ProjectSchema>('Project', {
           primaryValue: 'project 2'
         })
-          .value()
+          .values()
           .do(r => expect(r).to.be.null)
 
         yield database.get<TaskSchema>('Task', {
@@ -211,7 +212,7 @@ export default describe('Database public Method', () => {
           ],
           primaryValue: taskData._id as string
         })
-          .value()
+          .values()
           .do(([{ project }]) => expect(project).to.deep.equal({
             _id: taskData.project._id,
             name: taskData.project.name
@@ -231,7 +232,7 @@ export default describe('Database public Method', () => {
         yield database.get<TaskSchema>('Task', {
           fields: ['created', '__hidden__created']
         })
-          .value()
+          .values()
           .do(([...rets]) => {
             rets.forEach((r) => {
               expect(r.created).to.deep.equal(newCreated)
@@ -249,7 +250,7 @@ export default describe('Database public Method', () => {
         yield database.get<TaskSchema>('Task', {
           fields: ['created', '__hidden__created']
         })
-          .value()
+          .values()
           .do(([r]) => expect(r.created).to.deep.equal(newCreated))
       })
     })
@@ -274,7 +275,7 @@ export default describe('Database public Method', () => {
         }
       })
       yield database.get<TaskSchema>('Task')
-        .value()
+        .values()
         .do(r => {
           if (r) {
             expect(r.length).to.equal(count)
@@ -293,8 +294,18 @@ export default describe('Database public Method', () => {
       yield database.get('Task', {
         primaryValue: task._id as string
       })
-        .value()
+        .values()
         .do(r => expect(r).to.be.null)
+    })
+
+    it('should throw when delete a row from non-exist table', done => {
+      const tableName = 'TestTable-non-exist'
+      database.delete(tableName)
+        .catch(e => {
+          expect(e.message).to.equal(NON_EXISTENT_TABLE_ERR(tableName).message)
+          return Promise.resolve()
+        })
+        .subscribe(done)
     })
   })
 })
