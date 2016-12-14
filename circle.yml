@@ -4,9 +4,9 @@ machine:
 
 test:
   override:
-    - npm run cover
+    - npm run build_all && npm run cover
   post:
-    - cp ./.nyc_output/*.json $CIRCLE_ARTIFACTS
+    - cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js
 
 notify:
   webhooks:
