@@ -11,7 +11,7 @@ import {
   TOKEN_CONSUMED_ERR
 } from './RuntimeError'
 export class QueryToken<T> {
-  cousumed = false
+  consumed = false
 
   private selectMeta$ = this._selectMeta$
     .publishReplay(1)
@@ -36,19 +36,19 @@ export class QueryToken<T> {
   ) { }
 
   value(): Observable<T[]> {
-    if (this.cousumed) {
+    if (this.consumed) {
       return Observable.throw(TOKEN_CONSUMED_ERR())
     }
-    this.cousumed = true
+    this.consumed = true
     return this.selectMeta$
       .concatMap(meta => meta.getValue())
   }
 
   combine(...tokens: QueryToken<T>[]) {
-    if (this.cousumed) {
+    if (this.consumed) {
       throw TOKEN_CONSUMED_ERR()
     }
-    this.cousumed = true
+    this.consumed = true
     const selectMeta$ =
       this.select$
       .combineLatest(tokens.map((item) => item.select$))
@@ -76,10 +76,10 @@ export class QueryToken<T> {
   }
 
   changes(): Observable<T[]> {
-    if (this.cousumed) {
+    if (this.consumed) {
       return Observable.throw(TOKEN_CONSUMED_ERR())
     }
-    this.cousumed = true
+    this.consumed = true
     return this.db$.combineLatest(this.select$, this.predicate$, this.selectMeta$)
       .concatMap(([db, select, predicate, selectMeta]) => {
         return Observable.create((observer: Observer<T[]>) => {
