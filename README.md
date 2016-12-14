@@ -1,3 +1,7 @@
+[![CircleCI](https://circleci.com/gh/teambition/ReactiveDB.svg?style=svg)](https://circleci.com/gh/teambition/ReactiveDB)
+[![Coverage Status](https://coveralls.io/repos/github/teambition/ReactiveDB/badge.svg?branch=master)](https://coveralls.io/github/teambition/ReactiveDB?branch=master)
+[![Dependency Status](https://david-dm.org/teambition/ReactiveDB.svg)](https://david-dm.org/teambition/ReactiveDB)
+[![devDependency Status](https://david-dm.org/teambition/ReactiveDB.svg)](https://david-dm.org/teambition/ReactiveDB#info=devDependencies)
 # ReactiveDB
 一个 Reactive 风格的前端 ORM。基于 [Lovefield](https://github.com/google/lovefield) 与 [RxJS](https://github.com/ReactiveX/rxjs)。
 

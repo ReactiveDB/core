@@ -74,7 +74,7 @@ export interface SelectMetadata {
   mapper: Map<string, Function>
 }
 
-type FieldsValue = string | { [index: string]: string[] }
+export type FieldsValue = string | { [index: string]: string[] }
 
 // todo primary是optional？？？
 export interface GetQuery {
