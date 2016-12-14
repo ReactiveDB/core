@@ -1,7 +1,4 @@
 'use strict'
-import 'rxjs/add/operator/combineLatest'
-import 'rxjs/add/operator/switchMap'
-import 'rxjs/add/operator/concatMapTo'
 import { Observable } from 'rxjs/Observable'
 import { Observer } from 'rxjs/Observer'
 import * as lf from 'lovefield'

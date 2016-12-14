@@ -1,7 +1,4 @@
 'use strict'
-import 'rxjs/add/observable/fromPromise'
-import 'rxjs/add/operator/publishReplay'
-import 'rxjs/add/operator/do'
 import * as lf from 'lovefield'
 import { Observable } from 'rxjs/Observable'
 import { ReplaySubject } from 'rxjs/ReplaySubject'
