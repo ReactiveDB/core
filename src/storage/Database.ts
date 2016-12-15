@@ -381,7 +381,7 @@ export class Database {
         if (hooks.destroy && hooks.destroy.length) {
           const tx = db.createTransaction()
           hookStream = this.get(tableName, query)
-            .value()
+            .values()
             .flatMap(flat)
             .concatMap(r => Observable.from(hooks.destroy)
               .map(fn => fn(db, r))
@@ -780,9 +780,6 @@ export class Database {
     forEach(values, value => {
       const mainResult = value[tableName] || Object.create(null)
       const primaryValue = mainResult[primaryKey]
-      if (!primaryValue) {
-        throw INVALID_FIELD_DES_ERR()
-      }
 
       const resultSet = resultTable.get(mainResult[primaryValue])
       if (!resultSet) {
@@ -867,7 +864,7 @@ export class Database {
     const mainTable = db.getSchema().table(tableName)
     const columns: lf.schema.Column[] = []
     const allFields = new Set<string>()
-
+    let hasPrimaryField = false
     fields.forEach(field => {
       if (typeof field === 'string') {
         const colum = mainTable[field]
@@ -879,9 +876,10 @@ export class Database {
           if (hiddenRow) {
             columns.push(hiddenRow)
           }
+          hasPrimaryField = true
+          allFields.add(field)
         }
 
-        allFields.add(field)
       } else {
         const description = field
         forEach(description, (innerFields, propName) => {
@@ -916,6 +914,10 @@ export class Database {
         })
       }
     })
+
+    if (!hasPrimaryField) {
+      throw INVALID_FIELD_DES_ERR()
+    }
 
     return { columns, allFields }
   }

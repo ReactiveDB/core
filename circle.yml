@@ -4,7 +4,7 @@ machine:
 
 test:
   override:
-    - npm run build_all && npm run cover
+    - npm run lint && npm run build_all && npm run cover
   post:
     - cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js
 

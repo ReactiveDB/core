@@ -6,13 +6,14 @@ import {
   RDBType,
   NON_EXISTENT_PRIMARY_KEY_ERR,
   UNMODIFIABLE_TABLE_SCHEMA_ERR,
-  DEFINE_HOOK_ERR
+  DEFINE_HOOK_ERR,
+  UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR
 } from '../../index'
 
 export default describe('Database static Method', () => {
 
-  let tablename = ''
-  let i = 0
+  let tablename = 'TestTable0'
+  let i = 1
 
   beforeEach(() => {
     tablename = `TestTable${i++}`
@@ -68,6 +69,24 @@ export default describe('Database static Method', () => {
       }
       Database.defineSchema(tablename, metaData)
       expect(Database['schemaMetaData'].get(tablename)).to.equal(metaData)
+    })
+
+    it('should throw after Database init', () => {
+      const originalMetadata = Database['schemaMetaData']
+      new Database(lf.schema.DataStoreType.MEMORY, false)
+      const metaData = {
+        _id: {
+          type: RDBType.STRING,
+          primaryKey: true
+        }
+      }
+      const define = () => {
+        Database.defineSchema(tablename, metaData)
+        Database.defineSchema(tablename, metaData)
+      }
+      const err = UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR()
+      expect(define).to.throw(err.message)
+      Database['schemaMetaData'] = originalMetadata
     })
   })
 

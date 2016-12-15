@@ -38,7 +38,7 @@ export const INVALID_FIELD_DES_ERR =
   () => ReactiveDBError('Invalid field description, It should include its association field.')
 
 /**
- * QueryToken Error
+ * SelectMeta Error
  */
 
 export const TOKEN_CONSUMED_ERR =
