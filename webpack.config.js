@@ -7,7 +7,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin')
 module.exports = {
   entry: {
     'main': './test/e2e/app.ts',
-    'vendor': [ 'lovefield', 'rxjs' ]
+    'vendor': [ 'lovefield', 'rxjs', 'sinon', 'tman' ]
   },
   devtool: 'cheap-module-source-map',
   cache: true,
@@ -21,7 +21,8 @@ module.exports = {
     root: [ path.join(__dirname, 'src') ],
     extensions: ['', '.ts', '.js'],
     alias: {
-      'lovefield': path.join(process.cwd(), 'node_modules/lovefield/dist/lovefield.js')
+      'lovefield': path.join(process.cwd(), 'node_modules/lovefield/dist/lovefield.js'),
+      'sinon': path.join(process.cwd(), 'node_modules/sinon/pkg/sinon.js')
     }
   },
 
@@ -53,7 +54,7 @@ module.exports = {
   ],
 
   module: {
-    noParse: /tman\/browser\/tman\.js/,
+    noParse: [/tman\/browser\/tman\.js/, /sinon\/pkg\/sinon\.js/],
     preLoaders: [
       { test: /\.js$/, loader: 'source-map-loader', include: /rxjs/ }
     ],
