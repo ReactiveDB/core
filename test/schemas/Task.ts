@@ -1,5 +1,5 @@
 import * as lf from 'lovefield'
-import { RDBType } from '../index'
+import { RDBType, Association } from '../index'
 import { TeambitionTypes, Database, SubtaskSchema } from '../index'
 
 export interface TaskSchema {
@@ -15,10 +15,12 @@ export interface TaskSchema {
   accomplished: string
   project?: {
     _id: TeambitionTypes.ProjectId
-    name: string
+    name: string,
+    isArchived: boolean
   }
   subtasks: SubtaskSchema[]
-  created: string
+  created: string,
+  involveMembers: string[]
 }
 
 export default Database.defineSchema('Task', {
@@ -55,7 +57,7 @@ export default Database.defineSchema('Task', {
     type: RDBType.STRING
   },
   project: {
-    type: RDBType.OBJECT,
+    type: Association.oneToOne,
     virtual: {
       name: 'Project',
       where: (
@@ -67,7 +69,7 @@ export default Database.defineSchema('Task', {
     }
   },
   subtasks: {
-    type: RDBType.OBJECT,
+    type: Association.oneToMany,
     virtual: {
       name: 'Subtask',
       where: (subtaskTable: lf.schema.Table, taskTable: lf.schema.Table) => {

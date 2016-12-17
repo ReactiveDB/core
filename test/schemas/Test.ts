@@ -7,15 +7,18 @@ export interface TestSchema {
   taskId: TeambitionTypes.TaskId
 }
 
-export default Database.defineSchema('Test', {
-  _id: {
-    type: RDBType.STRING,
-    primaryKey: true
-  },
-  name: {
-    type: RDBType.STRING
-  },
-  taskId: {
-    type: RDBType.STRING
-  }
-})
+export const TestFixture = () =>
+  Database.defineSchema('Test', {
+    _id: {
+      type: RDBType.STRING,
+      primaryKey: true,
+      as: 'id'
+    },
+    name: {
+      type: RDBType.STRING,
+      as: 'id'
+    },
+    taskId: {
+      type: RDBType.STRING
+    }
+  })

@@ -46,7 +46,7 @@ export default describe('QueryToken test', () => {
   })
 
   describe('QueryToken.prototype.changes', () => {
-    it('should get inital value', function *() {
+    it('should get initial value', function *() {
       const value = yield queryToken.changes().take(1)
       expect(value).to.deep.equal(tasks)
     })

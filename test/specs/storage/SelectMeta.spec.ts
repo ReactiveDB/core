@@ -3,10 +3,17 @@ import * as lf from 'lovefield'
 import { expect, use } from 'chai'
 import * as sinon from 'sinon'
 import * as SinonChai from 'sinon-chai'
-import { beforeEach, it, describe } from 'tman'
+import { beforeEach, it, describe, afterEach } from 'tman'
 import { SelectMeta, lfFactory, TOKEN_CONSUMED_ERR, TOKEN_INVALID_ERR } from '../../index'
 
 use(SinonChai)
+
+interface Fixture {
+  _id: string,
+  time: number,
+  name: string,
+  folded?: boolean
+}
 
 export default describe('SelectMeta test', () => {
   let db: lf.Database
@@ -19,59 +26,94 @@ export default describe('SelectMeta test', () => {
       storeType: lf.schema.DataStoreType.MEMORY,
       enableInspector: false
     })
+
     const tableBuilder = schemaBuilder.createTable('TestSelectMetadata')
     tableBuilder.addColumn('_id', lf.Type.STRING)
       .addColumn('name', lf.Type.STRING)
       .addColumn('time', lf.Type.NUMBER)
       .addPrimaryKey(['_id'])
+
     yield db$.do(r => {
       db = r
       table = db.getSchema().table('TestSelectMetadata')
     })
+
     const rows: lf.Row[] = []
+
     for (let i = 0; i < 1000; i ++) {
       rows.push(table.createRow({
         _id: `_id:${i}`,
-        name: `name:${i}`,
+        name: 'name:${i}',
         time: i
       }))
     }
+
     yield db.insert().into(table).values(rows).exec()
   })
 
-  it('SelectMeta.constructor', () => {
-    const selectMeta = new SelectMeta(db, db.select().from(table), (values: any[]) => values)
+  afterEach(() => {
+    db.close()
+  })
+
+  it('should create a instance successfully', () => {
+    const selectMeta = new SelectMeta<Fixture>(db, db.select().from(table), (values: Fixture[]) => values)
     expect(selectMeta).to.be.instanceof(SelectMeta)
   })
 
-  describe('SelectMeta.prototype.values', () => {
-    it('values should be folded', async function () {
-      const selectMeta = new SelectMeta(db, db.select().from(table), (values: any[]) => {
-        return values.map(value => {
-          value.folded = 'true'
-          return value
-        })
-      }, table['time'].gte(50))
-      const values = await selectMeta.values().toPromise()
-      expect(values.length).to.equal(1000 - 50)
-      values.forEach(value => {
-        expect(value.folded).to.equal('true')
+  it('should getValues successfully via mapper', async function () {
+    const selectMeta = new SelectMeta<Fixture>(db, db.select().from(table), (values: Fixture[]) => {
+      return values.map(value => {
+        value.folded = true
+        return value
       })
-    })
+    }, table['time'].gte(50))
 
-    it('reconsume should throw', async function () {
-      const selectMeta = new SelectMeta(db, db.select().from(table), (values: any[]) => {
-        return values.map(value => {
-          value.folded = 'true'
-          return value
-        })
-      }, table['time'].gte(50))
-      await selectMeta.values().toPromise()
-      const get = () => selectMeta.values()
-      expect(get).to.throw(TOKEN_CONSUMED_ERR().message)
+    const values = await selectMeta.values().toPromise()
+
+    expect(values.length).to.equal(1000 - 50)
+    values.forEach((value: any) => {
+      expect((value).folded).to.equals(true)
     })
   })
 
+  it('should getValues successfully via table shape', async function() {
+    const selectMeta = new SelectMeta<Fixture>(db, db.select().from(table), {
+      primaryKey: {
+        name: '_id',
+        queried: true
+      },
+      definition: {
+        _id: {
+          column: '_id',
+          id: true
+        },
+        name: {
+          column: 'name'
+        },
+        time: {
+          column: 'time'
+        }
+      }
+    }, table['time'].gte(50))
+
+    const values = await selectMeta.values().toPromise()
+    expect(values.length).to.equal(1000 - 50)
+    values.forEach(value => {
+      expect(value.time >= 50).to.equals(true)
+    })
+
+    it('reconsume should throw', async function () {
+      const meta = new SelectMeta(db, db.select().from(table), (rows: any[]) => {
+        return rows.map(row => {
+          row.folded = 'true'
+          return row
+        })
+      }, table['time'].gte(50))
+      await meta.values().toPromise()
+      const get = () => meta.values()
+      expect(get).to.throw(TOKEN_CONSUMED_ERR().message)
+    })
+  })
 
   describe('SelectMeta.prototype.changes', () => {
     it('observe should ok', done => {
@@ -86,7 +128,7 @@ export default describe('SelectMeta test', () => {
 
       selectMeta.changes()
         .skip(1)
-        .subscribe(r => {
+        .subscribe((r: any[]) => {
           expect(r[0].name).to.equal(newName)
           done()
         })
@@ -158,7 +200,7 @@ export default describe('SelectMeta test', () => {
         .exec()
 
       yield changes.take(1)
-        .do(r => {
+        .do((r: any[]) => {
           expect(r[0].name).to.equal(newName)
         })
 

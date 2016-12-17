@@ -73,18 +73,22 @@ export default describe('Database static Method', () => {
 
     it('should throw after Database init', () => {
       const originalMetadata = Database['schemaMetaData']
-      new Database(lf.schema.DataStoreType.MEMORY, false)
+      const db = new Database(lf.schema.DataStoreType.MEMORY, false)
+
       const metaData = {
         _id: {
           type: RDBType.STRING,
           primaryKey: true
         }
       }
+
       const define = () => {
         Database.defineSchema(tablename, metaData)
         Database.defineSchema(tablename, metaData)
       }
+
       const err = UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR()
+      expect(db).is.not.null
       expect(define).to.throw(err.message)
       Database['schemaMetaData'] = originalMetadata
     })
