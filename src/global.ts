@@ -7,10 +7,10 @@ if (typeof global !== 'undefined') {
 
 import * as lf from 'lovefield'
 
-// lovefield declare merge
+// lovefield declaration merging
 declare module 'lovefield' {
   export interface Predicate {
-    copy(): lf.Predicate
+    copy?(): lf.Predicate
   }
 
   namespace query {
