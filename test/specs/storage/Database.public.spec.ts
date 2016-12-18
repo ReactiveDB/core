@@ -131,6 +131,16 @@ export default describe('Database public Method', () => {
           .toPromise()
       })
 
+      it('should throw when try to get data from non-existent table', async function() {
+        const tableName = 'NON_EXISTENT_FOO_TABLE'
+        try {
+          await database.get(tableName).values().toPromise()
+        } catch (e) {
+          let standardErr = NON_EXISTENT_TABLE_ERR(tableName)
+          expect(e.message).equals(standardErr.message)
+        }
+      })
+
       it('should get current fields when get with query', function *() {
         yield database.get<TaskSchema>('Task', { fields: ['note'], primaryValue: taskData._id as string })
           .values()
@@ -183,7 +193,6 @@ export default describe('Database public Method', () => {
             expect(e.message).to.equal(err.message)
             return Observable.of(null)
           })
-
       })
 
       it('update virtual props should do nothing', function* () {
