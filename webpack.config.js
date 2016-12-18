@@ -57,6 +57,11 @@ module.exports = {
   module: {
     noParse: [/tman\/browser\/tman\.js/, /sinon\/pkg\/sinon\.js/],
     preLoaders: [
+      {
+        test: /\.tsx?$/,
+        exclude: /node_modules/,
+        loader: 'tslint'
+      },
       { test: /\.js$/, loader: 'source-map-loader', include: /rxjs/ }
     ],
     loaders: [
