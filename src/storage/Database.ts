@@ -291,7 +291,7 @@ export class Database {
   update(tableName: string, clause: ClauseDescription, patch: Object) {
     const primaryKey = this.primaryKeysMap.get(tableName)
     if (!primaryKey) {
-      return Observable.throw(NON_EXISTENT_TABLE_ERR(tableName))
+      return Observable.throw(NON_EXISTENT_PRIMARY_KEY_ERR(tableName))
     }
 
     const selectMetadata = this.selectMetaData.get(tableName)

@@ -51,11 +51,8 @@ export const UNEXPECTED_ASSOCIATION_ERR =
 
 export const TRANSACTION_EXECUTE_FAILED =
   (e?: Error) => {
-    if (e) {
-      return ReactiveDBError('Transaction execute failed.')
-    } else {
-      return ReactiveDBError(`Transaction execute failed, due to: ${e.message}`)
-    }
+    let reason = e ? `, due to: ${e.message}` : ''
+    return ReactiveDBError(`Transaction execute failed${reason}.`)
   }
 
 /**

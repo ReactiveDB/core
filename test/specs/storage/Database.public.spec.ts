@@ -11,10 +11,12 @@ import {
   INVALID_FIELD_DES_ERR,
   UNMODIFIABLE_PRIMARYKEY_ERR,
   NON_EXISTENT_TABLE_ERR,
-  ALIAS_CONFLICT_ERR
+  ALIAS_CONFLICT_ERR,
+  UNEXPECTED_ASSOCIATION_ERR,
+  INVALID_ROW_TYPE_ERR
 } from '../../index'
 import taskGenerator from '../../utils/taskGenerator'
-import { TestFixture } from '../../schemas/Test'
+import { TestFixture, TestFixture2 } from '../../schemas/Test'
 
 export default describe('Database public Method', () => {
 
@@ -68,13 +70,50 @@ export default describe('Database public Method', () => {
       let hooks = Database['hooks']
 
       Database['schemaMetaData'] = new Map()
-      TestFixture()
+      TestFixture(true)
 
       let standardErr = ALIAS_CONFLICT_ERR('id', 'Test')
       try {
-        // tslint:disable-next-line
         const db = new Database()
         expect(db).is.undefined
+      } catch (err) {
+        expect(err.message).to.equal(standardErr.message)
+      } finally {
+        Database['schemaMetaData'] = meta
+        Database['hooks'] = hooks
+      }
+    })
+
+    it('should throw when association is unexpected, should be one of oneToOne, oneToMany, manyToMany', () => {
+      let meta = Database['schemaMetaData']
+      let hooks = Database['hooks']
+
+      Database['schemaMetaData'] = new Map()
+      TestFixture()
+
+      let standardErr = UNEXPECTED_ASSOCIATION_ERR()
+      try {
+        // tslint:disable-next-line
+        new Database()
+      } catch (err) {
+        expect(err.message).to.equal(standardErr.message)
+      } finally {
+        Database['schemaMetaData'] = meta
+        Database['hooks'] = hooks
+      }
+    })
+
+    it('should throw if RDBType is incorrect', () => {
+      let meta = Database['schemaMetaData']
+      let hooks = Database['hooks']
+
+      Database['schemaMetaData'] = new Map()
+      TestFixture2()
+
+      let standardErr = INVALID_ROW_TYPE_ERR()
+      try {
+        // tslint:disable-next-line
+        new Database()
       } catch (err) {
         expect(err.message).to.equal(standardErr.message)
       } finally {

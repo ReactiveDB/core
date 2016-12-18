@@ -101,18 +101,18 @@ export default describe('SelectMeta test', () => {
     values.forEach(value => {
       expect(value.time >= 50).to.equals(true)
     })
+  })
 
-    it('reconsume should throw', async function () {
-      const meta = new SelectMeta(db, db.select().from(table), (rows: any[]) => {
-        return rows.map(row => {
-          row.folded = 'true'
-          return row
-        })
-      }, table['time'].gte(50))
-      await meta.values().toPromise()
-      const get = () => meta.values()
-      expect(get).to.throw(TOKEN_CONSUMED_ERR().message)
-    })
+  it('reconsume should throw', async function () {
+    const meta = new SelectMeta(db, db.select().from(table), (rows: any[]) => {
+      return rows.map(row => {
+        row.folded = 'true'
+        return row
+      })
+    }, table['time'].gte(50))
+    await meta.values().toPromise()
+    const get = () => meta.values()
+    expect(get).to.throw(TOKEN_CONSUMED_ERR().message)
   })
 
   describe('SelectMeta.prototype.changes', () => {
