@@ -31,7 +31,7 @@ export interface SchemaMetadata {
   type: RDBType | Association
   primaryKey?: boolean
   index?: boolean
-  unique?: string
+  unique?: boolean
   // alias先不建议使用，还有些细节值得确定, 考虑是否将insert/update的结果一样以`as`的形式输出
   as?: string
   /**
@@ -187,11 +187,11 @@ export class Database {
     this.buildTables(schemaBuilder)
   }
 
-  insert<T>(tableName: string, data: T[]): Observable<T[]>
+  insert<T>(tableName: string, raw: T[]): Observable<T[]>
 
-  insert<T>(tableName: string, data: T): Observable<T>
+  insert<T>(tableName: string, raw: T): Observable<T>
 
-  insert<T>(tableName: string, data: T | T[]): Observable<T> | Observable<T[]>
+  insert<T>(tableName: string, raw: T | T[]): Observable<T> | Observable<T[]>
 
   /**
    * 存储数据到数据表
@@ -206,14 +206,14 @@ export class Database {
         let hook: Observable<any> = Observable.of(null)
         const rows: lf.Row[] = []
 
-        let data = clone(raw)
+        const data = clone(raw)
         if (data instanceof Array) {
           const hookObservables: Observable<lf.Transaction>[] = []
+          const hooks = Database.hooks.get(tableName)
 
           data.forEach(r => {
             rows.push(table.createRow(r))
-            const hooks = Database.hooks.get(tableName)
-            if (!hooks) {
+            if (!hooks || !hooks.insert || !hooks.insert.length) {
               return null
             }
 
@@ -224,26 +224,31 @@ export class Database {
             hookObservables.push(hookStream)
           })
 
-          hook = Observable.from(hookObservables)
-            .concatAll()
-            .skip(hookObservables.length - 1)
+          if (hooks && hookObservables.length) {
+            hook = Observable.from(hookObservables)
+              .concatAll()
+              .skip(hookObservables.length - 1)
+          }
+
         } else {
           rows.push(table.createRow(data))
           const hooks = Database.hooks.get(tableName)
 
-          if (hooks && hooks.insert) {
+          if (hooks && hooks.insert && hooks.insert.length) {
             hook = Observable.from(hooks.insert)
               .concatMap(fn => fn(db, data))
               .skip(hooks.insert.length - 1)
           }
         }
 
+        const tx = db.createTransaction()
         return hook.concatMap(() => {
-          return db.insertOrReplace()
+          return tx.exec([db.insertOrReplace()
             .into(table)
-            .values(rows)
-            .exec()
+            .values(rows)])
         })
+        .flatMap(identity)
+        .catch(() => tx.rollback().then(() => []))
       })
   }
 
@@ -289,12 +294,9 @@ export class Database {
   }
 
   update(tableName: string, clause: ClauseDescription, patch: Object) {
-    const primaryKey = this.primaryKeysMap.get(tableName)
-    if (!primaryKey) {
-      return Observable.throw(NON_EXISTENT_PRIMARY_KEY_ERR(tableName))
-    }
-
     const selectMetadata = this.selectMetaData.get(tableName)
+    const primaryKey = this.primaryKeysMap.get(tableName)
+
     return this.database$
       .concatMap<any, any>(db => {
         const table = db.getSchema().table(tableName)
@@ -303,6 +305,10 @@ export class Database {
         let predicate: lf.Predicate
 
         if (clause.primaryValue !== undefined) {
+          if (!primaryKey) {
+            return Observable.throw(NON_EXISTENT_PRIMARY_KEY_ERR(tableName))
+          }
+
           predicate = table[primaryKey].eq(clause.primaryValue)
         } else if (clause.where) {
           try {
@@ -393,11 +399,8 @@ export class Database {
         }
 
         return hookStream.concatMap(() => {
-          let _query = db.delete()
-            .from(table)
-          if (predicate) {
-            _query = _query.where(predicate)
-          }
+          let _query = db.delete().from(table)
+          _query = predicate ? _query.where(predicate) : _query
           return _query.exec()
         })
       })
@@ -468,7 +471,7 @@ export class Database {
           tags.push(true)
         }
 
-        if (def.unique != null) {
+        if (def.unique) {
           uniques.push(key)
           tags.push(true)
         }
@@ -616,7 +619,6 @@ export class Database {
     const virtualTable = db.getSchema().table(def.virtual.name)
     const virtualMetadata = this.selectMetaData.get(tableName).virtualMeta
     const resultType = virtualMetadata.get(key).resultType
-    const tx = db.createTransaction()
 
     if (virtualProp instanceof Array) {
       if (resultType && resultType !== 'Collection') {
@@ -636,18 +638,13 @@ export class Database {
         this.virtualTableMetadataDescription.set(tableName, virtualTableMetadataDescription)
       }
 
-      const insertQueue = Promise.all(virtualProp.map(_virtualProp => {
-        return this.insertOrUpdateVirtualProp(db, primaryKey, virtualTable, _virtualProp)
+      const insertQueue = Promise.all(virtualProp.map(data => {
+        return this.upsertVirtualProp(db, primaryKey, virtualTable, data)
       }))
 
       return Observable.fromPromise(insertQueue)
-        .concatMap(querys => querys.length ? tx.exec(querys) : Observable.empty())
-        .catch(e => tx.rollback()
-          .then(() => {
-            return Promise.reject(TRANSACTION_EXECUTE_FAILED(e)
-          )})
-        )
         .do(() => delete entity[key])
+        .reduce((acc, curr) => acc.concat(curr))
         .toPromise()
     } else {
       if (resultType && resultType !== 'Model') {
@@ -663,11 +660,7 @@ export class Database {
         this.virtualTableMetadataDescription.set(tableName, virtualTableMetadataDescription)
       }
 
-      return this.insertOrUpdateVirtualProp(db, primaryKey, virtualTable, virtualProp)
-        .then(query => tx.exec([query]))
-        .catch(e => tx.rollback()
-          .then(() => Promise.reject(TRANSACTION_EXECUTE_FAILED(e)))
-        )
+      return this.upsertVirtualProp(db, primaryKey, virtualTable, virtualProp)
         .then(() => delete entity[key])
       }
   }
@@ -686,33 +679,25 @@ export class Database {
    * 这个方法会将 project 字段从 TaskSchema 上剥离，存储到对应的 Project 表中
    * 表的名字定义在 schemaMetaData 中
    */
-  private insertOrUpdateVirtualProp (
+  private upsertVirtualProp<T> (
     db: lf.Database,
     primaryKey: string,
-    virtualTable: lf.schema.Table,
-    virtualProp: any
-  ): Promise<lf.query.Builder> {
-    return db.select()
-      .from(virtualTable)
-      .where(virtualTable[primaryKey].eq(virtualProp[primaryKey]))
+    table: lf.schema.Table,
+    data: T
+  ) {
+    const clause = () =>
+      table[primaryKey].eq(data[primaryKey])
+
+    return db.select().from(table)
+      .where(clause())
       .exec()
-      .then(result => {
-        if (result.length) {
-          const updateQuery = db.update(virtualTable)
-            .where(virtualTable[primaryKey].eq(virtualProp[primaryKey]))
-
-          forEach(virtualProp, (prop, propName) => {
-            if (propName !== primaryKey) {
-              updateQuery.set(virtualTable[propName], prop)
-            }
-          })
-
-          return updateQuery
+      .then((rows) => {
+        if (rows.length) {
+          return this.update(table.getName(), {
+            where: clause
+          }, rows[0]).toPromise()
         } else {
-          const row = virtualTable.createRow(virtualProp)
-          return db.insert()
-            .into(virtualTable)
-            .values([row])
+          return this.insert<T>(table.getName(), data).toPromise()
         }
       })
   }
@@ -843,13 +828,16 @@ export class Database {
   ) {
     const currentTable = db.getSchema().table(tableName)
     const virtualTable = this.selectMetaData.get(tableName)
+
     let columns: lf.schema.Column[] = []
     let allFields: Object = {}
     let association: string[] = []
 
     if (glob) {
-      association = Array.from(virtualTable.virtualMeta.keys())
-      association.forEach((asso) => fieldTree.add(asso))
+      virtualTable.virtualMeta.forEach((_, asso) => {
+        fieldTree.add(asso)
+        association.push(asso)
+      })
     }
 
     fieldTree.forEach((field, _) => {
