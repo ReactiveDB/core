@@ -172,6 +172,31 @@ export default describe('Database public Method', () => {
           })
           .toPromise()
       })
+
+      describe('insert data into table without any hooks', () => {
+        it('should insert single row', async function() {
+          const project = taskGenerator(1).pop().project
+          await database.insert('Project', project).toPromise()
+          const [result] = await database.get('Project', {
+            where: (table) => table['_id'].eq(project._id as any)
+          }).values().toPromise()
+
+          expect(result).deep.equals(project)
+        })
+
+        it('should insert multi rows', async function() {
+          let projects = taskGenerator(5).map((task) => task.project)
+          const name = 'foo'
+          projects.forEach((project) => project.name = name)
+
+          await database.insert('Project', projects).toPromise().catch(err => console.log(err))
+          const results = await database.get('Project', {
+            where: (table) => table['name'].eq(name)
+          }).values().toPromise()
+
+          expect(results).deep.equals(projects)
+        })
+      })
     })
 
     describe('Database.prototype.get', () => {
@@ -294,7 +319,7 @@ export default describe('Database public Method', () => {
       })
 
       it('bulk update should be ok', function* () {
-        const newCreated = new Date(2017, 1, 1)
+        const newCreated = new Date(2017, 0, 1)
         const data = {
           created: newCreated.toISOString()
         }
@@ -304,7 +329,7 @@ export default describe('Database public Method', () => {
         }, data)
 
         yield database.get<TaskSchema>('Task', {
-          fields: ['created']
+          fields: [ 'created']
         })
           .values()
           .do(([...rets]) => {
@@ -383,15 +408,15 @@ export default describe('Database public Method', () => {
     })
   })
 
-  describe.skip('Query relational data', () => {
+  describe('Query relational data', () => {
     const fixture = taskGenerator(1).pop()
 
     beforeEach(async function () {
-      await database.insert('Task', fixture).toPromise().then(v => console.log(111, v))
+      await database.insert('Task', fixture).toPromise()
     })
 
-    it('should get correct result', function* (){
-      yield database.get<TaskSchema>('Task')
+    it('should get correct result', async function () {
+      await database.get<TaskSchema>('Task')
         .values()
         .map(r => r)
         .do(rets => {
@@ -399,9 +424,8 @@ export default describe('Database public Method', () => {
 
           expect(rets.length).equal(1)
           expect(fixture).deep.equal(result)
-        })
+        }).toPromise()
     })
-
   })
 
 })
