@@ -32,7 +32,6 @@ export default describe('Graphify test', () => {
     }
   })
 
-
   it('should merge data as definition', () => {
     const result = graphify(data, definition)
     let expectResult = [

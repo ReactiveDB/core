@@ -51,7 +51,8 @@ export default Database.defineSchema('Task', {
     type: RDBType.STRING
   },
   content: {
-    type: RDBType.STRING
+    type: RDBType.STRING,
+    unique: true
   },
   note: {
     type: RDBType.STRING

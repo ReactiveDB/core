@@ -8,11 +8,10 @@ export interface ProjectSchema {
 export default Database.defineSchema('Project', {
   _id: {
     type: RDBType.STRING,
-    primaryKey: true,
+    primaryKey: true
   },
   name: {
-    type: RDBType.STRING,
-    unique: 'name'
+    type: RDBType.STRING
   },
   isArchived: {
     type: RDBType.BOOLEAN
