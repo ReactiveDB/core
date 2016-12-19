@@ -107,10 +107,15 @@ export class SelectMeta <T> {
         let result = graphify<T>(rows, this.shape.definition)
         let col = this.shape.primaryKey.name
 
-        return !this.shape.primaryKey.queried ? result.map((entity) => {
-          delete entity[col]
-          return entity
-        }) : result
+        return !this.shape.primaryKey.queried ? this.removeKey(result, col) : result
       })
+  }
+
+  private removeKey(data: any[], key: string) {
+    data.forEach((entity) => {
+        delete entity[key]
+    })
+
+    return data
   }
 }
