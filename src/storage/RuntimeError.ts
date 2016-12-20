@@ -23,7 +23,7 @@ export const UNMODIFIABLE_PRIMARYKEY_ERR =
   () => ReactiveDBError(`PrimaryKey is unmodifiable.`)
 
 export const NON_EXISTENT_COLUMN_ERR =
-  (column: string, tableName: string) => ReactiveDBError(`Updated column: \`${column}\` was not defined in table: \`${tableName}\` `)
+  (column: string, tableName: string) => ReactiveDBError(`Column: \`${column}\` was not defined in table: \`${tableName}\` `)
 
 export const INVALID_RESULT_TYPE_ERR =
   (column: string) => ReactiveDBError(`Invalid resultType \`${column}\`.`)
