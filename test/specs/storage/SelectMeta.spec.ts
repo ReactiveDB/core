@@ -60,7 +60,7 @@ export default describe('SelectMeta test', () => {
     expect(selectMeta).to.be.instanceof(SelectMeta)
   })
 
-  it('should getValues successfully via mapper', async function () {
+  it('should getValues successfully via mapper', function* () {
     const selectMeta = new SelectMeta<Fixture>(db, db.select().from(table), (values: Fixture[]) => {
       return values.map(value => {
         value.folded = true
@@ -68,15 +68,15 @@ export default describe('SelectMeta test', () => {
       })
     }, table['time'].gte(50))
 
-    const values = await selectMeta.values().toPromise()
+    const results = yield selectMeta.values()
 
-    expect(values.length).to.equal(1000 - 50)
-    values.forEach((value: any) => {
-      expect((value).folded).to.equals(true)
+    expect(results.length).to.equal(1000 - 50)
+    results.forEach((ret: any) => {
+      expect((ret).folded).to.equals(true)
     })
   })
 
-  it('should getValues successfully via table shape', async function() {
+  it('should getValues successfully via table shape', function* () {
     const selectMeta = new SelectMeta<Fixture>(db, db.select().from(table), {
       primaryKey: {
         name: '_id',
@@ -96,23 +96,28 @@ export default describe('SelectMeta test', () => {
       }
     }, table['time'].gte(50))
 
-    const values = await selectMeta.values().toPromise()
-    expect(values.length).to.equal(1000 - 50)
-    values.forEach(value => {
-      expect(value.time >= 50).to.equals(true)
+    const results = yield selectMeta.values()
+
+    expect(results.length).to.equal(1000 - 50)
+    results.forEach((ret: any) => {
+      expect(ret.time >= 50).to.equals(true)
     })
   })
 
-  it('reconsume should throw', async function () {
+  it('reconsume should throw', function* () {
     const meta = new SelectMeta(db, db.select().from(table), (rows: any[]) => {
       return rows.map(row => {
         row.folded = 'true'
         return row
       })
     }, table['time'].gte(50))
-    await meta.values().toPromise()
-    const get = () => meta.values()
-    expect(get).to.throw(TOKEN_CONSUMED_ERR().message)
+    yield meta.values()
+
+    try {
+      yield meta.values()
+    } catch (e) {
+      expect(e.message).to.equal(TOKEN_CONSUMED_ERR().message)
+    }
   })
 
   describe('SelectMeta.prototype.changes', () => {
@@ -139,7 +144,7 @@ export default describe('SelectMeta test', () => {
         .exec()
     })
 
-    it('unsubscribe should ok', function *() {
+    it('unsubscribe should ok', function* () {
       const selectMeta = new SelectMeta(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
           value.folded = 'true'
@@ -171,20 +176,20 @@ export default describe('SelectMeta test', () => {
     it('reconsume should throw', function () {
       const selectMeta = new SelectMeta(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
-          value.folded = 'true'
-          return value
+          return { ...value, folded: true }
         })
       }, table['time'].gte(50))
+
       selectMeta.changes()
       const get = () => selectMeta.changes()
+
       expect(get).to.throw(TOKEN_CONSUMED_ERR().message)
     })
 
-    it('should throw when getValue error', function *() {
+    it('should throw when getValue error', function* () {
       const selectMeta = new SelectMeta(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
-          value.folded = 'true'
-          return value
+          return { ...value, folded: true }
         })
       }, table['time'].gte(50))
 
@@ -199,10 +204,8 @@ export default describe('SelectMeta test', () => {
         .where(table['_id'].eq('_id:50'))
         .exec()
 
-      yield changes.take(1)
-        .do((r: any[]) => {
-          expect(r[0].name).to.equal(newName)
-        })
+      const [result1] = yield changes.take(1)
+      expect(result1.name).to.equal(newName)
 
       const error = new TypeError('not happy')
 
@@ -213,11 +216,11 @@ export default describe('SelectMeta test', () => {
         .where(table['_id'].eq('_id:50'))
         .exec()
 
-      yield changes.take(1)
-        .catch(e => {
-          expect(e.message).to.equal(error.message)
-          return Promise.resolve()
-        })
+      try {
+        yield changes.take(1)
+      } catch (e) {
+        expect(e.message).to.equal(error.message)
+      }
     })
   })
 
@@ -231,12 +234,12 @@ export default describe('SelectMeta test', () => {
     beforeEach(() => {
       selectMeta1 = new SelectMeta(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
-          return {...value, folded: 1}
+          return { ...value, folded: 1 }
         })
       }, table['time'].lt(50))
       selectMeta2 = new SelectMeta(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
-          return {...value, folded: 2}
+          return { ...value, folded: 2 }
         })
       }, lf.op.and(table['time'].gte(50), table['time'].lt(100)))
 
@@ -244,13 +247,13 @@ export default describe('SelectMeta test', () => {
 
       selectMeta3 = new SelectMeta(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
-          return {...value, folded: 3}
+          return { ...value, folded: 3 }
         })
       }, lf.op.and(table['time'].gte(100), table['time'].lt(150)))
 
       selectMeta4 = new SelectMeta(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
-          return {...value, folded: 4}
+          return { ...value, folded: 4 }
         })
       }, lf.op.and(table['time'].gte(150), table['time'].lt(200)))
 
@@ -287,7 +290,7 @@ export default describe('SelectMeta test', () => {
       }
     })
 
-    it('changes should observe all values from original SelectMeta', function *() {
+    it('changes should observe all values from original SelectMeta', function* () {
       const changes$ = dist.changes()
         .publish()
         .refCount()

@@ -40,7 +40,7 @@ export default describe('Database public Method', () => {
       expect(database).to.be.instanceof(Database)
     })
 
-    it('should create database$ Observable', function *() {
+    it('should create database$ Observable', function* () {
       expect(database.database$).to.be.instanceof(Observable)
       yield database.database$
         .do(db => {
@@ -130,7 +130,7 @@ export default describe('Database public Method', () => {
 
     let expectResult: TaskSchema
 
-    beforeEach(function *() {
+    beforeEach(function* () {
       taskData = taskGenerator(1)[0]
       expectResult = clone(taskData)
       const storeTask = clone(taskData)
@@ -148,51 +148,45 @@ export default describe('Database public Method', () => {
         expect(storeResult).to.deep.equal([expectResult])
       })
 
-      it('virtual property should store seprately', async function () {
+      it('virtual property should store seprately', function* () {
         const subtask = taskData.subtasks[0]
 
-        await database.get<ProjectSchema>('Project', {
+        const [result1] = yield database.get<ProjectSchema>('Project', {
           primaryValue: taskData.project._id as string
-        })
-          .values()
-          .do(([r]) => {
-            expect(r._id).to.equal(taskData.project._id)
-            expect(r.name).to.equal(taskData.project.name)
-          })
-          .toPromise()
+        }).values()
 
-        await database.get<SubtaskSchema>('Subtask', {
+        expect(result1._id).to.equal(taskData.project._id)
+        expect(result1.name).to.equal(taskData.project.name)
+
+        const [result2] = yield database.get<SubtaskSchema>('Subtask', {
           primaryValue: subtask._id as string
-        })
-          .values()
-          .do(([r]) => {
-            expect(r._id).to.equal(subtask._id)
-            expect(r.content).to.equal(subtask.content)
-            expect(r._taskId).to.equal(subtask._taskId)
-          })
-          .toPromise()
+        }).values()
+
+        expect(result2._id).to.equal(subtask._id)
+        expect(result2.content).to.equal(subtask.content)
+        expect(result2._taskId).to.equal(subtask._taskId)
       })
 
       describe('insert data into table without any hooks', () => {
-        it('should insert single row', async function() {
+        it('should insert single row', function* () {
           const project = taskGenerator(1).pop().project
-          await database.insert('Project', project).toPromise()
-          const [result] = await database.get('Project', {
+          yield database.insert('Project', project)
+          const [result] = yield database.get('Project', {
             where: (table) => table['_id'].eq(project._id as any)
-          }).values().toPromise()
+          }).values()
 
           expect(result).deep.equals(project)
         })
 
-        it('should insert multi rows', async function() {
+        it('should insert multi rows', function* () {
           let projects = taskGenerator(5).map((task) => task.project)
           const name = 'foo'
           projects.forEach((project) => project.name = name)
 
-          await database.insert('Project', projects).toPromise().catch(err => console.log(err))
-          const results = await database.get('Project', {
+          yield database.insert('Project', projects)
+          const results = yield database.get('Project', {
             where: (table) => table['name'].eq(name)
-          }).values().toPromise()
+          }).values()
 
           expect(results).deep.equals(projects)
         })
@@ -200,68 +194,66 @@ export default describe('Database public Method', () => {
     })
 
     describe('Database.prototype.get', () => {
-      it('should get correct fields', async function () {
-        await database.insert('Task', {
+      it('should get correct fields', function* () {
+        yield database.insert('Task', {
           _id: '1112',
           _projectId: 'haha',
           note: 'note',
           content: 'content',
           _stageId: 'stageId'
         })
-          .toPromise()
 
-        await database.get<TaskSchema>('Task', {
+        const [result] = yield database.get<TaskSchema>('Task', {
           primaryValue: '1112'
-        })
-          .values()
-          .do(r => {
-            expect(r['xxx']).to.be.undefined
-          })
-          .toPromise()
+        }).values()
+
+        const undef = 'UNDEF'
+
+        expect(result[undef]).to.be.undefined
+        expect(result['_id']).is.equals('1112')
       })
 
-      it('should throw when try to get data from non-existent table', async function() {
+      it('should throw when try to get data from non-existent table', function* () {
         const tableName = 'NON_EXISTENT_FOO_TABLE'
         try {
-          await database.get(tableName).values().toPromise()
+          yield database.get(tableName).values()
         } catch (e) {
-          let standardErr = NON_EXISTENT_TABLE_ERR(tableName)
+          const standardErr = NON_EXISTENT_TABLE_ERR(tableName)
           expect(e.message).equals(standardErr.message)
         }
       })
 
-      it('should get current fields when get with query', function *() {
-        yield database.get<TaskSchema>('Task', { fields: ['note'], primaryValue: taskData._id as string })
-          .values()
-          .do(([r]) => {
-            expect(r.note).to.equal(taskData.note)
-            expect(r._id).to.be.undefined
-          })
+      it('should get current fields when get with query', function* () {
+        const [result] = yield database.get<TaskSchema>('Task', {
+          fields: ['note'], primaryValue: taskData._id as string
+        }).values()
+
+        expect(result.note).to.equal(taskData.note)
+        expect(result._id).to.be.undefined
       })
 
-      it('should be ok when fileds include not exist field', function *() {
-        yield database.get<TaskSchema>('Task', { fields: ['xxx', 'note'], primaryValue: taskData._id as string })
-          .values()
-          .do(([r]) => {
-            expect(r.note).to.equal(taskData.note)
-            expect((<any>r).xxx).to.be.undefined
-          })
+      it('should be ok when fileds include not exist field', function* () {
+        const undef = 'UNDEF'
+        const [result] = yield database.get<TaskSchema>('Task', {
+          fields: [undef, 'note'], primaryValue: taskData._id as string
+        }).values()
+
+        expect(result.note).to.equal(taskData.note)
+        expect((result as any)['undef']).to.be.undefined
       })
 
-      it('should get empty array when query is not match any result', function *() {
-        yield database.get<TaskSchema>('Task', { primaryValue: 'testtask' })
-          .values()
-          .do((r) => expect(r).deep.equal([]))
+      it('should get empty array when query is not match any result', function* () {
+        const result = yield database.get<TaskSchema>('Task', { primaryValue: 'testtask' }).values()
+        expect(result).deep.equal([])
       })
 
-      it('should throw when fields only include virtual field', function *() {
-        yield database.get('Task', { fields: ['project'] })
-          .values()
-          .catch(err => {
-            const standardErr = INVALID_FIELD_DES_ERR()
-            expect(err.message).to.equal(standardErr.message)
-            return Observable.of(null)
-          })
+      it('should throw when fields only include virtual field', function* () {
+        try {
+          yield database.get('Task', { fields: ['project'] }).values()
+        } catch (err) {
+          const standardErr = INVALID_FIELD_DES_ERR()
+          expect(err.message).to.equal(standardErr.message)
+        }
       })
 
     })
@@ -269,41 +261,38 @@ export default describe('Database public Method', () => {
     describe('Database.prototype.update', () => {
       const tasks = taskGenerator(10)
 
-      beforeEach(async function () {
-        await database.insert('Task', tasks).toPromise()
+      beforeEach(function* () {
+        yield database.insert('Task', tasks)
       })
 
-      it('should not update primaryKey', function *() {
-        yield database.update('Task', taskData._id as string, {
-          _id: 'fuck'
-        })
-          .catch(e => {
-            const err = UNMODIFIABLE_PRIMARYKEY_ERR()
-            expect(e.message).to.equal(err.message)
-            return Observable.of(null)
+      it('should not update primaryKey', function* () {
+        try {
+          yield database.update('Task', taskData._id as string, {
+            _id: 'fuck'
           })
+        } catch (e) {
+          const standardErr = UNMODIFIABLE_PRIMARYKEY_ERR()
+          expect(e.message).to.equal(standardErr.message)
+        }
       })
 
       it('update virtual props should do nothing', function* () {
-        yield database.update('Task', taskData._id as string, {
+        const result1 = yield database.update('Task', taskData._id as string, {
           project: {
             _id: 'project 2',
             name: 'xxx'
           }
         })
-          .do(r => {
-            expect(r).to.be.undefined
-          })
 
-        yield database.get<ProjectSchema>('Project', {
+        expect(result1).to.be.undefined
+
+        const result2 = yield database.get<ProjectSchema>('Project', {
           primaryValue: 'project 2'
-        })
-          .values()
-          .do(r => {
-            expect(r).deep.equal([])
-          })
+        }).values()
 
-        yield database.get<TaskSchema>('Task', {
+        expect(result2).deep.equal([])
+
+        const [{ project }] = yield database.get<TaskSchema>('Task', {
           fields: [
             '_id', {
               project: ['_id', 'name', 'isArchived'],
@@ -311,11 +300,9 @@ export default describe('Database public Method', () => {
             }
           ],
           primaryValue: taskData._id as string
-        })
-          .values()
-          .do(([{ project }]) => {
-            expect(project).to.deep.equal(taskData.project)
-          })
+        }).values()
+
+        expect(project).to.deep.equal(taskData.project)
       })
 
       it('bulk update should be ok', function* () {
@@ -328,28 +315,26 @@ export default describe('Database public Method', () => {
           where: (table) => table['created'].isNotNull()
         }, data)
 
-        yield database.get<TaskSchema>('Task', {
+        const [...results] = yield database.get<TaskSchema>('Task', {
           fields: [ 'created']
+        }).values()
+
+        results.forEach((r: any) => {
+          expect(r.created).to.deep.equal(newCreated.toISOString())
         })
-          .values()
-          .do(([...rets]) => {
-            rets.forEach((r) => {
-              expect(r.created).to.deep.equal(newCreated.toISOString())
-            })
-          })
       })
 
-      it('update hidden property should ok', function *() {
+      it('update hidden property should ok', function* () {
         const newCreated = new Date(2017, 1, 1)
         yield database.update('Task', taskData._id as string, {
           created: newCreated.toISOString()
         })
 
-        yield database.get<TaskSchema>('Task', {
+        const [result] = yield database.get<TaskSchema>('Task', {
           fields: ['created']
-        })
-          .values()
-          .do(([r]) => expect(r.created).to.deep.equal(newCreated.toISOString()))
+        }).values()
+
+        expect(result.created).to.deep.equal(newCreated.toISOString())
       })
     })
   })
@@ -357,11 +342,11 @@ export default describe('Database public Method', () => {
   describe('Database.prototype.delete', () => {
     const tasks = taskGenerator(30)
 
-    beforeEach(async function () {
-      await database.insert('Task', tasks).toPromise()
+    beforeEach(function* () {
+      yield database.insert('Task', tasks)
     })
 
-    it('should delete correct values with delete query', function *() {
+    it('should delete correct values with delete query', function* () {
       const testDate = moment()
       const count = tasks.filter(task => {
         return moment(task.created).valueOf() <= testDate.valueOf()
@@ -373,58 +358,49 @@ export default describe('Database public Method', () => {
         }
       })
 
-      yield database.get<TaskSchema>('Task')
-        .values()
-        .do(r => {
-          if (r.length) {
-            expect(r.length).to.equal(count)
-          } else {
-            expect(r).deep.equal([])
-          }
-        })
+      const result = yield database.get<TaskSchema>('Task').values()
+      if (result.length) {
+        expect(result.length).to.equal(count)
+      } else {
+        expect(result).deep.equal([])
+      }
     })
 
-    it('should delete correct values with primaryValue', function *() {
+    it('should delete correct values with primaryValue', function* () {
       const task = tasks[0]
       yield database.delete('Task', {
         primaryValue: task._id as string
       })
 
-      yield database.get('Task', {
+      const result = yield database.get('Task', {
         primaryValue: task._id as string
-      })
-        .values()
-        .do(r => expect(r).deep.equal([]))
+      }).values()
+
+      expect(result).deep.equal([])
     })
 
-    it('should throw when delete a row from non-exist table', done => {
+    it('should throw when delete a row from non-exist table', function* () {
       const tableName = 'TestTable-non-exist'
-      database.delete(tableName)
-        .catch(e => {
-          expect(e.message).to.equal(NON_EXISTENT_TABLE_ERR(tableName).message)
-          return Promise.resolve()
-        })
-        .subscribe(done)
+      try {
+        yield database.delete(tableName)
+      } catch (e) {
+        expect(e.message).to.equal(NON_EXISTENT_TABLE_ERR(tableName).message)
+      }
     })
   })
 
   describe('Query relational data', () => {
     const fixture = taskGenerator(1).pop()
 
-    beforeEach(async function () {
-      await database.insert('Task', fixture).toPromise()
+    beforeEach(function* () {
+      yield database.insert('Task', fixture)
     })
 
-    it('should get correct result', async function () {
-      await database.get<TaskSchema>('Task')
-        .values()
-        .map(r => r)
-        .do(rets => {
-          let result = rets[rets.length - 1]
+    it('should get correct result', function* () {
+      const rets = yield database.get<TaskSchema>('Task').values()
 
-          expect(rets.length).equal(1)
-          expect(fixture).deep.equal(result)
-        }).toPromise()
+      expect(rets.length).to.equal(1)
+      expect(rets[rets.length - 1]).deep.equal(fixture)
     })
   })
 

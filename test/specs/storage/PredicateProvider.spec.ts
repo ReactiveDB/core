@@ -9,7 +9,6 @@ export default describe('PredicateProvider test', () => {
   let table: lf.schema.Table
   let version = 1
 
-
   beforeEach(function* () {
     const schemaBuilder = lf.schema.create('PredicateProviderDatabase', version ++)
     const db$ = lfFactory(schemaBuilder, {
@@ -48,12 +47,12 @@ export default describe('PredicateProvider test', () => {
       expect(fn).to.throw(NON_EXISTENT_COLUMN_ERR('nonExist', table.getName()).message)
     })
 
-    it('literal value should ok', async function () {
+    it('literal value should ok', function* () {
       const predicate = new PredicateProvider(table, {
         time1: 20
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
@@ -62,88 +61,88 @@ export default describe('PredicateProvider test', () => {
       expect(result[0]['time1']).to.equal(20)
     })
 
-    it('$ne should ok', async function () {
+    it('$ne should ok', function* () {
       const predicate = new PredicateProvider(table, {
         time1: {
           $ne: 20
         }
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
 
       expect(result.length).to.equal(dataLength - 1)
 
-      result.forEach(r => expect(r['time1'] === 20).to.be.false)
+      result.forEach((r: any) => expect(r['time1'] === 20).to.be.false)
     })
 
-    it('$lt should ok', async function () {
+    it('$lt should ok', function* () {
       const predicate = new PredicateProvider(table, {
         time1: {
           $lt: 20
         }
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
 
       expect(result.length).to.equal(20)
-      result.forEach(r => expect(r['time1'] < 20).to.be.true)
+      result.forEach((r: any) => expect(r['time1'] < 20).to.be.true)
     })
 
-    it('$lte should ok', async function () {
+    it('$lte should ok', function* () {
       const predicate = new PredicateProvider(table, {
         time1: {
           $lte: 19
         }
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
 
       expect(result.length).to.equal(20)
-      result.forEach(r => expect(r['time1'] <= 19).to.be.true)
+      result.forEach((r: any) => expect(r['time1'] <= 19).to.be.true)
     })
 
-    it('$gt should ok', async function () {
+    it('$gt should ok', function* () {
       const predicate = new PredicateProvider(table, {
         time2: {
           $gt: 20
         }
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
 
       expect(result.length).to.equal(dataLength - 20)
-      result.forEach(r => expect(r['time2'] > 20).to.be.true)
+      result.forEach((r: any) => expect(r['time2'] > 20).to.be.true)
     })
 
-    it('$gte should ok', async function () {
+    it('$gte should ok', function* () {
       const predicate = new PredicateProvider(table, {
         time2: {
           $gte: 21
         }
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
 
       expect(result.length).to.equal(dataLength - 20)
-      result.forEach(r => expect(r['time2'] >= 21).to.be.true)
+      result.forEach((r: any) => expect(r['time2'] >= 21).to.be.true)
     })
 
-    it('$match should ok', async function () {
+    it('$match should ok', function* () {
       const regExp = /\:(\d{0,1}1$)/
       const predicate = new PredicateProvider(table, {
         name: {
@@ -151,16 +150,16 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
 
       expect(result.length).to.equal(10)
-      result.forEach(r => expect(regExp.test(r['name'])).to.be.true)
+      result.forEach((r: any) => expect(regExp.test(r['name'])).to.be.true)
     })
 
-    it('$notMatch should ok', async function () {
+    it('$notMatch should ok', function* () {
       const regExp = /\:(\d{0,1}1$)/
       const predicate = new PredicateProvider(table, {
         name: {
@@ -168,33 +167,33 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
 
       // 上一个测试中结果长度是 10
       expect(result.length).to.equal(dataLength - 10)
-      result.forEach(r => expect(regExp.test(r['name'])).to.be.false)
+      result.forEach((r: any) => expect(regExp.test(r['name'])).to.be.false)
     })
 
-    it('$between should ok', async function () {
+    it('$between should ok', function* () {
       const predicate = new PredicateProvider(table, {
         time1: {
           $between: [1, 20]
         }
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
 
       expect(result.length).to.equal(20)
-      result.forEach(r => expect(r['time1'] > 0 && r['time1'] <= 20).to.be.true)
+      result.forEach((r: any) => expect(r['time1'] > 0 && r['time1'] <= 20).to.be.true)
     })
 
-    it('$in should ok', async function () {
+    it('$in should ok', function* () {
       const seed = [10, 20, 30, 10000]
       const predicate = new PredicateProvider(table, {
         time1: {
@@ -202,55 +201,55 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
 
       expect(result.length).to.equal(3)
-      result.forEach(r => expect(seed.indexOf(r['time1']) !== -1).to.be.true)
+      result.forEach((r: any) => expect(seed.indexOf(r['time1']) !== -1).to.be.true)
     })
 
-    it('$isNull should ok', async function () {
+    it('$isNull should ok', function* () {
       const predicate = new PredicateProvider(table, {
         nullable: {
           $isNull: true
         }
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
 
       expect(result.length).to.equal(700)
-      result.forEach(r => expect(r['nullable']).to.be.null)
+      result.forEach((r: any) => expect(r['nullable']).to.be.null)
     })
 
-    it('$isNotNull should ok', async function () {
+    it('$isNotNull should ok', function* () {
       const predicate = new PredicateProvider(table, {
         nullable: {
           $isNotNull: true
         }
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
 
       expect(result.length).to.equal(300)
-      result.forEach(r => expect(r['nullable']).to.not.be.null)
+      result.forEach((r: any) => expect(r['nullable']).to.not.be.null)
     })
 
-    it('$not should ok', async function () {
+    it('$not should ok', function* () {
       const predicate = new PredicateProvider(table, {
         $not: {
           time1: 0
         }
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
@@ -258,7 +257,7 @@ export default describe('PredicateProvider test', () => {
       expect(result.length).to.equal(dataLength - 1)
     })
 
-    it('$and should ok', async function () {
+    it('$and should ok', function* () {
       const predicate = new PredicateProvider(table, {
         time1: {
           $and: {
@@ -268,16 +267,16 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
 
       expect(result.length).to.equal(150)
-      result.forEach(r => expect(r['time1'] >= 50 && r['time1'] < 200).to.be.true)
+      result.forEach((r: any) => expect(r['time1'] >= 50 && r['time1'] < 200).to.be.true)
     })
 
-    it('$or should ok', async function () {
+    it('$or should ok', function* () {
       const predicate = new PredicateProvider(table, {
         time1: {
           $or: {
@@ -287,16 +286,16 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
 
       expect(result.length).to.equal(100)
-      result.forEach(r => expect(r['time1'] >= dataLength - 50 || r['time1'] < 50).to.be.true)
+      result.forEach((r: any) => expect(r['time1'] >= dataLength - 50 || r['time1'] < 50).to.be.true)
     })
 
-    it('complex PredicateDescription should ok', async function () {
+    it('complex PredicateDescription should ok', function* () {
       const reg = /\:(\d{0,1}1$)/
       const predicate = new PredicateProvider(table, {
         time1: {
@@ -316,14 +315,14 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = await db.select()
+      const result = yield db.select()
         .from(table)
         .where(predicate)
         .exec()
 
       expect(result.length).to.equal(5)
 
-      result.forEach(r => {
+      result.forEach((r: any) => {
         const pred1 = r['time1'] >= dataLength - 50 || r['time1'] < 50
         const pred2 = r['time2'] >= dataLength / 2 && r['time2'] < dataLength
         const pred3 = reg.test(r['name'])
