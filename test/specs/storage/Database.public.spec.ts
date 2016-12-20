@@ -10,9 +10,13 @@ import {
   clone,
   INVALID_FIELD_DES_ERR,
   UNMODIFIABLE_PRIMARYKEY_ERR,
-  NON_EXISTENT_TABLE_ERR
+  NON_EXISTENT_TABLE_ERR,
+  ALIAS_CONFLICT_ERR,
+  UNEXPECTED_ASSOCIATION_ERR,
+  INVALID_ROW_TYPE_ERR
 } from '../../index'
 import taskGenerator from '../../utils/taskGenerator'
+import { TestFixture, TestFixture2 } from '../../schemas/Test'
 
 export default describe('Database public Method', () => {
 
@@ -60,9 +64,67 @@ export default describe('Database public Method', () => {
       expect(taskSelectMetaData.virtualMeta.get('project').name).to.equal('Project')
       assert.isFunction(taskSelectMetaData.virtualMeta.get('project').where)
     })
+
+    it('should throw when alias conflict in table design', () => {
+      let meta = Database['schemaMetaData']
+      let hooks = Database['hooks']
+
+      Database['schemaMetaData'] = new Map()
+      TestFixture(true)
+
+      let standardErr = ALIAS_CONFLICT_ERR('id', 'Test')
+      try {
+        const db = new Database()
+        expect(db).is.undefined
+      } catch (err) {
+        expect(err.message).to.equal(standardErr.message)
+      } finally {
+        Database['schemaMetaData'] = meta
+        Database['hooks'] = hooks
+      }
+    })
+
+    it('should throw when association is unexpected, should be one of oneToOne, oneToMany, manyToMany', () => {
+      let meta = Database['schemaMetaData']
+      let hooks = Database['hooks']
+
+      Database['schemaMetaData'] = new Map()
+      TestFixture()
+
+      let standardErr = UNEXPECTED_ASSOCIATION_ERR()
+      try {
+        // tslint:disable-next-line
+        new Database()
+      } catch (err) {
+        expect(err.message).to.equal(standardErr.message)
+      } finally {
+        Database['schemaMetaData'] = meta
+        Database['hooks'] = hooks
+      }
+    })
+
+    it('should throw if RDBType is incorrect', () => {
+      let meta = Database['schemaMetaData']
+      let hooks = Database['hooks']
+
+      Database['schemaMetaData'] = new Map()
+      TestFixture2()
+
+      let standardErr = INVALID_ROW_TYPE_ERR()
+      try {
+        // tslint:disable-next-line
+        new Database()
+      } catch (err) {
+        expect(err.message).to.equal(standardErr.message)
+      } finally {
+        Database['schemaMetaData'] = meta
+        Database['hooks'] = hooks
+      }
+    })
+
   })
 
-  describe('store, get, update', () => {
+  describe('insert, get, update', () => {
     let storeResult: TaskSchema[]
     let taskData: TaskSchema
 
@@ -79,9 +141,11 @@ export default describe('Database public Method', () => {
       storeResult = yield database.insert('Task', storeTask)
     })
 
-    describe('Database.prototype.store', () => {
+    describe('Database.prototype.insert', () => {
       it('should return data by fields', () => {
-        expect(storeResult[0]).to.deep.equal(expectResult)
+        // 因为这里不是通过alias convert输出的，所以这里会吐出真实的数据，而不是 created => __hidden__created 的映射
+        // 因此 expectResult.created 仍然是一个真实的DateTime类型
+        expect(storeResult).to.deep.equal([expectResult])
       })
 
       it('virtual property should store seprately', async function () {
@@ -108,6 +172,31 @@ export default describe('Database public Method', () => {
           })
           .toPromise()
       })
+
+      describe('insert data into table without any hooks', () => {
+        it('should insert single row', async function() {
+          const project = taskGenerator(1).pop().project
+          await database.insert('Project', project).toPromise()
+          const [result] = await database.get('Project', {
+            where: (table) => table['_id'].eq(project._id as any)
+          }).values().toPromise()
+
+          expect(result).deep.equals(project)
+        })
+
+        it('should insert multi rows', async function() {
+          let projects = taskGenerator(5).map((task) => task.project)
+          const name = 'foo'
+          projects.forEach((project) => project.name = name)
+
+          await database.insert('Project', projects).toPromise().catch(err => console.log(err))
+          const results = await database.get('Project', {
+            where: (table) => table['name'].eq(name)
+          }).values().toPromise()
+
+          expect(results).deep.equals(projects)
+        })
+      })
     })
 
     describe('Database.prototype.get', () => {
@@ -131,6 +220,16 @@ export default describe('Database public Method', () => {
           .toPromise()
       })
 
+      it('should throw when try to get data from non-existent table', async function() {
+        const tableName = 'NON_EXISTENT_FOO_TABLE'
+        try {
+          await database.get(tableName).values().toPromise()
+        } catch (e) {
+          let standardErr = NON_EXISTENT_TABLE_ERR(tableName)
+          expect(e.message).equals(standardErr.message)
+        }
+      })
+
       it('should get current fields when get with query', function *() {
         yield database.get<TaskSchema>('Task', { fields: ['note'], primaryValue: taskData._id as string })
           .values()
@@ -149,10 +248,10 @@ export default describe('Database public Method', () => {
           })
       })
 
-      it('should get null when query is not match any result', function *() {
+      it('should get empty array when query is not match any result', function *() {
         yield database.get<TaskSchema>('Task', { primaryValue: 'testtask' })
           .values()
-          .do((r) => expect(r).to.be.null)
+          .do((r) => expect(r).deep.equal([]))
       })
 
       it('should throw when fields only include virtual field', function *() {
@@ -164,8 +263,8 @@ export default describe('Database public Method', () => {
             return Observable.of(null)
           })
       })
-    })
 
+    })
 
     describe('Database.prototype.update', () => {
       const tasks = taskGenerator(10)
@@ -183,7 +282,6 @@ export default describe('Database public Method', () => {
             expect(e.message).to.equal(err.message)
             return Observable.of(null)
           })
-
       })
 
       it('update virtual props should do nothing', function* () {
@@ -201,26 +299,27 @@ export default describe('Database public Method', () => {
           primaryValue: 'project 2'
         })
           .values()
-          .do(r => expect(r).to.be.null)
+          .do(r => {
+            expect(r).deep.equal([])
+          })
 
         yield database.get<TaskSchema>('Task', {
           fields: [
             '_id', {
-              project: ['_id', 'name'],
+              project: ['_id', 'name', 'isArchived'],
               subtasks: ['_id', 'name']
             }
           ],
           primaryValue: taskData._id as string
         })
           .values()
-          .do(([{ project }]) => expect(project).to.deep.equal({
-            _id: taskData.project._id,
-            name: taskData.project.name
-          }))
+          .do(([{ project }]) => {
+            expect(project).to.deep.equal(taskData.project)
+          })
       })
 
       it('bulk update should be ok', function* () {
-        const newCreated = new Date(2017, 1, 1)
+        const newCreated = new Date(2017, 0, 1)
         const data = {
           created: newCreated.toISOString()
         }
@@ -230,13 +329,12 @@ export default describe('Database public Method', () => {
         }, data)
 
         yield database.get<TaskSchema>('Task', {
-          fields: ['created', '__hidden__created']
+          fields: [ 'created']
         })
           .values()
           .do(([...rets]) => {
             rets.forEach((r) => {
-              expect(r.created).to.deep.equal(newCreated)
-              expect(r['__hidden__created']).to.deep.equal(newCreated.toISOString())
+              expect(r.created).to.deep.equal(newCreated.toISOString())
             })
           })
       })
@@ -248,10 +346,10 @@ export default describe('Database public Method', () => {
         })
 
         yield database.get<TaskSchema>('Task', {
-          fields: ['created', '__hidden__created']
+          fields: ['created']
         })
           .values()
-          .do(([r]) => expect(r.created).to.deep.equal(newCreated))
+          .do(([r]) => expect(r.created).to.deep.equal(newCreated.toISOString()))
       })
     })
   })
@@ -267,20 +365,21 @@ export default describe('Database public Method', () => {
       const testDate = moment()
       const count = tasks.filter(task => {
         return moment(task.created).valueOf() <= testDate.valueOf()
-      })
-        .length
+      }).length
+
       yield database.delete('Task', {
         where: (table: lf.schema.Table) => {
           return table['created'].gte(testDate.valueOf())
         }
       })
+
       yield database.get<TaskSchema>('Task')
         .values()
         .do(r => {
-          if (r) {
+          if (r.length) {
             expect(r.length).to.equal(count)
           } else {
-            expect(r).to.be.null
+            expect(r).deep.equal([])
           }
         })
     })
@@ -295,7 +394,7 @@ export default describe('Database public Method', () => {
         primaryValue: task._id as string
       })
         .values()
-        .do(r => expect(r).to.be.null)
+        .do(r => expect(r).deep.equal([]))
     })
 
     it('should throw when delete a row from non-exist table', done => {
@@ -308,4 +407,25 @@ export default describe('Database public Method', () => {
         .subscribe(done)
     })
   })
+
+  describe('Query relational data', () => {
+    const fixture = taskGenerator(1).pop()
+
+    beforeEach(async function () {
+      await database.insert('Task', fixture).toPromise()
+    })
+
+    it('should get correct result', async function () {
+      await database.get<TaskSchema>('Task')
+        .values()
+        .map(r => r)
+        .do(rets => {
+          let result = rets[rets.length - 1]
+
+          expect(rets.length).equal(1)
+          expect(fixture).deep.equal(result)
+        }).toPromise()
+    })
+  })
+
 })

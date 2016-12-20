@@ -79,4 +79,4 @@ export const clone = <T>(origin: T): T | null => {
   return target
 }
 
-export function flat <T>(r: T) { return r }
+export function identity (r: any) { return r }

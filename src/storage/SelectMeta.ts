@@ -9,14 +9,25 @@ import {
   TOKEN_INVALID_ERR,
   TOKEN_CONSUMED_ERR
 } from './RuntimeError'
-import { flat } from '../utils'
+import { identity } from '../utils'
+import graphify from './Graphify'
+
+export type GraphMapper = (data: any) => any
+
+export interface TableShape {
+  primaryKey: {
+    name: string,
+    queried: boolean
+  }
+  definition: Object
+}
 
 export class SelectMeta <T> {
   static factory<U>(... metaDatas: SelectMeta<U>[]) {
     const originalToken = metaDatas[0]
-    const fakeQuery = { toSql: flat }
+    const fakeQuery = { toSql: identity }
     // 初始化一个空的 SelectMeta，然后在初始化以后替换它上面的属性和方法
-    const dist = new SelectMeta<U>(originalToken.db, fakeQuery as any, flat)
+    const dist = new SelectMeta<U>(originalToken.db, fakeQuery as any, identity)
     dist.change$ = Observable.from(metaDatas)
       .map(metas => metas.change$)
       .combineAll()
@@ -24,7 +35,7 @@ export class SelectMeta <T> {
     dist.values = () => {
       return Observable.from(metaDatas)
         .map(metaData => metaData.values())
-        .flatMap(flat)
+        .flatMap(identity)
         .reduce((acc: U[], val: U[]) => acc.concat(val))
     }
     dist.select = originalToken.select
@@ -40,7 +51,7 @@ export class SelectMeta <T> {
   constructor(
     public db: lf.Database,
     select: lf.query.Select,
-    private fold: (values: T[]) => T[],
+    private shape: TableShape | GraphMapper,
     public predicate?: lf.Predicate
   ) {
     this.select = select.toSql()
@@ -63,8 +74,9 @@ export class SelectMeta <T> {
     if (this.consumed) {
       throw TOKEN_CONSUMED_ERR()
     }
+
     this.consumed = true
-    return Observable.fromPromise(this.getValue())
+    return Observable.fromPromise(this.getValue() as Promise<T[]>)
   }
 
   combine(... selectMetas: SelectMeta<T>[]): SelectMeta<T> {
@@ -86,6 +98,24 @@ export class SelectMeta <T> {
   private getValue() {
     return this.query
       .exec()
-      .then(this.fold)
+      .then((rows: any[]) => {
+        // manually provided mapper function
+        if (typeof this.shape === 'function') {
+          return this.shape(rows)
+        }
+
+        let result = graphify<T>(rows, this.shape.definition)
+        let col = this.shape.primaryKey.name
+
+        return !this.shape.primaryKey.queried ? this.removeKey(result, col) : result
+      })
+  }
+
+  private removeKey(data: any[], key: string) {
+    data.forEach((entity) => {
+        delete entity[key]
+    })
+
+    return data
   }
 }

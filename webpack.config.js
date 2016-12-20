@@ -22,7 +22,8 @@ module.exports = {
     extensions: ['', '.ts', '.js'],
     alias: {
       'lovefield': path.join(process.cwd(), 'node_modules/lovefield/dist/lovefield.js'),
-      'sinon': path.join(process.cwd(), 'node_modules/sinon/pkg/sinon.js')
+      'sinon': path.join(process.cwd(), 'node_modules/sinon/pkg/sinon.js'),
+      'tman': path.join(process.cwd(), 'node_modules/tman/browser/tman.js')
     }
   },
 
@@ -56,6 +57,11 @@ module.exports = {
   module: {
     noParse: [/tman\/browser\/tman\.js/, /sinon\/pkg\/sinon\.js/],
     preLoaders: [
+      {
+        test: /\.tsx?$/,
+        exclude: /node_modules/,
+        loader: 'tslint'
+      },
       { test: /\.js$/, loader: 'source-map-loader', include: /rxjs/ }
     ],
     loaders: [

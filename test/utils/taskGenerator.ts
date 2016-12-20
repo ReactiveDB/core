@@ -16,14 +16,17 @@ export default function (limit: number) {
       _creatorId: uuid(),
       _executorId: uuid(),
       _tasklistId: uuid(),
+      _sourceId: null,
       accomplished: null,
       subtasks: subtaskGenerator(randomNumber(1, 20), _id),
       content: 'content: ' + uuid(),
       note: 'note: ' + uuid(),
       project: {
         _id: _projectId,
-        name: 'project name: ' + uuid()
+        name: 'project name: ' + uuid(),
+        isArchived: true
       },
+      involveMembers: [],
       created: moment().add(6 - randomNumber(0, 12), 'month').add(30 - randomNumber(0, 30), 'day').toISOString()
     })
   }

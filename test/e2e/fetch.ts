@@ -24,6 +24,15 @@ Observable.ajax({
   .map(r => r.response)
   .concatMap(r => database.insert('Subtask', r))
   .do(() => {
+    database.insert('Subtask', {
+      _id: 1,
+      content: 'foo',
+      _taskId: '56cfbabb981fbfc92eb8f517',
+      isDone: true,
+      created: new Date().toISOString()
+    })
+  })
+  .do(() => {
     database.update('Project', '584172991548501c664fb6e2', {
       name: 'updated task project'
     })
@@ -33,7 +42,17 @@ Observable.ajax({
     })
   })
   .concatMap(() => {
-    return database.get<TaskSchema>('Task').changes()
+    // database.delete<TaskSchema>('Task', {
+    //   where: (table) => table['created'].gte(1)
+    // }).subscribe(r => console.log(1111, r))
+    // , {
+    //   fields: ['_id', {
+    //     project: ['_id', {
+    //       post: ['_id', 'content']
+    //     }]
+    //   }]
+    // }
+    return database.get<TaskSchema>('Task').values()
   })
   .subscribe(r => {
     console.timeEnd('Tasks change notify')

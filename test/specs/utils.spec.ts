@@ -1,6 +1,6 @@
 'use strict'
 import * as chai from 'chai'
-import { forEach } from '../index'
+import { forEach, clone } from '../index'
 import { describe, it } from 'tman'
 
 const expect = chai.expect
@@ -114,6 +114,24 @@ export default describe('utils test', () => {
       return arr.push(val)
     })
     expect(arr).to.deep.equal(dest)
+  })
+
+  it('clone should ok', () => {
+    const obj = {
+      a: [1, 2, 3],
+      b: 1,
+      c: {
+        a: 1,
+        b: 2,
+        c: 3
+      },
+      d: new Date(),
+      f: '1',
+      e: false,
+      g: true
+    }
+
+    expect(clone(obj)).deep.equals(obj)
   })
 
 })
