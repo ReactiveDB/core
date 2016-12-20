@@ -463,7 +463,7 @@ export class Database {
         tableBuilder = this.addRow(tableBuilder, key, def.type as RDBType, nullable, def)
         fields.add(key)
 
-        let tags: boolean[] = []
+        const tags: boolean[] = []
 
         if (def.primaryKey) {
           primaryKey.push(key)
@@ -540,12 +540,12 @@ export class Database {
   }
 
   private buildTableShape(tableName: string, metadata: SchemaDef) {
-    let definedShape = this.tableShapeMap.get(tableName)
+    const definedShape = this.tableShapeMap.get(tableName)
     if (definedShape && Object.keys(definedShape).length > 0) {
       return
     }
 
-    let shape = definedShape || Object.create(null)
+    const shape = definedShape || Object.create(null)
     forEach(metadata, (value, key) => {
       const label = value.as ? value.as : key
       const matcher = {
@@ -724,7 +724,7 @@ export class Database {
       fields = fields.concat(primaryKey)
     }
     const queriedFields: Set<FieldsValue> = hasQueryFields ? new Set(fields) : selectMetadata.fields
-    let { columns, allFields } = this.buildColumns(db, tableName, queriedFields, !hasQueryFields)
+    const { columns, allFields } = this.buildColumns(db, tableName, queriedFields, !hasQueryFields)
 
     virtualMetadata.forEach((virtual, key) => {
       if ((hasQueryFields && key in allFields) || !hasQueryFields) {
@@ -769,7 +769,7 @@ export class Database {
     }
 
     const shape = this.tableShapeMap.get(tableName)
-    let filteredShape = {}
+    const filteredShape = Object.create(null)
     forEach(shape, (value, key) => {
       if (key in allFields) {
         filteredShape[key] = value
@@ -830,8 +830,8 @@ export class Database {
     const virtualTable = this.selectMetaData.get(tableName)
 
     let columns: lf.schema.Column[] = []
-    let allFields: Object = {}
-    let association: string[] = []
+    const allFields = Object.create(null)
+    const association: string[] = []
 
     if (glob) {
       virtualTable.virtualMeta.forEach((_, asso) => {

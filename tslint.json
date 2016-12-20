@@ -23,6 +23,7 @@
       "check-else",
       "check-whitespace",
       "check-open-brace"],
+    "prefer-const": true,
     "quotemark": [true,
       "single",
       "avoid-escape"],

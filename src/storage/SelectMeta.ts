@@ -104,8 +104,8 @@ export class SelectMeta <T> {
           return this.shape(rows)
         }
 
-        let result = graphify<T>(rows, this.shape.definition)
-        let col = this.shape.primaryKey.name
+        const result = graphify<T>(rows, this.shape.definition)
+        const col = this.shape.primaryKey.name
 
         return !this.shape.primaryKey.queried ? this.removeKey(result, col) : result
       })

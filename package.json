@@ -41,7 +41,7 @@
     "tman": "^1.6.3",
     "ts-loader": "^1.2.2",
     "ts-node": "^1.7.0",
-    "tslint": "^4.0.2",
+    "tslint": "^4.1.1",
     "tslint-loader": "^3.3.0",
     "typescript": "^2.1.4",
     "webpack": "^1.13.3",
