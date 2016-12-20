@@ -231,14 +231,12 @@ export default describe('SelectMeta test', () => {
     beforeEach(() => {
       selectMeta1 = new SelectMeta(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
-          value.folded = 'true1'
-          return value
+          return {...value, folded: 1}
         })
       }, table['time'].lt(50))
       selectMeta2 = new SelectMeta(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
-          value.folded = 'true2'
-          return value
+          return {...value, folded: 2}
         })
       }, lf.op.and(table['time'].gte(50), table['time'].lt(100)))
 
@@ -246,15 +244,13 @@ export default describe('SelectMeta test', () => {
 
       selectMeta3 = new SelectMeta(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
-          value.folded = 'true3'
-          return value
+          return {...value, folded: 3}
         })
       }, lf.op.and(table['time'].gte(100), table['time'].lt(150)))
 
       selectMeta4 = new SelectMeta(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
-          value.folded = 'true3'
-          return value
+          return {...value, folded: 4}
         })
       }, lf.op.and(table['time'].gte(150), table['time'].lt(200)))
 
@@ -271,6 +267,24 @@ export default describe('SelectMeta test', () => {
           expect(r.length).to.equal(200)
           done()
         })
+    })
+
+    it('result should be combined', function* () {
+      const result = yield dist.values()
+      const count = 200
+      expect(result.length).is.equals(count)
+
+      for (let i = 0; i < count; i++) {
+        if (i < 50) {
+          expect(result[i].folded).is.equals(1)
+        } else if (i >= 50 && i < 100) {
+          expect(result[i].folded).is.equals(2)
+        } else if (i >= 100 && i < 150) {
+          expect(result[i].folded).is.equals(3)
+        } else {
+          expect(result[i].folded).is.equals(4)
+        }
+      }
     })
 
     it('changes should observe all values from original SelectMeta', function *() {
