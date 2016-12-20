@@ -8,7 +8,7 @@ export interface TestSchema {
 }
 
 export const TestFixture = (enableAliasConfict = false) => {
-  let schema = {
+  const schema = {
     _id: {
       type: RDBType.STRING,
       primaryKey: true,
@@ -48,7 +48,7 @@ export const TestFixture = (enableAliasConfict = false) => {
 }
 
 export const TestFixture2 = () => {
-  let schema = {
+  const schema = {
     _id: {
       type: RDBType.STRING,
       primaryKey: true,
