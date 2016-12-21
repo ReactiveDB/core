@@ -173,7 +173,7 @@ export default describe('SelectMeta test', () => {
       expect(stub).to.be.calledOnce
     })
 
-    it('reconsume should throw', function () {
+    it('reconsume should throw', () => {
       const selectMeta = new SelectMeta(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
           return { ...value, folded: true }

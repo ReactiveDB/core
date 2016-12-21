@@ -66,13 +66,13 @@ export default describe('Database public Method', () => {
     })
 
     it('should throw when alias conflict in table design', () => {
-      let meta = Database['schemaMetaData']
-      let hooks = Database['hooks']
+      const meta = Database['schemaMetaData']
+      const hooks = Database['hooks']
 
       Database['schemaMetaData'] = new Map()
       TestFixture(true)
 
-      let standardErr = ALIAS_CONFLICT_ERR('id', 'Test')
+      const standardErr = ALIAS_CONFLICT_ERR('id', 'Test')
       try {
         const db = new Database()
         expect(db).is.undefined
@@ -85,13 +85,13 @@ export default describe('Database public Method', () => {
     })
 
     it('should throw when association is unexpected, should be one of oneToOne, oneToMany, manyToMany', () => {
-      let meta = Database['schemaMetaData']
-      let hooks = Database['hooks']
+      const meta = Database['schemaMetaData']
+      const hooks = Database['hooks']
 
       Database['schemaMetaData'] = new Map()
       TestFixture()
 
-      let standardErr = UNEXPECTED_ASSOCIATION_ERR()
+      const standardErr = UNEXPECTED_ASSOCIATION_ERR()
       try {
         // tslint:disable-next-line
         new Database()
@@ -104,13 +104,13 @@ export default describe('Database public Method', () => {
     })
 
     it('should throw if RDBType is incorrect', () => {
-      let meta = Database['schemaMetaData']
-      let hooks = Database['hooks']
+      const meta = Database['schemaMetaData']
+      const hooks = Database['hooks']
 
       Database['schemaMetaData'] = new Map()
       TestFixture2()
 
-      let standardErr = INVALID_ROW_TYPE_ERR()
+      const standardErr = INVALID_ROW_TYPE_ERR()
       try {
         // tslint:disable-next-line
         new Database()
@@ -179,7 +179,7 @@ export default describe('Database public Method', () => {
         })
 
         it('should insert multi rows', function* () {
-          let projects = taskGenerator(5).map((task) => task.project)
+          const projects = taskGenerator(5).map((task) => task.project)
           const name = 'foo'
           projects.forEach((project) => project.name = name)
 
