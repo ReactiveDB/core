@@ -805,7 +805,7 @@ export class Database {
       fieldTree.add(pk)
     }
 
-    fieldTree.forEach((field, _) => {
+    fieldTree.forEach(field => {
       if (typeof field === 'string'
       && associationItem.indexOf(field) === -1
       && associationMeta.indexOf(field) === -1) {
