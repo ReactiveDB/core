@@ -40,13 +40,13 @@ export default describe('QueryToken test', () => {
         })
     })
 
-    it('should complete after values emited', function *() {
+    it('should complete after values emited', function* () {
       yield queryToken.values()
     })
   })
 
   describe('QueryToken.prototype.changes', () => {
-    it('should get initial value', function *() {
+    it('should get initial value', function* () {
       const value = yield queryToken.changes().take(1)
       expect(value).to.deep.equal(tasks)
     })
@@ -85,15 +85,12 @@ export default describe('QueryToken test', () => {
       expect(combined).to.be.instanceof(QueryToken)
     })
 
-    it('combined.values should return combined values', done => {
-      combined.values()
-        .subscribe(r => {
-          expect(r).to.deep.equal(tasks.concat(tasks2))
-          done()
-        })
+    it('combined.values should return combined values', function* () {
+      const result = yield combined.values()
+      expect(result).to.deep.equal(tasks.concat(tasks2))
     })
 
-    it('should notified when origin SelectMeta updated', function *() {
+    it('should notified when origin SelectMeta updated', function* () {
       const source$ = combined.changes()
         .publishReplay(1)
         .refCount()
