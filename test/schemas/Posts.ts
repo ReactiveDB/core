@@ -12,5 +12,8 @@ export default Database.defineSchema('Post', {
   },
   content: {
     type: RDBType.BOOLEAN
+  },
+  belongTo: {
+    type: RDBType.STRING
   }
 })

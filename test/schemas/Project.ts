@@ -15,5 +15,21 @@ export default Database.defineSchema('Project', {
   },
   isArchived: {
     type: RDBType.BOOLEAN
-  }
+  },
 })
+
+// waiting for next lovefield release
+/**
+  posts: {
+    type: Association.oneToMany,
+    virtual: {
+      name: 'Post',
+      where: (
+        postTable: lf.schema.Table,
+        projectTable: lf.schema.Table
+      ) => {
+        return postTable['belongTo'].eq(projectTable['_id'])
+      }
+    }
+  }
+ */

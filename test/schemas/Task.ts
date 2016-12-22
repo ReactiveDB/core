@@ -16,7 +16,8 @@ export interface TaskSchema {
   project?: {
     _id: TeambitionTypes.ProjectId
     name: string,
-    isArchived: boolean
+    isArchived: boolean,
+    posts?: any[]
   }
   subtasks: SubtaskSchema[]
   created: string,

@@ -249,11 +249,37 @@ export default describe('Database public Method', () => {
 
       it('should throw when fields only include virtual field', function* () {
         try {
-          yield database.get('Task', { fields: ['project'] }).values()
+          yield database.get('Task', {
+            fields: [
+              'project', 'subtasks'
+            ],
+            primaryValue: taskData._id as string
+          }).values()
+
+          throw new TypeError('Invalid code path reached!')
         } catch (err) {
           const standardErr = INVALID_FIELD_DES_ERR()
           expect(err.message).to.equal(standardErr.message)
         }
+      })
+
+      it('should get correct result when passin partial query fields', function* () {
+        const [{ project }] = yield database.get<TaskSchema>('Task', {
+          fields: [
+            '_id', {
+              project: ['_id'],
+              subtasks: ['_id', 'name']
+            }
+          ],
+          primaryValue: taskData._id as string
+        }).values()
+
+        const expectProject = clone(taskData.project)
+        delete expectProject.isArchived
+        delete expectProject.name
+        delete expectProject.posts
+
+        expect(project).to.deep.equal(expectProject)
       })
 
     })
