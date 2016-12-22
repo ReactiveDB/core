@@ -35,7 +35,7 @@ export const INVALID_VIRTUAL_VALUE_ERR =
   (prop: string) => ReactiveDBError(`Invalid value of virtual prop: \`${prop}\`, Expect Object/Array.`)
 
 export const INVALID_FIELD_DES_ERR =
-  () => ReactiveDBError('Invalid field description, It should include its association field.')
+  () => ReactiveDBError('Invalid field description, Only navigation properties were included in description.')
 
 export const ALIAS_CONFLICT_ERR =
   (alias: string, tableName: string) => ReactiveDBError(`Alias: \`${alias}\` conflict in table: ${tableName}.`)
@@ -78,10 +78,12 @@ export const NON_EXISTENT_FIELD_WARN =
 export const BUILD_PREDICATE_FAILED_WARN =
   (e: Error, tableName?: string, key?: string) => {
     let message = `Build predicate faild due to: ${e.message}`
-    if (tableName && key) {
-      message += `, error was in ${tableName}, ${key}`
+    if (tableName) {
+      message += `, error was in ${tableName}`
     }
-
+    if (key) {
+      message += `, ${key}`
+    }
     message += '.'
     console.warn(message)
   }
