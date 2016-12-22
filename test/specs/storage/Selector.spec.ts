@@ -4,7 +4,7 @@ import { expect, use } from 'chai'
 import * as sinon from 'sinon'
 import * as SinonChai from 'sinon-chai'
 import { beforeEach, it, describe, afterEach } from 'tman'
-import { SelectMeta, lfFactory, TOKEN_CONSUMED_ERR, TOKEN_INVALID_ERR } from '../../index'
+import { Selector, lfFactory, TOKEN_CONSUMED_ERR, TOKEN_INVALID_ERR } from '../../index'
 
 use(SinonChai)
 
@@ -56,12 +56,12 @@ export default describe('SelectMeta test', () => {
   })
 
   it('should create a instance successfully', () => {
-    const selectMeta = new SelectMeta<Fixture>(db, db.select().from(table), (values: Fixture[]) => values)
-    expect(selectMeta).to.be.instanceof(SelectMeta)
+    const selectMeta = new Selector<Fixture>(db, db.select().from(table), (values: Fixture[]) => values)
+    expect(selectMeta).to.be.instanceof(Selector)
   })
 
   it('should getValues successfully via mapper', function* () {
-    const selectMeta = new SelectMeta<Fixture>(db, db.select().from(table), (values: Fixture[]) => {
+    const selectMeta = new Selector<Fixture>(db, db.select().from(table), (values: Fixture[]) => {
       return values.map(value => {
         value.folded = true
         return value
@@ -77,8 +77,8 @@ export default describe('SelectMeta test', () => {
   })
 
   it('should getValues successfully via table shape', function* () {
-    const selectMeta = new SelectMeta<Fixture>(db, db.select().from(table), {
-      primaryKey: {
+    const selectMeta = new Selector<Fixture>(db, db.select().from(table), {
+      pk: {
         name: '_id',
         queried: true
       },
@@ -105,7 +105,7 @@ export default describe('SelectMeta test', () => {
   })
 
   it('reconsume should throw', function* () {
-    const meta = new SelectMeta(db, db.select().from(table), (rows: any[]) => {
+    const meta = new Selector(db, db.select().from(table), (rows: any[]) => {
       return rows.map(row => {
         row.folded = 'true'
         return row
@@ -122,7 +122,7 @@ export default describe('SelectMeta test', () => {
 
   describe('SelectMeta.prototype.changes', () => {
     it('observe should ok', done => {
-      const selectMeta = new SelectMeta(db, db.select().from(table), (values: any[]) => {
+      const selectMeta = new Selector(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
           value.folded = 'true'
           return value
@@ -145,7 +145,7 @@ export default describe('SelectMeta test', () => {
     })
 
     it('unsubscribe should ok', function* () {
-      const selectMeta = new SelectMeta(db, db.select().from(table), (values: any[]) => {
+      const selectMeta = new Selector(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
           value.folded = 'true'
           return value
@@ -174,7 +174,7 @@ export default describe('SelectMeta test', () => {
     })
 
     it('reconsume should throw', () => {
-      const selectMeta = new SelectMeta(db, db.select().from(table), (values: any[]) => {
+      const selectMeta = new Selector(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
           return { ...value, folded: true }
         })
@@ -187,7 +187,7 @@ export default describe('SelectMeta test', () => {
     })
 
     it('should throw when getValue error', function* () {
-      const selectMeta = new SelectMeta(db, db.select().from(table), (values: any[]) => {
+      const selectMeta = new Selector(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
           return { ...value, folded: true }
         })
@@ -225,19 +225,19 @@ export default describe('SelectMeta test', () => {
   })
 
   describe('SelectMeta.prototype.combine', () => {
-    let selectMeta1: SelectMeta<any>
-    let selectMeta2: SelectMeta<any>
-    let selectMeta3: SelectMeta<any>
-    let selectMeta4: SelectMeta<any>
-    let dist: SelectMeta<any>
+    let selectMeta1: Selector<any>
+    let selectMeta2: Selector<any>
+    let selectMeta3: Selector<any>
+    let selectMeta4: Selector<any>
+    let dist: Selector<any>
 
     beforeEach(() => {
-      selectMeta1 = new SelectMeta(db, db.select().from(table), (values: any[]) => {
+      selectMeta1 = new Selector(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
           return { ...value, folded: 1 }
         })
       }, table['time'].lt(50))
-      selectMeta2 = new SelectMeta(db, db.select().from(table), (values: any[]) => {
+      selectMeta2 = new Selector(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
           return { ...value, folded: 2 }
         })
@@ -245,13 +245,13 @@ export default describe('SelectMeta test', () => {
 
       const select1And2 = selectMeta1.combine(selectMeta2)
 
-      selectMeta3 = new SelectMeta(db, db.select().from(table), (values: any[]) => {
+      selectMeta3 = new Selector(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
           return { ...value, folded: 3 }
         })
       }, lf.op.and(table['time'].gte(100), table['time'].lt(150)))
 
-      selectMeta4 = new SelectMeta(db, db.select().from(table), (values: any[]) => {
+      selectMeta4 = new Selector(db, db.select().from(table), (values: any[]) => {
         return values.map(value => {
           return { ...value, folded: 4 }
         })
@@ -261,7 +261,7 @@ export default describe('SelectMeta test', () => {
     })
 
     it('should return SelectMeta', () => {
-      expect(dist).instanceof(SelectMeta)
+      expect(dist).instanceof(Selector)
     })
 
     it('result metadata should combine all results', done => {
@@ -327,7 +327,7 @@ export default describe('SelectMeta test', () => {
     })
 
     it('should throw when combine two different SelectMetas', () => {
-      const different = new SelectMeta(db, db.select(table['_id']).from(table), () => void 0)
+      const different = new Selector(db, db.select(table['_id']).from(table), () => void 0)
       const fn = () => dist.combine(different)
       expect(fn).to.throw(TOKEN_INVALID_ERR().message)
     })
