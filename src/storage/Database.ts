@@ -536,12 +536,7 @@ export class Database {
   }
 
   private buildTableShape(tableName: string, metadata: SchemaDef) {
-    const definedShape = this.tableShapeMap.get(tableName)
-    if (definedShape && Object.keys(definedShape).length > 0) {
-      return
-    }
-
-    const shape = definedShape || Object.create(null)
+    const shape = Object.create(null)
     forEach(metadata, (value, key) => {
       const label = value.as ? value.as : key
       const matcher = {
@@ -612,8 +607,9 @@ export class Database {
       return Promise.resolve()
     }
 
-    if (typeof prop !== 'object') {
-      return Promise.reject(INVALID_NAVIGATINO_TYPE_ERR(prop, ['Object/Array', typeof prop]))
+    const propType = typeof prop
+    if (propType !== 'object') {
+      return Promise.reject(INVALID_NAVIGATINO_TYPE_ERR(prop, ['Object / Array', propType]))
     }
 
     const pk = this.primaryKeysMap.get(def.virtual.name)
@@ -637,9 +633,8 @@ export class Database {
           .toPromise()
 
       case Association.oneToOne:
-        const type = typeof prop
-        if (type !== 'object' || Array.isArray(prop)) {
-          return Promise.reject(INVALID_NAVIGATINO_TYPE_ERR(key, ['Object', type === 'object' ? 'Array' : type]))
+        if (propType !== 'object' || Array.isArray(prop)) {
+          return Promise.reject(INVALID_NAVIGATINO_TYPE_ERR(key, ['Object', propType === 'object' ? 'Array' : propType]))
         }
 
         return this.upsertVirtualProp(db, pk, virtualTable, prop)

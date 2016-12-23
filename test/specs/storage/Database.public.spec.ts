@@ -280,6 +280,31 @@ export default describe('Database public Method', () => {
         expect(project).to.deep.equal(expectProject)
       })
 
+      it('should throw when build whereClause failed', function* () {
+        let result: any[]
+        try {
+          result = yield database.get<TaskSchema>('Task', {
+            where: () => {
+              throw new TypeError()
+            }
+          }).values()
+        } catch(e) {
+          throw new TypeError('Invalid code path reached.')
+        }
+
+        expect(result.length).to.greaterThan(0)
+      })
+
+      it('should get value when both pk and whereClause were specified', function* () {
+        let task = clone(taskData)
+
+        const [{ _id }] = yield database.get<TaskSchema>('Task', {
+          where: (table) => table['_projectId'].eq(task._projectId as string),
+          primaryValue: task._id as string
+        }).values()
+
+        expect(_id).to.equal(task._id)
+      })
     })
 
     describe('Database.prototype.update', () => {
