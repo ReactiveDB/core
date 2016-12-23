@@ -1,5 +1,5 @@
 'use strict'
-import { TeambitionTypes, Database, RDBType } from '../index'
+import { TeambitionTypes, Database, RDBType, Association } from '../index'
 
 export interface TestSchema {
   _id: string
@@ -44,7 +44,7 @@ export const TestFixture = (enableAliasConfict = false) => {
     schema.data2['as'] = 'id'
   }
 
-  Database.defineSchema('Test', schema)
+  Database.defineSchema('Fixture1', schema)
 }
 
 export const TestFixture2 = () => {
@@ -74,5 +74,29 @@ export const TestFixture2 = () => {
     }
   }
 
-  Database.defineSchema('Test', schema)
+  Database.defineSchema('Fixture2', schema)
 }
+
+const schema = {
+  id: {
+    type: RDBType.STRING,
+    primaryKey: true
+  },
+  data1: {
+    type: RDBType.NUMBER
+  },
+  data2: {
+    type: Association.oneToMany,
+    virtual: {
+      name: 'Project',
+      where: (
+        projectTable: lf.schema.Table,
+        testTable: lf.schema.Table
+      ) => {
+        return projectTable['_id'].eq(testTable['id'])
+      }
+    }
+  }
+}
+
+Database.defineSchema('Test', schema)

@@ -53,9 +53,7 @@ export default describe('Database public Method', () => {
     })
 
     it('should store primaryKeys in primaryKeysMap', () => {
-      database['primaryKeysMap'].forEach(val => {
-        expect(val).to.equal('_id')
-      })
+      expect(database['primaryKeysMap'].size).to.equal(database['selectMetaData'].size)
     })
 
     it('should store selectMetaData', () => {
@@ -72,7 +70,7 @@ export default describe('Database public Method', () => {
       Database['schemaMetaData'] = new Map()
       TestFixture(true)
 
-      const standardErr = ALIAS_CONFLICT_ERR('id', 'Test')
+      const standardErr = ALIAS_CONFLICT_ERR('id', 'Fixture1')
       try {
         const db = new Database()
         expect(db).is.undefined
@@ -342,7 +340,7 @@ export default describe('Database public Method', () => {
         }, data)
 
         const [...results] = yield database.get<TaskSchema>('Task', {
-          fields: [ 'created']
+          fields: ['created']
         }).values()
 
         results.forEach((r: any) => {
@@ -361,6 +359,24 @@ export default describe('Database public Method', () => {
         }).values()
 
         expect(result.created).to.deep.equal(newCreated.toISOString())
+      })
+
+      it('update row via pk should be ok', function* () {
+        let task = clone(tasks[0])
+
+        let patchData = {
+          note: 'foo'
+        }
+
+        yield database.update('Task', {
+          primaryValue: task._id as string
+        }, patchData)
+
+        const [result] = yield database.get<TaskSchema>('Task', {
+          where: (table) => table['note'].eq('foo')
+        }).values()
+
+        expect(result._id).to.equal(task._id)
       })
     })
   })

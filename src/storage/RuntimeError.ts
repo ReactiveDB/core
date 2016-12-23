@@ -25,14 +25,17 @@ export const UNMODIFIABLE_PRIMARYKEY_ERR =
 export const NON_EXISTENT_COLUMN_ERR =
   (column: string, tableName: string) => ReactiveDBError(`Column: \`${column}\` was not defined in table: \`${tableName}\` `)
 
-export const INVALID_RESULT_TYPE_ERR =
-  (column: string) => ReactiveDBError(`Invalid resultType \`${column}\`.`)
+export const INVALID_NAVIGATINO_TYPE_ERR =
+  (column: string, expect?: string[]) => {
+    let message = `Invalid type of navigation properties: \`${column}\``
+    if (expect) {
+      message += `, Expect ${expect[0]} but got ${expect[1]}`
+    }
+    return ReactiveDBError(message + '.')
+  }
 
 export const INVALID_ROW_TYPE_ERR =
   () => ReactiveDBError('Invalid row type.')
-
-export const INVALID_VIRTUAL_VALUE_ERR =
-  (prop: string) => ReactiveDBError(`Invalid value of virtual prop: \`${prop}\`, Expect Object/Array.`)
 
 export const INVALID_FIELD_DES_ERR =
   () => ReactiveDBError('Invalid field description, Only navigation properties were included in description.')
