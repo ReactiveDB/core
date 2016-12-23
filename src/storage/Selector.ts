@@ -67,6 +67,10 @@ export class Selector <T> {
     })
   }
 
+  toString(): string {
+    return this.query.toSql()
+  }
+
   values(): Observable<T[]> | never {
     if (this.consumed) {
       throw TOKEN_CONSUMED_ERR()
