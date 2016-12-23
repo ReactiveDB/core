@@ -15,9 +15,8 @@ import {
   NON_EXISTENT_PRIMARY_KEY_ERR,
   UNMODIFIABLE_PRIMARYKEY_ERR,
   NON_EXISTENT_COLUMN_ERR,
-  INVALID_RESULT_TYPE_ERR,
+  INVALID_NAVIGATINO_TYPE_ERR,
   INVALID_ROW_TYPE_ERR,
-  INVALID_VIRTUAL_VALUE_ERR,
   INVALID_FIELD_DES_ERR,
   NON_DEFINED_PROPERTY_WARN,
   NON_EXISTENT_FIELD_WARN,
@@ -293,6 +292,10 @@ export class Database {
     const selectMetadata = this.selectMetaData.get(tableName)
     const pk = this.primaryKeysMap.get(tableName)
 
+    if (!selectMetadata) {
+      return Observable.throw(NON_EXISTENT_TABLE_ERR(tableName))
+    }
+
     return this.database$
       .concatMap<any, any>(db => {
         const table = db.getSchema().table(tableName)
@@ -301,10 +304,6 @@ export class Database {
         let predicate: lf.Predicate
 
         if (clause.primaryValue !== undefined) {
-          if (!pk) {
-            return Observable.throw(NON_EXISTENT_PRIMARY_KEY_ERR(tableName))
-          }
-
           predicate = table[pk].eq(clause.primaryValue)
         } else if (clause.where) {
           try {
@@ -614,7 +613,7 @@ export class Database {
     }
 
     if (typeof prop !== 'object') {
-      return Promise.reject(INVALID_VIRTUAL_VALUE_ERR(prop))
+      return Promise.reject(INVALID_NAVIGATINO_TYPE_ERR(prop, ['Object/Array', typeof prop]))
     }
 
     const pk = this.primaryKeysMap.get(def.virtual.name)
@@ -625,7 +624,7 @@ export class Database {
     switch (recordType) {
       case Association.oneToMany:
         if (!Array.isArray(prop)) {
-          return Promise.reject(INVALID_RESULT_TYPE_ERR(key))
+          return Promise.reject(INVALID_NAVIGATINO_TYPE_ERR(key))
         }
 
         const insertQueue = Promise.all(prop.map(data => {
@@ -638,8 +637,9 @@ export class Database {
           .toPromise()
 
       case Association.oneToOne:
-        if (typeof prop !== 'object') {
-          return Promise.reject(INVALID_RESULT_TYPE_ERR(key))
+        const type = typeof prop
+        if (type !== 'object' || Array.isArray(prop)) {
+          return Promise.reject(INVALID_NAVIGATINO_TYPE_ERR(key, ['Object', type === 'object' ? 'Array' : type]))
         }
 
         return this.upsertVirtualProp(db, pk, virtualTable, prop)
