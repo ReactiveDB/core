@@ -19,8 +19,8 @@ function onUpgrade (rawDb: lf.raw.BackStore) {
 
 export const lfFactory = (schemaBuilder: lf.schema.Builder, config: LfFactoryInit): Observable<lf.Database> => {
   return Observable.create((observer: Observer<lf.Database>) => {
-    (<any>config).onUpgrade = onUpgrade
-    schemaBuilder.connect(<any>config)
+    (config as any).onUpgrade = onUpgrade
+    schemaBuilder.connect(config)
       .then(db => {
         observer.next(db)
         observer.complete()

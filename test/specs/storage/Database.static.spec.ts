@@ -4,6 +4,7 @@ import { expect } from 'chai'
 import {
   Database,
   RDBType,
+  Association,
   NON_EXISTENT_PRIMARY_KEY_ERR,
   UNMODIFIABLE_TABLE_SCHEMA_ERR,
   DEFINE_HOOK_ERR,
@@ -58,7 +59,7 @@ export default describe('Database static Method', () => {
           type: RDBType.STRING
         },
         juju: {
-          type: RDBType.OBJECT,
+          type: Association.oneToOne,
           virtual: {
             name: 'JuJu',
             where: (table: lf.schema.Table, data: any) => {

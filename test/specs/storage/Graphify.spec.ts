@@ -28,13 +28,13 @@ export default describe('Graphify test', () => {
       id: {
         column: 'id',
       },
-      foo: [ {content: { column: 'foo' } } ]
+      foo: [ { content: { column: 'foo' } } ]
     }
   })
 
   it('should merge data as definition', () => {
     const result = graphify(data, definition)
-    let expectResult = [
+    const expectResult = [
       {
         id: 1,
         foo: [

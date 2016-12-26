@@ -10,7 +10,7 @@ export enum RDBType {
 }
 
 export enum Association {
-  oneToMany = 200,
+  oneToMany = 1000,
   oneToOne,
   manyToMany
 }

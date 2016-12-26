@@ -9,11 +9,11 @@ import {
   TaskSchema,
   clone,
   INVALID_FIELD_DES_ERR,
-  UNMODIFIABLE_PRIMARYKEY_ERR,
   NON_EXISTENT_TABLE_ERR,
   ALIAS_CONFLICT_ERR,
   UNEXPECTED_ASSOCIATION_ERR,
-  INVALID_ROW_TYPE_ERR
+  INVALID_ROW_TYPE_ERR,
+  INVALID_PATCH_TYPE_ERR
 } from '../../index'
 import taskGenerator from '../../utils/taskGenerator'
 import { TestFixture, TestFixture2 } from '../../schemas/Test'
@@ -53,9 +53,7 @@ export default describe('Database public Method', () => {
     })
 
     it('should store primaryKeys in primaryKeysMap', () => {
-      database['primaryKeysMap'].forEach(val => {
-        expect(val).to.equal('_id')
-      })
+      expect(database['primaryKeysMap'].size).to.equal(database['selectMetaData'].size)
     })
 
     it('should store selectMetaData', () => {
@@ -66,13 +64,13 @@ export default describe('Database public Method', () => {
     })
 
     it('should throw when alias conflict in table design', () => {
-      let meta = Database['schemaMetaData']
-      let hooks = Database['hooks']
+      const meta = Database['schemaMetaData']
+      const hooks = Database['hooks']
 
       Database['schemaMetaData'] = new Map()
       TestFixture(true)
 
-      let standardErr = ALIAS_CONFLICT_ERR('id', 'Test')
+      const standardErr = ALIAS_CONFLICT_ERR('id', 'Fixture1')
       try {
         const db = new Database()
         expect(db).is.undefined
@@ -85,13 +83,13 @@ export default describe('Database public Method', () => {
     })
 
     it('should throw when association is unexpected, should be one of oneToOne, oneToMany, manyToMany', () => {
-      let meta = Database['schemaMetaData']
-      let hooks = Database['hooks']
+      const meta = Database['schemaMetaData']
+      const hooks = Database['hooks']
 
       Database['schemaMetaData'] = new Map()
       TestFixture()
 
-      let standardErr = UNEXPECTED_ASSOCIATION_ERR()
+      const standardErr = UNEXPECTED_ASSOCIATION_ERR()
       try {
         // tslint:disable-next-line
         new Database()
@@ -104,13 +102,13 @@ export default describe('Database public Method', () => {
     })
 
     it('should throw if RDBType is incorrect', () => {
-      let meta = Database['schemaMetaData']
-      let hooks = Database['hooks']
+      const meta = Database['schemaMetaData']
+      const hooks = Database['hooks']
 
       Database['schemaMetaData'] = new Map()
       TestFixture2()
 
-      let standardErr = INVALID_ROW_TYPE_ERR()
+      const standardErr = INVALID_ROW_TYPE_ERR()
       try {
         // tslint:disable-next-line
         new Database()
@@ -167,6 +165,20 @@ export default describe('Database public Method', () => {
         expect(result2._taskId).to.equal(subtask._taskId)
       })
 
+      it('should be ok when insert data which its virtual property was already stored', function* () {
+        const [task] = taskGenerator(1)
+        const name = 'foo'
+        task.project = { ...taskData.project, name: 'foo' }
+
+        yield database.insert('Task', task)
+
+        const [result] = yield database.get('Project', {
+          where: (table) => table['_id'].eq(taskData.project._id as string)
+        }).values()
+
+        expect(result.name).to.equal(name)
+      })
+
       describe('insert data into table without any hooks', () => {
         it('should insert single row', function* () {
           const project = taskGenerator(1).pop().project
@@ -179,7 +191,7 @@ export default describe('Database public Method', () => {
         })
 
         it('should insert multi rows', function* () {
-          let projects = taskGenerator(5).map((task) => task.project)
+          const projects = taskGenerator(5).map((task) => task.project)
           const name = 'foo'
           projects.forEach((project) => project.name = name)
 
@@ -249,13 +261,64 @@ export default describe('Database public Method', () => {
 
       it('should throw when fields only include virtual field', function* () {
         try {
-          yield database.get('Task', { fields: ['project'] }).values()
+          yield database.get('Task', {
+            fields: [
+              'project', 'subtasks'
+            ],
+            primaryValue: taskData._id as string
+          }).values()
+
+          throw new TypeError('Invalid code path reached!')
         } catch (err) {
           const standardErr = INVALID_FIELD_DES_ERR()
           expect(err.message).to.equal(standardErr.message)
         }
       })
 
+      it('should get correct result when passin partial query fields', function* () {
+        const [{ project }] = yield database.get<TaskSchema>('Task', {
+          fields: [
+            '_id', {
+              project: ['_id'],
+              subtasks: ['_id', 'name']
+            }
+          ],
+          primaryValue: taskData._id as string
+        }).values()
+
+        const expectProject = clone(taskData.project)
+        delete expectProject.isArchived
+        delete expectProject.name
+        delete expectProject.posts
+
+        expect(project).to.deep.equal(expectProject)
+      })
+
+      it('should throw when build whereClause failed', function* () {
+        let result: any[]
+        try {
+          result = yield database.get<TaskSchema>('Task', {
+            where: () => {
+              throw new TypeError('error occured when build execute where clause function')
+            }
+          }).values()
+        } catch (e) {
+          throw new TypeError('Invalid code path reached.')
+        }
+
+        expect(result.length).to.greaterThan(0)
+      })
+
+      it('should get value when both pk and whereClause were specified', function* () {
+        const task = clone(taskData)
+
+        const [{ _id }] = yield database.get<TaskSchema>('Task', {
+          where: (table) => table['_projectId'].eq(task._projectId as string),
+          primaryValue: task._id as string
+        }).values()
+
+        expect(_id).to.equal(task._id)
+      })
     })
 
     describe('Database.prototype.update', () => {
@@ -266,14 +329,18 @@ export default describe('Database public Method', () => {
       })
 
       it('should not update primaryKey', function* () {
-        try {
-          yield database.update('Task', taskData._id as string, {
-            _id: 'fuck'
-          })
-        } catch (e) {
-          const standardErr = UNMODIFIABLE_PRIMARYKEY_ERR()
-          expect(e.message).to.equal(standardErr.message)
-        }
+        const note = 'foo'
+        yield database.update('Task', taskData._id as string, {
+          _id: 'fuck',
+          note
+        })
+
+        const [result] = yield database.get('Task', {
+          where: (table) => table['_id'].eq(taskData._id as string)
+        }).values()
+
+        expect(result._id).eq(taskData._id)
+        expect(result.note).eq(note)
       })
 
       it('update virtual props should do nothing', function* () {
@@ -316,7 +383,7 @@ export default describe('Database public Method', () => {
         }, data)
 
         const [...results] = yield database.get<TaskSchema>('Task', {
-          fields: [ 'created']
+          fields: ['created']
         }).values()
 
         results.forEach((r: any) => {
@@ -336,6 +403,58 @@ export default describe('Database public Method', () => {
 
         expect(result.created).to.deep.equal(newCreated.toISOString())
       })
+
+      it('update row via pk should be ok', function* () {
+        const task = clone(tasks[0])
+
+        const patchData = {
+          note: 'foo'
+        }
+
+        yield database.update('Task', {
+          primaryValue: task._id as string
+        }, patchData)
+
+        const [result] = yield database.get<TaskSchema>('Task', {
+          where: (table) => table['note'].eq('foo')
+        }).values()
+
+        expect(result._id).to.equal(task._id)
+      })
+
+      it('update navigation property which is already stored should be ok', function* () {
+        const task = tasks[0]
+        const project = task.project
+        const name = 'bar'
+        const patch = { name }
+
+        yield database.update('Project', {
+          where: (table) => table['_id'].eq(project._id as string)
+        }, patch)
+
+        const [result] = yield database.get<TaskSchema>('Task', {
+          where: (table) => table['_id'].eq(task._id as string)
+        }).values()
+
+        expect(result.project.name).to.equal(name)
+      })
+
+      it('should throw when patched data is not a single record', function* () {
+        const results = yield database.get<TaskSchema>('Task').values()
+        const patch = results.map((ret: TaskSchema) => {
+          return { ...ret, content: 'bar' }
+        })
+
+        try {
+          yield database.update('Task', {
+            where: (table) => table['_id'].isNotNull()
+          }, patch)
+        } catch (e) {
+          const standardErr = INVALID_PATCH_TYPE_ERR('Array')
+          expect(e.message).to.equal(standardErr.message)
+        }
+      })
+
     })
   })
 

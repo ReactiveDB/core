@@ -1,7 +1,4 @@
-'use strict'
-import 'rxjs/add/operator/scan'
-import 'rxjs/add/operator/reduce'
-import 'rxjs/add/operator/startWith'
+import './RxOperator'
 import { Observer } from 'rxjs/Observer'
 import { Observable } from 'rxjs/Observable'
 import * as lf from 'lovefield'
@@ -15,19 +12,19 @@ import graphify from './Graphify'
 export type GraphMapper = (data: any) => any
 
 export interface TableShape {
-  primaryKey: {
+  pk: {
     name: string,
     queried: boolean
   }
   definition: Object
 }
 
-export class SelectMeta <T> {
-  static factory<U>(... metaDatas: SelectMeta<U>[]) {
+export class Selector <T> {
+  static factory<U>(... metaDatas: Selector<U>[]) {
     const originalToken = metaDatas[0]
     const fakeQuery = { toSql: identity }
-    // 初始化一个空的 SelectMeta，然后在初始化以后替换它上面的属性和方法
-    const dist = new SelectMeta<U>(originalToken.db, fakeQuery as any, identity)
+    // 初始化一个空的 QuerySelector，然后在初始化以后替换它上面的属性和方法
+    const dist = new Selector<U>(originalToken.db, fakeQuery as any, identity)
     dist.change$ = Observable.from(metaDatas)
       .map(metas => metas.change$)
       .combineAll()
@@ -70,6 +67,10 @@ export class SelectMeta <T> {
     })
   }
 
+  toString(): string {
+    return this.query.toSql()
+  }
+
   values(): Observable<T[]> | never {
     if (this.consumed) {
       throw TOKEN_CONSUMED_ERR()
@@ -79,12 +80,12 @@ export class SelectMeta <T> {
     return Observable.fromPromise(this.getValue() as Promise<T[]>)
   }
 
-  combine(... selectMetas: SelectMeta<T>[]): SelectMeta<T> {
+  combine(... selectMetas: Selector<T>[]): Selector<T> {
     const isEqual = selectMetas.every(meta => meta.select === this.select)
     if (!isEqual) {
       throw TOKEN_INVALID_ERR()
     }
-    return SelectMeta.factory(this, ... selectMetas)
+    return Selector.factory(this, ... selectMetas)
   }
 
   changes(): Observable<T[]> | never {
@@ -105,9 +106,9 @@ export class SelectMeta <T> {
         }
 
         const result = graphify<T>(rows, this.shape.definition)
-        const col = this.shape.primaryKey.name
+        const col = this.shape.pk.name
 
-        return !this.shape.primaryKey.queried ? this.removeKey(result, col) : result
+        return !this.shape.pk.queried ? this.removeKey(result, col) : result
       })
   }
 

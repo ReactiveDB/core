@@ -12,5 +12,11 @@ export default Database.defineSchema('Post', {
   },
   content: {
     type: RDBType.BOOLEAN
+  },
+  belongTo: {
+    type: RDBType.STRING
+  },
+  created: {
+    type: RDBType.DATE_TIME
   }
 })

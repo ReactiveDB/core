@@ -1,17 +1,17 @@
 import { ReplaySubject } from 'rxjs/ReplaySubject'
 import { Observable } from 'rxjs/Observable'
 
-export default class MockSelectMeta<T> {
+export default class MockSelector<T> {
   static datas = new Map<string, any>()
-  static selectMeta = new Map<string, MockSelectMeta<any>>()
+  static selectMeta = new Map<string, MockSelector<any>>()
 
   static update(_id: string, patch: any) {
-    if (!MockSelectMeta.datas.has(_id)) {
+    if (!MockSelector.datas.has(_id)) {
       throw new TypeError(`Patch target is not exist: ${_id}`)
     }
-    const data = MockSelectMeta.datas.get(_id)
+    const data = MockSelector.datas.get(_id)
     Object.assign(data, patch)
-    MockSelectMeta.selectMeta.get(_id).notify()
+    MockSelector.selectMeta.get(_id).notify()
   }
 
   private subject = new ReplaySubject<T[]>(1)
@@ -20,11 +20,11 @@ export default class MockSelectMeta<T> {
   constructor(datas: Map<string, T>) {
     const result: T[] = []
     datas.forEach((val, key) => {
-      if (MockSelectMeta.datas.has(key)) {
+      if (MockSelector.datas.has(key)) {
         throw new TypeError(`Conflic data`)
       }
-      MockSelectMeta.datas.set(key, val)
-      MockSelectMeta.selectMeta.set(key, this)
+      MockSelector.datas.set(key, val)
+      MockSelector.selectMeta.set(key, this)
       result.push(val)
     })
     this.datas = result
@@ -39,9 +39,9 @@ export default class MockSelectMeta<T> {
     return this.subject.take(1)
   }
 
-  combine(... metas: MockSelectMeta<T>[]) {
+  combine(... metas: MockSelector<T>[]) {
     metas.unshift(this)
-    const dist = new MockSelectMeta(new Map)
+    const dist = new MockSelector(new Map)
     dist.values = () => {
       return Observable.from(metas)
         .map(meta => meta.values())

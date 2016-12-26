@@ -23,7 +23,8 @@ module.exports = {
     alias: {
       'lovefield': path.join(process.cwd(), 'node_modules/lovefield/dist/lovefield.js'),
       'sinon': path.join(process.cwd(), 'node_modules/sinon/pkg/sinon.js'),
-      'tman': path.join(process.cwd(), 'node_modules/tman/browser/tman.js')
+      'tman': path.join(process.cwd(), 'node_modules/tman/browser/tman.js'),
+      'tman-skin': path.join(process.cwd(), 'node_modules/tman/browser/tman.css')
     }
   },
 

@@ -1,11 +1,11 @@
 'use strict'
 import { Observable } from 'rxjs/Observable'
-import { SelectMeta } from './SelectMeta'
+import { Selector } from './Selector'
 
 export class QueryToken <T> {
-  private selectMeta$: Observable<SelectMeta<T>>
+  private selectMeta$: Observable<Selector<T>>
 
-  constructor(meta$: Observable<SelectMeta<T>>) {
+  constructor(meta$: Observable<Selector<T>>) {
     this.selectMeta$ = meta$.publishReplay(1)
       .refCount()
   }
@@ -25,9 +25,9 @@ export class QueryToken <T> {
     const newMeta$ = Observable.from(tokens)
       .map(token => token.selectMeta$)
       .combineAll()
-      .map((r: SelectMeta<T>[]) => {
+      .map((r: Selector<T>[]) => {
         const first = r.shift()
-        return first.combine(... r)
+        return first.combine(...r)
       })
     return new QueryToken(newMeta$)
   }

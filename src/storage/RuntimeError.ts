@@ -19,23 +19,23 @@ export const UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR =
 export const NON_EXISTENT_PRIMARY_KEY_ERR =
   (meta: Object) => ReactiveDBError(`PrimaryKey is required in schema defination: ${JSON.stringify(meta, null, 2)}`)
 
-export const UNMODIFIABLE_PRIMARYKEY_ERR =
-  () => ReactiveDBError(`PrimaryKey is unmodifiable.`)
-
 export const NON_EXISTENT_COLUMN_ERR =
   (column: string, tableName: string) => ReactiveDBError(`Column: \`${column}\` was not defined in table: \`${tableName}\` `)
 
-export const INVALID_RESULT_TYPE_ERR =
-  (column: string) => ReactiveDBError(`Invalid resultType \`${column}\`.`)
+export const INVALID_NAVIGATINO_TYPE_ERR =
+  (column: string, expect?: string[]) => {
+    let message = `Invalid type of navigation properties: \`${column}\``
+    if (expect) {
+      message += `, Expect ${expect[0]} but got ${expect[1]}`
+    }
+    return ReactiveDBError(message + '.')
+  }
 
 export const INVALID_ROW_TYPE_ERR =
   () => ReactiveDBError('Invalid row type.')
 
-export const INVALID_VIRTUAL_VALUE_ERR =
-  (prop: string) => ReactiveDBError(`Invalid value of virtual prop: \`${prop}\`, Expect Object/Array.`)
-
 export const INVALID_FIELD_DES_ERR =
-  () => ReactiveDBError('Invalid field description, It should include its association field.')
+  () => ReactiveDBError('Invalid field description, Only navigation properties were included in description.')
 
 export const ALIAS_CONFLICT_ERR =
   (alias: string, tableName: string) => ReactiveDBError(`Alias: \`${alias}\` conflict in table: ${tableName}.`)
@@ -54,6 +54,9 @@ export const TRANSACTION_EXECUTE_FAILED =
     const reason = e ? `, due to: ${e.message}` : ''
     return ReactiveDBError(`Transaction execute failed${reason}.`)
   }
+
+export const INVALID_PATCH_TYPE_ERR =
+  (errType: string) => ReactiveDBError(`Unexpected type of data, expect Object but got ${errType}`)
 
 /**
  * SelectMeta Error
@@ -78,10 +81,15 @@ export const NON_EXISTENT_FIELD_WARN =
 export const BUILD_PREDICATE_FAILED_WARN =
   (e: Error, tableName?: string, key?: string) => {
     let message = `Build predicate faild due to: ${e.message}`
-    if (tableName && key) {
-      message += `, error was in ${tableName}, ${key}`
+    if (tableName) {
+      message += `, error was in ${tableName}`
     }
-
+    if (key) {
+      message += `, ${key}`
+    }
     message += '.'
     console.warn(message)
   }
+
+export const UNMODIFIABLE_PRIMARYKEY_WARN =
+  () => console.warn(`PrimaryKey is unmodifiable.`)
