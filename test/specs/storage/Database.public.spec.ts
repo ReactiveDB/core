@@ -9,7 +9,6 @@ import {
   TaskSchema,
   clone,
   INVALID_FIELD_DES_ERR,
-  UNMODIFIABLE_PRIMARYKEY_ERR,
   NON_EXISTENT_TABLE_ERR,
   ALIAS_CONFLICT_ERR,
   UNEXPECTED_ASSOCIATION_ERR,
@@ -166,6 +165,20 @@ export default describe('Database public Method', () => {
         expect(result2._taskId).to.equal(subtask._taskId)
       })
 
+      it('should be ok when insert data which its virtual property was already stored', function* () {
+        const [task] = taskGenerator(1)
+        const name = 'foo'
+        task.project = { ...taskData.project, name: 'foo' }
+
+        yield database.insert('Task', task)
+
+        const [result] = yield database.get('Project', {
+          where: (table) => table['_id'].eq(taskData.project._id as string)
+        }).values()
+
+        expect(result.name).to.equal(name)
+      })
+
       describe('insert data into table without any hooks', () => {
         it('should insert single row', function* () {
           const project = taskGenerator(1).pop().project
@@ -316,14 +329,18 @@ export default describe('Database public Method', () => {
       })
 
       it('should not update primaryKey', function* () {
-        try {
-          yield database.update('Task', taskData._id as string, {
-            _id: 'fuck'
-          })
-        } catch (e) {
-          const standardErr = UNMODIFIABLE_PRIMARYKEY_ERR()
-          expect(e.message).to.equal(standardErr.message)
-        }
+        const note = 'foo'
+        yield database.update('Task', taskData._id as string, {
+          _id: 'fuck',
+          note
+        })
+
+        const [result] = yield database.get('Task', {
+          where: (table) => table['_id'].eq(taskData._id as string)
+        }).values()
+
+        expect(result._id).eq(taskData._id)
+        expect(result.note).eq(note)
       })
 
       it('update virtual props should do nothing', function* () {
@@ -424,7 +441,9 @@ export default describe('Database public Method', () => {
 
       it('should throw when patched data is not a single record', function* () {
         const results = yield database.get<TaskSchema>('Task').values()
-        const patch = results.map((ret:TaskSchema) => ({ ...ret, content: 'bar' }))
+        const patch = results.map((ret: TaskSchema) => {
+          return { ...ret, content: 'bar' }
+        })
 
         try {
           yield database.update('Task', {

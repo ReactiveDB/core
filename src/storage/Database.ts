@@ -13,7 +13,7 @@ import {
   UNMODIFIABLE_TABLE_SCHEMA_ERR,
   UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR,
   NON_EXISTENT_PRIMARY_KEY_ERR,
-  UNMODIFIABLE_PRIMARYKEY_ERR,
+  UNMODIFIABLE_PRIMARYKEY_WARN,
   NON_EXISTENT_COLUMN_ERR,
   INVALID_NAVIGATINO_TYPE_ERR,
   INVALID_ROW_TYPE_ERR,
@@ -306,7 +306,7 @@ export class Database {
     return this.database$
       .concatMap<any, any>(db => {
         const table = db.getSchema().table(tableName)
-        let updateQuery: lf.query.Update | TypeError | undefined
+        let updateQuery: lf.query.Update
 
         let predicate: lf.Predicate
 
@@ -323,30 +323,26 @@ export class Database {
         forEach(patch, (val, key) => {
           const row = table[key]
           const virtualMeta = selectMetadata.virtualMeta.get(key)
+
           if (typeof row === 'undefined') {
             console.warn(NON_EXISTENT_COLUMN_ERR(key, tableName))
           } else if (key === pk) {
-            updateQuery = UNMODIFIABLE_PRIMARYKEY_ERR()
+            UNMODIFIABLE_PRIMARYKEY_WARN()
           } else if (!virtualMeta) {
             const hiddenRow = table[`${Database.__HIDDEN__}${key}`]
             if (hiddenRow) {
               const mapFn = selectMetadata.mapper.get(key)
-              updateQuery = db.update(table)
+              updateQuery = (updateQuery || db.update(table))
                 .set(hiddenRow, val)
                 .set(row, mapFn(val))
             } else {
-              updateQuery = db.update(table)
-                .set(row, val)
+              updateQuery = (updateQuery || db.update(table)).set(row, val)
             }
           }
         })
 
-        if (updateQuery instanceof TypeError) {
-          return Promise.reject(updateQuery)
-        } else if (updateQuery) {
-          return updateQuery
-            .where(predicate)
-            .exec()
+        if (updateQuery) {
+          return updateQuery.where(predicate).exec()
         } else {
           return Promise.resolve()
         }
@@ -684,7 +680,7 @@ export class Database {
         if (rows.length) {
           return this.update(table.getName(), {
             where: clause
-          }, rows[0]).toPromise()
+          }, data).toPromise()
         } else {
           return this.insert<T>(table.getName(), data).toPromise()
         }

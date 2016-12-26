@@ -19,9 +19,6 @@ export const UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR =
 export const NON_EXISTENT_PRIMARY_KEY_ERR =
   (meta: Object) => ReactiveDBError(`PrimaryKey is required in schema defination: ${JSON.stringify(meta, null, 2)}`)
 
-export const UNMODIFIABLE_PRIMARYKEY_ERR =
-  () => ReactiveDBError(`PrimaryKey is unmodifiable.`)
-
 export const NON_EXISTENT_COLUMN_ERR =
   (column: string, tableName: string) => ReactiveDBError(`Column: \`${column}\` was not defined in table: \`${tableName}\` `)
 
@@ -93,3 +90,6 @@ export const BUILD_PREDICATE_FAILED_WARN =
     message += '.'
     console.warn(message)
   }
+
+export const UNMODIFIABLE_PRIMARYKEY_WARN =
+  () => console.warn(`PrimaryKey is unmodifiable.`)
