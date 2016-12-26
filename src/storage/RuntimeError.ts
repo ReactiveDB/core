@@ -1,26 +1,50 @@
-const ReactiveDBError = (message: string) => new TypeError(message)
+export interface ReactiveDBError extends Error { }
+
+export interface ReactiveDBErrorConstructor {
+  new(message: string): ReactiveDBError
+  readonly prototype: ReactiveDBError
+}
+
+function ReactiveDBErrorCtor(this: ReactiveDBError, message: string): ReactiveDBError {
+  const err = Error.call(this, message)
+  this.name = err.name
+  this.message = message
+  this.stack = err.stack
+  return this
+}
+
+ReactiveDBErrorCtor.prototype = Object.create(Error.prototype, {
+  constructor: {
+    value: ReactiveDBErrorCtor,
+    enumerable: false,
+    writable: true,
+    configurable: true
+  }
+})
+
+export const ReactiveDBError = ReactiveDBErrorCtor as any as ReactiveDBErrorConstructor
 
 /**
  * Databse Error
  */
 
 export const DEFINE_HOOK_ERR =
-  (tableName: string) => ReactiveDBError(`Table: \`${tableName}\` cannot be found, Please use \`defineSchema\` first.`)
+  (tableName: string) => new ReactiveDBError(`Table: \`${tableName}\` cannot be found, Please use \`defineSchema\` first.`)
 
 export const NON_EXISTENT_TABLE_ERR =
-  (tableName: string) => ReactiveDBError(`Table: \`${tableName}\` cannot be found.`)
+  (tableName: string) => new ReactiveDBError(`Table: \`${tableName}\` cannot be found.`)
 
 export const UNMODIFIABLE_TABLE_SCHEMA_ERR =
-  (tableName: string) => ReactiveDBError(`Table: \`${tableName}\`'s schema cannot be modified.`)
+  (tableName: string) => new ReactiveDBError(`Table: \`${tableName}\`'s schema cannot be modified.`)
 
 export const UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR =
-  () => ReactiveDBError(`Method: defineSchema cannot be invoked once Database is initialized.`)
+  () => new ReactiveDBError(`Method: defineSchema cannot be invoked once Database is initialized.`)
 
 export const NON_EXISTENT_PRIMARY_KEY_ERR =
-  (meta: Object) => ReactiveDBError(`PrimaryKey is required in schema defination: ${JSON.stringify(meta, null, 2)}`)
+  (meta: Object) => new ReactiveDBError(`PrimaryKey is required in schema defination: ${JSON.stringify(meta, null, 2)}`)
 
 export const NON_EXISTENT_COLUMN_ERR =
-  (column: string, tableName: string) => ReactiveDBError(`Column: \`${column}\` was not defined in table: \`${tableName}\` `)
+  (column: string, tableName: string) => new ReactiveDBError(`Column: \`${column}\` was not defined in table: \`${tableName}\` `)
 
 export const INVALID_NAVIGATINO_TYPE_ERR =
   (column: string, expect?: string[]) => {
@@ -28,45 +52,51 @@ export const INVALID_NAVIGATINO_TYPE_ERR =
     if (expect) {
       message += `, Expect ${expect[0]} but got ${expect[1]}`
     }
-    return ReactiveDBError(message + '.')
+    return new ReactiveDBError(message + '.')
   }
 
 export const INVALID_ROW_TYPE_ERR =
-  () => ReactiveDBError('Invalid row type.')
+  () => new ReactiveDBError('Invalid row type.')
 
 export const INVALID_FIELD_DES_ERR =
-  () => ReactiveDBError('Invalid field description, Only navigation properties were included in description.')
+  () => new ReactiveDBError('Invalid field description, Only navigation properties were included in description.')
 
 export const ALIAS_CONFLICT_ERR =
-  (alias: string, tableName: string) => ReactiveDBError(`Alias: \`${alias}\` conflict in table: ${tableName}.`)
+  (alias: string, tableName: string) => new ReactiveDBError(`Alias: \`${alias}\` conflict in table: ${tableName}.`)
 
 export const GRAPHIFY_ROWS_FAILED_ERR =
-  (err: Error) => ReactiveDBError(`Graphify query result failed, due to: ${err.message}.`)
+  (err: Error) => new ReactiveDBError(`Graphify query result failed, due to: ${err.message}.`)
 
 export const NOT_IMPLEMENT_ERR =
-  () => ReactiveDBError('Not implement yet.')
+  () => new ReactiveDBError('Not implement yet.')
 
 export const UNEXPECTED_ASSOCIATION_ERR =
-  () => ReactiveDBError('Unexpected association was specified.')
+  () => new ReactiveDBError('Unexpected association was specified.')
 
 export const TRANSACTION_EXECUTE_FAILED =
   (e?: Error) => {
     const reason = e ? `, due to: ${e.message}` : ''
-    return ReactiveDBError(`Transaction execute failed${reason}.`)
+    return new ReactiveDBError(`Transaction execute failed${reason}.`)
+  }
+
+export const HOOK_EXECUTE_FAILED =
+  (type: 'delete' | 'insert', e?: Error) => {
+    const reason = e ? `, due to ${e.message}` : ''
+    return new ReactiveDBError(`${type} hook execute faild${reason}`)
   }
 
 export const INVALID_PATCH_TYPE_ERR =
-  (errType: string) => ReactiveDBError(`Unexpected type of data, expect Object but got ${errType}`)
+  (errType: string) => new ReactiveDBError(`Unexpected type of data, expect Object but got ${errType}`)
 
 /**
  * SelectMeta Error
  */
 
 export const TOKEN_CONSUMED_ERR =
-  () => ReactiveDBError('QueryToken was already consumed.')
+  () => new ReactiveDBError('QueryToken was already consumed.')
 
 export const TOKEN_INVALID_ERR =
-  () => ReactiveDBError(`Token cannot be combined.`)
+  () => new ReactiveDBError(`Token cannot be combined.`)
 
 /**
  * Warning
