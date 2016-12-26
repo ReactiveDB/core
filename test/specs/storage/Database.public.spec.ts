@@ -150,14 +150,16 @@ export default describe('Database public Method', () => {
         const subtask = taskData.subtasks[0]
 
         const [result1] = yield database.get<ProjectSchema>('Project', {
-          primaryValue: taskData.project._id as string
+          where: {
+            _id: taskData.project._id as string
+          }
         }).values()
 
         expect(result1._id).to.equal(taskData.project._id)
         expect(result1.name).to.equal(taskData.project.name)
 
         const [result2] = yield database.get<SubtaskSchema>('Subtask', {
-          primaryValue: subtask._id as string
+          where: { _id: subtask._id as string }
         }).values()
 
         expect(result2._id).to.equal(subtask._id)
@@ -173,7 +175,9 @@ export default describe('Database public Method', () => {
         yield database.insert('Task', task)
 
         const [result] = yield database.get('Project', {
-          where: (table) => table['_id'].eq(taskData.project._id as string)
+          where: {
+            _id: taskData.project._id
+          }
         }).values()
 
         expect(result.name).to.equal(name)
@@ -184,7 +188,9 @@ export default describe('Database public Method', () => {
           const project = taskGenerator(1).pop().project
           yield database.insert('Project', project)
           const [result] = yield database.get('Project', {
-            where: (table) => table['_id'].eq(project._id as any)
+            where: {
+              _id: project._id as string
+            }
           }).values()
 
           expect(result).deep.equals(project)
@@ -197,7 +203,7 @@ export default describe('Database public Method', () => {
 
           yield database.insert('Project', projects)
           const results = yield database.get('Project', {
-            where: (table) => table['name'].eq(name)
+            where: { name }
           }).values()
 
           expect(results).deep.equals(projects)
@@ -216,11 +222,10 @@ export default describe('Database public Method', () => {
         })
 
         const [result] = yield database.get<TaskSchema>('Task', {
-          primaryValue: '1112'
+          where: { _id: '1112' }
         }).values()
 
         const undef = 'UNDEF'
-
         expect(result[undef]).to.be.undefined
         expect(result['_id']).is.equals('1112')
       })
@@ -237,7 +242,9 @@ export default describe('Database public Method', () => {
 
       it('should get current fields when get with query', function* () {
         const [result] = yield database.get<TaskSchema>('Task', {
-          fields: ['note'], primaryValue: taskData._id as string
+          fields: ['note'], where: {
+            _id: taskData._id
+          }
         }).values()
 
         expect(result.note).to.equal(taskData.note)
@@ -247,7 +254,7 @@ export default describe('Database public Method', () => {
       it('should be ok when fileds include not exist field', function* () {
         const undef = 'UNDEF'
         const [result] = yield database.get<TaskSchema>('Task', {
-          fields: [undef, 'note'], primaryValue: taskData._id as string
+          fields: [undef, 'note'], where: { _id: taskData._id }
         }).values()
 
         expect(result.note).to.equal(taskData.note)
@@ -255,7 +262,7 @@ export default describe('Database public Method', () => {
       })
 
       it('should get empty array when query is not match any result', function* () {
-        const result = yield database.get<TaskSchema>('Task', { primaryValue: 'testtask' }).values()
+        const result = yield database.get<TaskSchema>('Task', { where: { _id: 'testtask' } }).values()
         expect(result).deep.equal([])
       })
 
@@ -265,7 +272,7 @@ export default describe('Database public Method', () => {
             fields: [
               'project', 'subtasks'
             ],
-            primaryValue: taskData._id as string
+            where: { _id: taskData._id }
           }).values()
 
           throw new TypeError('Invalid code path reached!')
@@ -283,7 +290,7 @@ export default describe('Database public Method', () => {
               subtasks: ['_id', 'name']
             }
           ],
-          primaryValue: taskData._id as string
+          where: { _id: taskData._id }
         }).values()
 
         const expectProject = clone(taskData.project)
@@ -297,8 +304,8 @@ export default describe('Database public Method', () => {
       it('should throw when build whereClause failed', function* () {
         let result: any[]
         try {
-          result = yield database.get<TaskSchema>('Task', {
-            where: () => {
+          result = yield database.get<TaskSchema>('Task', <any>{
+            get where() {
               throw new TypeError('error occured when build execute where clause function')
             }
           }).values()
@@ -311,10 +318,11 @@ export default describe('Database public Method', () => {
 
       it('should get value when both pk and whereClause were specified', function* () {
         const task = clone(taskData)
-
-        const [{ _id }] = yield database.get<TaskSchema>('Task', {
-          where: (table) => table['_projectId'].eq(task._projectId as string),
-          primaryValue: task._id as string
+        const [ { _id } ] = yield database.get<TaskSchema>('Task', {
+          where: {
+            _id: task._id,
+            _projectId: task._projectId
+          }
         }).values()
 
         expect(_id).to.equal(task._id)
@@ -336,7 +344,7 @@ export default describe('Database public Method', () => {
         })
 
         const [result] = yield database.get('Task', {
-          where: (table) => table['_id'].eq(taskData._id as string)
+          where: { _id: taskData._id }
         }).values()
 
         expect(result._id).eq(taskData._id)
@@ -344,7 +352,9 @@ export default describe('Database public Method', () => {
       })
 
       it('update virtual props should do nothing', function* () {
-        const result1 = yield database.update('Task', taskData._id as string, {
+        const result1 = yield database.update('Task', {
+          where: { _id: taskData._id }
+        }, {
           project: {
             _id: 'project 2',
             name: 'xxx'
@@ -354,7 +364,7 @@ export default describe('Database public Method', () => {
         expect(result1).to.be.undefined
 
         const result2 = yield database.get<ProjectSchema>('Project', {
-          primaryValue: 'project 2'
+          where: { _id: 'project 2' }
         }).values()
 
         expect(result2).deep.equal([])
@@ -366,7 +376,7 @@ export default describe('Database public Method', () => {
               subtasks: ['_id', 'name']
             }
           ],
-          primaryValue: taskData._id as string
+          where: { _id: taskData._id }
         }).values()
 
         expect(project).to.deep.equal(taskData.project)
@@ -379,7 +389,11 @@ export default describe('Database public Method', () => {
         }
 
         yield database.update('Task', {
-          where: (table) => table['created'].isNotNull()
+          where: {
+            created: {
+              $isNotNull: true
+            }
+          }
         }, data)
 
         const [...results] = yield database.get<TaskSchema>('Task', {
@@ -412,11 +426,13 @@ export default describe('Database public Method', () => {
         }
 
         yield database.update('Task', {
-          primaryValue: task._id as string
+          where: { _id: task._id }
         }, patchData)
 
         const [result] = yield database.get<TaskSchema>('Task', {
-          where: (table) => table['note'].eq('foo')
+          where: {
+            note: 'foo'
+          }
         }).values()
 
         expect(result._id).to.equal(task._id)
@@ -429,11 +445,15 @@ export default describe('Database public Method', () => {
         const patch = { name }
 
         yield database.update('Project', {
-          where: (table) => table['_id'].eq(project._id as string)
+          where: {
+            _id: project._id
+          }
         }, patch)
 
         const [result] = yield database.get<TaskSchema>('Task', {
-          where: (table) => table['_id'].eq(task._id as string)
+          where: {
+            _id: task._id
+          }
         }).values()
 
         expect(result.project.name).to.equal(name)
@@ -447,7 +467,11 @@ export default describe('Database public Method', () => {
 
         try {
           yield database.update('Task', {
-            where: (table) => table['_id'].isNotNull()
+            where: {
+              _id: {
+                $isNotNull: true
+              }
+            }
           }, patch)
         } catch (e) {
           const standardErr = INVALID_PATCH_TYPE_ERR('Array')
@@ -472,8 +496,10 @@ export default describe('Database public Method', () => {
       }).length
 
       yield database.delete('Task', {
-        where: (table: lf.schema.Table) => {
-          return table['created'].gte(testDate.valueOf())
+        where: {
+          created: {
+            $gte: testDate.valueOf()
+          }
         }
       })
 
@@ -488,11 +514,11 @@ export default describe('Database public Method', () => {
     it('should delete correct values with primaryValue', function* () {
       const task = tasks[0]
       yield database.delete('Task', {
-        primaryValue: task._id as string
+        where: { _id: task._id }
       })
 
       const result = yield database.get('Task', {
-        primaryValue: task._id as string
+        where: { _id: task._id }
       }).values()
 
       expect(result).deep.equal([])

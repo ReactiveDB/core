@@ -62,9 +62,9 @@ export default describe('Database static Method', () => {
           type: Association.oneToOne,
           virtual: {
             name: 'JuJu',
-            where: (table: lf.schema.Table, data: any) => {
-              return table['name'].eq(data.name)
-            }
+            where: (data: lf.schema.Table) => ({
+              name: data['name']
+            })
           }
         }
       }

@@ -96,7 +96,11 @@ export class PredicateProvider {
   getPredicate(): lf.Predicate {
     const predicates = this.normalizeMeta(this.meta)
     if (predicates.length) {
-      return lf.op.and.apply(lf.op, predicates)
+      if (predicates.length === 1) {
+        return predicates[0]
+      } else {
+        return lf.op.and.apply(lf.op, predicates)
+      }
     } else {
       return null
     }
@@ -110,14 +114,14 @@ export class PredicateProvider {
       } else if (this.checkPredicate(val)) {
         predicates = predicates.concat(this.normalizeMeta(val as PredicateDescription, this.table[key]))
       } else {
-        column = column || this.table[key]
-        if (!column) {
+        const _column = column || this.table[key]
+        if (!_column) {
           throw NON_EXISTENT_COLUMN_ERR(key, this.table.getName())
         }
         if (this.checkMethod(key)) {
-          predicates.push(predicateFactory[key](column, val))
+          predicates.push(predicateFactory[key](_column, val))
         } else {
-          predicates.push(column.eq(val as ValueLiteral))
+          predicates.push(_column.eq(val as ValueLiteral))
         }
       }
     })
@@ -133,7 +137,10 @@ export class PredicateProvider {
   }
 
   private checkPredicate(val: Partial<PredicateMeta> | ValueLiteral) {
-    return typeof val === 'object' && !(val instanceof Array) && !(val instanceof RegExp)
+    return typeof val === 'object' &&
+          !(val instanceof Array) &&
+          !(val instanceof RegExp) &&
+          !(val instanceof (lf.schema as any).BaseColumn)
   }
 
 }
