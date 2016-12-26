@@ -9,10 +9,6 @@ import * as lf from 'lovefield'
 
 // lovefield declaration merging
 declare module 'lovefield' {
-  export interface Predicate {
-    copy?(): lf.Predicate
-  }
-
   namespace query {
     export interface Select extends lf.query.Builder {
       clone(): lf.query.Select
