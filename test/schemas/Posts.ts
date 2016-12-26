@@ -15,5 +15,8 @@ export default Database.defineSchema('Post', {
   },
   belongTo: {
     type: RDBType.STRING
+  },
+  created: {
+    type: RDBType.DATE_TIME
   }
 })

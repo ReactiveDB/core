@@ -58,6 +58,9 @@ export const TRANSACTION_EXECUTE_FAILED =
     return ReactiveDBError(`Transaction execute failed${reason}.`)
   }
 
+export const INVALID_PATCH_TYPE_ERR =
+  (errType: string) => ReactiveDBError(`Unexpected type of data, expect Object but got ${errType}`)
+
 /**
  * SelectMeta Error
  */

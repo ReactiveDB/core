@@ -13,7 +13,8 @@ import {
   NON_EXISTENT_TABLE_ERR,
   ALIAS_CONFLICT_ERR,
   UNEXPECTED_ASSOCIATION_ERR,
-  INVALID_ROW_TYPE_ERR
+  INVALID_ROW_TYPE_ERR,
+  INVALID_PATCH_TYPE_ERR
 } from '../../index'
 import taskGenerator from '../../utils/taskGenerator'
 import { TestFixture, TestFixture2 } from '../../schemas/Test'
@@ -285,10 +286,10 @@ export default describe('Database public Method', () => {
         try {
           result = yield database.get<TaskSchema>('Task', {
             where: () => {
-              throw new TypeError()
+              throw new TypeError('error occured when build execute where clause function')
             }
           }).values()
-        } catch(e) {
+        } catch (e) {
           throw new TypeError('Invalid code path reached.')
         }
 
@@ -296,7 +297,7 @@ export default describe('Database public Method', () => {
       })
 
       it('should get value when both pk and whereClause were specified', function* () {
-        let task = clone(taskData)
+        const task = clone(taskData)
 
         const [{ _id }] = yield database.get<TaskSchema>('Task', {
           where: (table) => table['_projectId'].eq(task._projectId as string),
@@ -387,9 +388,9 @@ export default describe('Database public Method', () => {
       })
 
       it('update row via pk should be ok', function* () {
-        let task = clone(tasks[0])
+        const task = clone(tasks[0])
 
-        let patchData = {
+        const patchData = {
           note: 'foo'
         }
 
@@ -403,6 +404,38 @@ export default describe('Database public Method', () => {
 
         expect(result._id).to.equal(task._id)
       })
+
+      it('update navigation property which is already stored should be ok', function* () {
+        const task = tasks[0]
+        const project = task.project
+        const name = 'bar'
+        const patch = { name }
+
+        yield database.update('Project', {
+          where: (table) => table['_id'].eq(project._id as string)
+        }, patch)
+
+        const [result] = yield database.get<TaskSchema>('Task', {
+          where: (table) => table['_id'].eq(task._id as string)
+        }).values()
+
+        expect(result.project.name).to.equal(name)
+      })
+
+      it('should throw when patched data is not a single record', function* () {
+        const results = yield database.get<TaskSchema>('Task').values()
+        const patch = results.map((ret:TaskSchema) => ({ ...ret, content: 'bar' }))
+
+        try {
+          yield database.update('Task', {
+            where: (table) => table['_id'].isNotNull()
+          }, patch)
+        } catch (e) {
+          const standardErr = INVALID_PATCH_TYPE_ERR('Array')
+          expect(e.message).to.equal(standardErr.message)
+        }
+      })
+
     })
   })
 

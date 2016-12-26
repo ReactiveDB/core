@@ -24,7 +24,8 @@ import {
   ALIAS_CONFLICT_ERR,
   NOT_IMPLEMENT_ERR,
   UNEXPECTED_ASSOCIATION_ERR,
-  TRANSACTION_EXECUTE_FAILED
+  TRANSACTION_EXECUTE_FAILED,
+  INVALID_PATCH_TYPE_ERR
 } from './RuntimeError'
 
 export interface SchemaMetadata {
@@ -294,6 +295,12 @@ export class Database {
 
     if (!selectMetadata) {
       return Observable.throw(NON_EXISTENT_TABLE_ERR(tableName))
+    }
+
+    const patchType = typeof patch
+    const isArray = Array.isArray(patch)
+    if (patchType !== 'object' || isArray) {
+      throw INVALID_PATCH_TYPE_ERR(isArray ? 'Array' : patchType)
     }
 
     return this.database$
@@ -724,7 +731,6 @@ export class Database {
     }
 
     const definition = this.tableShapeMap.get(tableName)
-
     return new Selector<T>(db, query, {
       pk: {
         queried: isKeyQueried,
