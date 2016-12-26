@@ -11,16 +11,18 @@ import {
   UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR
 } from '../../index'
 
-export default describe('Database static Method', () => {
+export default describe('Database Method before Connect', () => {
 
   let tablename = 'TestTable0'
   let i = 1
+  let database: Database
 
   beforeEach(() => {
     tablename = `TestTable${i++}`
+    database = new Database()
   })
 
-  describe('Database.defineSchema', () => {
+  describe('Database.prototype.defineSchema', () => {
     it('should throw without primaryKey', () => {
       const metaData = {
         _id: {
@@ -28,7 +30,7 @@ export default describe('Database static Method', () => {
         }
       }
       const define = () => {
-        Database.defineSchema(tablename, metaData)
+        database.defineSchema(tablename, metaData)
       }
       const err = NON_EXISTENT_PRIMARY_KEY_ERR(metaData)
       expect(define).to.throw(err.message)
@@ -42,8 +44,8 @@ export default describe('Database static Method', () => {
         }
       }
       const define = () => {
-        Database.defineSchema(tablename, metaData)
-        Database.defineSchema(tablename, metaData)
+        database.defineSchema(tablename, metaData)
+        database.defineSchema(tablename, metaData)
       }
       const err = UNMODIFIABLE_TABLE_SCHEMA_ERR(tablename)
       expect(define).to.throw(err.message)
@@ -68,12 +70,11 @@ export default describe('Database static Method', () => {
           }
         }
       }
-      Database.defineSchema(tablename, metaData)
-      expect(Database['schemaMetaData'].get(tablename)).to.equal(metaData)
+      database.defineSchema(tablename, metaData)
+      expect(database['schemaMetaData'].get(tablename)).to.equal(metaData)
     })
 
-    it('should throw after Database init', () => {
-      const originalMetadata = Database['schemaMetaData']
+    it('should throw after Database connect', () => {
       const db = new Database(lf.schema.DataStoreType.MEMORY, false)
 
       const metaData = {
@@ -83,21 +84,36 @@ export default describe('Database static Method', () => {
         }
       }
 
+      db.connect()
+
       const define = () => {
-        Database.defineSchema(tablename, metaData)
-        Database.defineSchema(tablename, metaData)
+        db.defineSchema(tablename, metaData)
+        db.defineSchema(tablename, metaData)
       }
 
       const err = UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR()
       expect(db).is.not.null
       expect(define).to.throw(err.message)
-      Database['schemaMetaData'] = originalMetadata
     })
   })
 
-  describe('Database.defineHook', () => {
+  describe('Database.prototype.defineHook', () => {
+    it('should throw after connect', () => {
+      const db = new Database(lf.schema.DataStoreType.MEMORY, false)
+
+      db.connect()
+
+      const define = () => {
+        db.defineHook(tablename, { })
+      }
+
+      const err = UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR()
+      expect(db).is.not.null
+      expect(define).to.throw(err.message)
+    })
+
     it('should return hookDef', () => {
-      Database.defineSchema(tablename, {
+      database.defineSchema(tablename, {
         _id: {
           primaryKey: true,
           type: RDBType.STRING
@@ -109,12 +125,12 @@ export default describe('Database static Method', () => {
       const hookMetadata = {
         insert: (db: lf.Database, entity: any) => Promise.resolve({ db, entity })
       }
-      const hookDef = Database.defineHook(tablename, hookMetadata)
+      const hookDef = database.defineHook(tablename, hookMetadata)
       expect(hookDef).to.equal(hookMetadata)
     })
 
     it('should add hookDef to Database.hooks', () => {
-      Database.defineSchema(tablename, {
+      database.defineSchema(tablename, {
         _id: {
           primaryKey: true,
           type: RDBType.STRING
@@ -125,13 +141,13 @@ export default describe('Database static Method', () => {
       })
       const storeFunc = (db: lf.Database, entity: any) => Promise.resolve({ db, entity })
       const hookMetadata = { insert: storeFunc }
-      Database.defineHook(tablename, hookMetadata)
-      expect(Database['hooks'].get(tablename).insert).to.deep.equal([storeFunc])
+      database.defineHook(tablename, hookMetadata)
+      expect(database['hooks'].get(tablename).insert).to.deep.equal([storeFunc])
     })
 
     it('should throw before defineSchema', () => {
       const define = () => {
-        Database.defineHook(tablename, {})
+        database.defineHook(tablename, {})
       }
       const err = DEFINE_HOOK_ERR(tablename)
       expect(define).to.throw(err.message)

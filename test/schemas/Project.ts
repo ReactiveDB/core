@@ -5,7 +5,7 @@ export interface ProjectSchema {
   _id: TeambitionTypes.ProjectId
   name: string
 }
-export default Database.defineSchema('Project', {
+export default (db: Database) => db.defineSchema('Project', {
   _id: {
     type: RDBType.STRING,
     primaryKey: true

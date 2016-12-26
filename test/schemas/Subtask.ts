@@ -9,7 +9,7 @@ export interface SubtaskSchema {
   created: string
 }
 
-export default Database.defineSchema('Subtask', {
+export default (db: Database) => db.defineSchema('Subtask', {
   _id: {
     type: RDBType.STRING,
     primaryKey: true

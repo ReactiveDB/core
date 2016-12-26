@@ -44,10 +44,10 @@ export const TestFixture = (enableAliasConfict = false) => {
     schema.data2['as'] = 'id'
   }
 
-  Database.defineSchema('Fixture1', schema)
+  return (db: Database) => db.defineSchema('Fixture1', schema)
 }
 
-export const TestFixture2 = () => {
+export const TestFixture2 = (db: Database) => {
   const schema = {
     _id: {
       type: RDBType.STRING,
@@ -74,28 +74,30 @@ export const TestFixture2 = () => {
     }
   }
 
-  Database.defineSchema('Fixture2', schema)
+  return db.defineSchema('Fixture2', schema)
 }
 
-const schema = {
-  id: {
-    type: RDBType.STRING,
-    primaryKey: true
-  },
-  data1: {
-    type: RDBType.NUMBER
-  },
-  data2: {
-    type: Association.oneToMany,
-    virtual: {
-      name: 'Project',
-      where: (
-        projectTable: lf.schema.Table,
-      ) => ({
-        id: projectTable['_id']
-      })
+export default (db: Database) => {
+  const schema = {
+    id: {
+      type: RDBType.STRING,
+      primaryKey: true
+    },
+    data1: {
+      type: RDBType.NUMBER
+    },
+    data2: {
+      type: Association.oneToMany,
+      virtual: {
+        name: 'Project',
+        where: (
+          projectTable: lf.schema.Table,
+        ) => ({
+          id: projectTable['_id']
+        })
+      }
     }
   }
-}
 
-Database.defineSchema('Test', schema)
+  return db.defineSchema('Test', schema)
+}

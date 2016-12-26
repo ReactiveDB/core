@@ -38,7 +38,7 @@ export const UNMODIFIABLE_TABLE_SCHEMA_ERR =
   (tableName: string) => new ReactiveDBError(`Table: \`${tableName}\`'s schema cannot be modified.`)
 
 export const UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR =
-  () => new ReactiveDBError(`Method: defineSchema cannot be invoked once Database is initialized.`)
+  () => new ReactiveDBError(`Method: defineSchema cannot be invoked once Database is connected.`)
 
 export const NON_EXISTENT_PRIMARY_KEY_ERR =
   (meta: Object) => new ReactiveDBError(`PrimaryKey is required in schema defination: ${JSON.stringify(meta, null, 2)}`)

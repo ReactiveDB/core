@@ -54,7 +54,7 @@ Observable.ajax({
     // }
     return database.get<TaskSchema>('Task').values()
   })
-  .subscribe(r => {
+  .subscribe((_) => {
     console.timeEnd('Tasks change notify')
     // console.log(r)
   }, err => {
