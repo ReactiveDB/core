@@ -56,7 +56,7 @@ Observable.ajax({
   })
   .subscribe(r => {
     console.timeEnd('Tasks change notify')
-    console.log(r)
+    // console.log(r)
   }, err => {
     console.error(err)
   })
