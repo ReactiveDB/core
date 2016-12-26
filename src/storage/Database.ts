@@ -9,6 +9,7 @@ import { PredicateDescription, PredicateProvider } from './PredicateProvider'
 import { forEach, identity, clone } from '../utils'
 
 import {
+  ReactiveDBError,
   DEFINE_HOOK_ERR,
   NON_EXISTENT_TABLE_ERR,
   UNMODIFIABLE_TABLE_SCHEMA_ERR,
@@ -26,6 +27,7 @@ import {
   NOT_IMPLEMENT_ERR,
   UNEXPECTED_ASSOCIATION_ERR,
   TRANSACTION_EXECUTE_FAILED,
+  HOOK_EXECUTE_FAILED,
   INVALID_PATCH_TYPE_ERR
 } from './RuntimeError'
 
@@ -384,11 +386,16 @@ export class Database {
             .concatMap(r => Observable.from(hooks.destroy)
               .map(fn => fn(db, r))
             )
+            .catch(e => Promise.reject(HOOK_EXECUTE_FAILED('delete', e)))
             .toArray()
             .concatMap(r => tx.exec(r))
-            .catch(e => tx.rollback()
-              .then(() => Promise.reject(TRANSACTION_EXECUTE_FAILED(e)))
-            )
+            .catch(e => {
+              if (e instanceof ReactiveDBError) {
+                return Promise.reject(e)
+              }
+              return tx.rollback()
+                .then(() => Promise.reject(TRANSACTION_EXECUTE_FAILED(e)))
+            })
             .mapTo(db)
         }
 
