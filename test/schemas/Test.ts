@@ -1,5 +1,6 @@
 'use strict'
 import { TeambitionTypes, Database, RDBType, Association } from '../index'
+import { ProjectSchema } from './Project'
 
 export interface TestSchema {
   _id: string
@@ -25,11 +26,10 @@ export const TestFixture = (enableAliasConfict = false) => {
       virtual: {
         name: 'Project',
         where: (
-          projectTable: lf.schema.Table,
-          taskTable: lf.schema.Table
-        ) => {
-          return projectTable['_id'].eq(taskTable['_projectId'])
-        }
+          projectTable: lf.schema.Table & ProjectSchema
+        ) => ({
+          _projectId: projectTable._id
+        })
       }
     },
     data4: {
@@ -91,10 +91,9 @@ const schema = {
       name: 'Project',
       where: (
         projectTable: lf.schema.Table,
-        testTable: lf.schema.Table
-      ) => {
-        return projectTable['_id'].eq(testTable['id'])
-      }
+      ) => ({
+        id: projectTable['_id']
+      })
     }
   }
 }

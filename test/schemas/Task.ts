@@ -63,10 +63,11 @@ export default Database.defineSchema('Task', {
     virtual: {
       name: 'Project',
       where: (
-        projectTable: lf.schema.Table,
-        taskTable: lf.schema.Table
+        projectTable: lf.schema.Table & TaskSchema
       ) => {
-        return projectTable['_id'].eq(taskTable['_projectId'])
+        return {
+          _projectId: projectTable._id
+        }
       }
     }
   },
@@ -74,8 +75,12 @@ export default Database.defineSchema('Task', {
     type: Association.oneToMany,
     virtual: {
       name: 'Subtask',
-      where: (subtaskTable: lf.schema.Table, taskTable: lf.schema.Table) => {
-        return subtaskTable['_taskId'].eq(taskTable['_id'])
+      where: (
+        subtaskTable: lf.schema.Table & SubtaskSchema
+      ) => {
+        return {
+          _id: subtaskTable._taskId
+        }
       }
     }
   },

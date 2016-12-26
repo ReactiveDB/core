@@ -5,6 +5,7 @@ import { lfFactory } from './lovefield'
 import { RDBType, Association } from './DataType'
 import { Selector } from './Selector'
 import { QueryToken } from './QueryToken'
+import { PredicateDescription, PredicateProvider } from './PredicateProvider'
 import { forEach, identity, clone } from '../utils'
 
 import {
@@ -41,7 +42,7 @@ export interface SchemaMetadata {
    */
   virtual?: {
     name: string
-    where(table: lf.schema.Table, data: lf.schema.Table): lf.Predicate
+    where(virtualTable: lf.schema.Table): PredicateDescription
   }
   // 被 Database.prototype.createRow 动态挂上去的
   // readonly isHidden?: boolean
@@ -82,8 +83,7 @@ export interface SelectMetadata {
 export type FieldsValue = string | { [index: string]: FieldsValue[] }
 
 export interface ClauseDescription {
-  where?(table: lf.schema.Table): lf.Predicate
-  primaryValue?: string | number
+  where?: PredicateDescription
 }
 
 export interface QueryDescription extends ClauseDescription {
@@ -310,11 +310,9 @@ export class Database {
 
         let predicate: lf.Predicate
 
-        if (clause.primaryValue !== undefined) {
-          predicate = table[pk].eq(clause.primaryValue)
-        } else if (clause.where) {
+        if (clause.where) {
           try {
-            predicate = clause.where(table)
+            predicate = new PredicateProvider(table, clause.where).getPredicate()
           } catch (e) {
             return Observable.throw(e)
           }
@@ -364,11 +362,9 @@ export class Database {
       .concatMap(db => {
         const table = db.getSchema().table(tableName)
         let predicate: lf.Predicate
-        if (clause.primaryValue) {
-          predicate = table[pk].eq(clause.primaryValue)
-        } else if (clause.where) {
+        if (clause.where) {
           try {
-            predicate = clause.where(table)
+            predicate = new PredicateProvider(table, clause.where).getPredicate()
           } catch (e) {
             return Observable.throw(e)
           }
@@ -376,7 +372,7 @@ export class Database {
 
         const hooks = Database.hooks.get(tableName)
         let hookStream = Observable.of(db)
-        const query = clause.primaryValue ? { primaryValue: clause.primaryValue } : {
+        const query = {
           where: clause.where
         }
 
@@ -670,11 +666,12 @@ export class Database {
     table: lf.schema.Table,
     data: T
   ) {
-    const clause = () =>
-      table[pk].eq(data[pk])
-
+    const clause = {
+      [pk]: data[pk]
+    }
+    const predicate = new PredicateProvider(table, clause).getPredicate()
     return db.select().from(table)
-      .where(clause())
+      .where(predicate)
       .exec()
       .then((rows) => {
         if (rows.length) {
@@ -709,21 +706,12 @@ export class Database {
       query.leftOuterJoin(table, info.predicate)
     })
 
-    if (queryClause.where) {
-      try {
-        mainPredicate = queryClause.where(mainTable)
-      } catch (e) {
-        BUILD_PREDICATE_FAILED_WARN(e)
+    try {
+      if (queryClause.where) {
+        mainPredicate = new PredicateProvider(mainTable, queryClause.where).getPredicate()
       }
-    }
-
-    if (queryClause.primaryValue) {
-      const primaryValueMatch = mainTable[pk].eq(queryClause.primaryValue)
-      if (mainPredicate) {
-        mainPredicate = lf.op.and(mainPredicate, primaryValueMatch)
-      } else {
-        mainPredicate = primaryValueMatch
-      }
+    } catch (e) {
+      BUILD_PREDICATE_FAILED_WARN(e)
     }
 
     const definition = this.tableShapeMap.get(tableName)
@@ -805,7 +793,7 @@ export class Database {
       fieldTree.add(pk)
     }
 
-    fieldTree.forEach((field, _) => {
+    fieldTree.forEach(field => {
       if (typeof field === 'string'
       && associationItem.indexOf(field) === -1
       && associationMeta.indexOf(field) === -1) {
@@ -874,7 +862,7 @@ export class Database {
   private static unwrapPredicate(db: lf.Database, tableName: string, targetTableName: string, joinClause: Function) {
     const [table, targetTable] = Database.getTable(db, tableName, targetTableName)
     try {
-      return joinClause(table, targetTable)
+      return new PredicateProvider(targetTable, joinClause(table)).getPredicate()
     } catch (e) {
       BUILD_PREDICATE_FAILED_WARN(e, tableName)
       return null
