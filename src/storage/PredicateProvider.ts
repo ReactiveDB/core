@@ -27,52 +27,52 @@ export interface PredicateDescription {
 
 const predicateFactory = {
 
-  $ne <T extends ValueLiteral>(colum: lf.schema.Column, value: T): lf.Predicate {
-    return lf.op.not(colum.eq(value))
+  $ne <T extends ValueLiteral>(column: lf.schema.Column, value: T): lf.Predicate {
+    return lf.op.not(column.eq(value))
   },
 
-  $lt <T extends VaildEqType>(colum: lf.schema.Column, value: T): lf.Predicate {
-    return colum.lt(value)
+  $lt <T extends VaildEqType>(column: lf.schema.Column, value: T): lf.Predicate {
+    return column.lt(value)
   },
 
-  $lte <T extends VaildEqType>(colum: lf.schema.Column, value: T): lf.Predicate {
-    return colum.lte(value)
+  $lte <T extends VaildEqType>(column: lf.schema.Column, value: T): lf.Predicate {
+    return column.lte(value)
   },
 
-  $gt <T extends VaildEqType>(colum: lf.schema.Column, value: T): lf.Predicate {
-    return colum.gt(value)
+  $gt <T extends VaildEqType>(column: lf.schema.Column, value: T): lf.Predicate {
+    return column.gt(value)
   },
 
-  $gte <T extends VaildEqType>(colum: lf.schema.Column, value: T): lf.Predicate {
-    return colum.gte(value)
+  $gte <T extends VaildEqType>(column: lf.schema.Column, value: T): lf.Predicate {
+    return column.gte(value)
   },
 
-  $match (colum: lf.schema.Column, reg: RegExp): lf.Predicate {
-    return colum.match(reg)
+  $match (column: lf.schema.Column, reg: RegExp): lf.Predicate {
+    return column.match(reg)
   },
 
-  $notMatch(colum: lf.schema.Column, reg: RegExp): lf.Predicate {
-    return lf.op.not(colum.match(reg))
+  $notMatch(column: lf.schema.Column, reg: RegExp): lf.Predicate {
+    return lf.op.not(column.match(reg))
   },
 
-  $between (colum: lf.schema.Column, values: [ number, number ]): lf.Predicate {
-    return colum.between(values[0], values[1])
+  $between (column: lf.schema.Column, values: [ number, number ]): lf.Predicate {
+    return column.between(values[0], values[1])
   },
 
-  $has(colum: lf.schema.Column, value: string): lf.Predicate {
-    return colum.match(new RegExp(`(${value}\\b)`))
+  $has(column: lf.schema.Column, value: string): lf.Predicate {
+    return column.match(new RegExp(`(${value}\\b)`))
   },
 
-  $in (colum: lf.schema.Column, range: ValueLiteral[]): lf.Predicate {
-    return colum.in(range)
+  $in (column: lf.schema.Column, range: ValueLiteral[]): lf.Predicate {
+    return column.in(range)
   },
 
-  $isNull (colum: lf.schema.Column): lf.Predicate {
-    return colum.isNull()
+  $isNull (column: lf.schema.Column): lf.Predicate {
+    return column.isNull()
   },
 
-  $isNotNull (colum: lf.schema.Column): lf.Predicate {
-    return colum.isNotNull()
+  $isNotNull (column: lf.schema.Column): lf.Predicate {
+    return column.isNotNull()
   },
 }
 
