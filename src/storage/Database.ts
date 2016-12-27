@@ -97,6 +97,12 @@ export interface JoinInfo {
   predicate: lf.Predicate
 }
 
+export type ShapeMatcher = {
+  id: boolean
+  column: string
+  type?: string
+}
+
 export class Database {
   /**
    * hidden row namespace
@@ -552,17 +558,23 @@ export class Database {
 
   private buildTableShape(tableName: string, metadata: SchemaDef) {
     const shape = Object.create(null)
+
     forEach(metadata, (value, key) => {
       const label = value.as ? value.as : key
-      const matcher = {
+      const matcher: ShapeMatcher = {
         column: `${tableName}__${key}`,
-        id: !!value.primaryKey
+        id: !!value.primaryKey,
       }
 
       if (!value.virtual) {
         if (shape[label] !== undefined) {
           throw ALIAS_CONFLICT_ERR(label, tableName)
         }
+
+        if (value.type === RDBType.LITERAL_ARRAY) {
+          matcher.type = 'LiteralArray'
+        }
+
         shape[label] = matcher
       } else {
         const virtualTableName = value.virtual.name
