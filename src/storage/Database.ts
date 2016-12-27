@@ -447,8 +447,6 @@ export class Database {
 
     return Promise.all(disposeQueue)
       .then(() => {
-        // restore hooks
-        // review: hooks似乎应该是跟随database实例更好？
         this.hooks.forEach(tableHookDef => {
           tableHookDef.insert = []
           tableHookDef.destroy = []
