@@ -3,7 +3,8 @@ import { TaskSchema } from '../index'
 import { uuid } from './uuid'
 import subtaskGenerator from './subtaskGenerator'
 // import postGenerator from './postGenerator'
-import { randomNumber } from './random'
+import { randomNumber, random } from './random'
+import { generateInvolveMembers } from './involveMembersGenerator'
 
 export default function (limit: number) {
   const result: TaskSchema[] = []
@@ -11,11 +12,17 @@ export default function (limit: number) {
     limit --
     const _id = uuid()
     const _projectId = uuid()
+    const _stageId = uuid()
+    const _creatorId = uuid()
+    const _executorId = random(20) ? uuid() : _creatorId
+    const involves = [ _executorId ]
+    if (_creatorId !== _executorId) {
+      involves.push(_creatorId)
+    }
     result.push({
       _id, _projectId,
-      _stageId: uuid(),
-      _creatorId: uuid(),
-      _executorId: uuid(),
+      _stageId, _creatorId,
+      _executorId,
       _tasklistId: uuid(),
       _sourceId: null,
       accomplished: null,
@@ -27,7 +34,7 @@ export default function (limit: number) {
         name: 'project name: ' + uuid(),
         isArchived: true
       },
-      involveMembers: [],
+      involveMembers: generateInvolveMembers(15, involves),
       created: moment().add(6 - randomNumber(0, 12), 'month').add(30 - randomNumber(0, 30), 'day').toISOString()
     })
   }
