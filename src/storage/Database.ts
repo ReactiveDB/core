@@ -16,7 +16,7 @@ import {
   UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR,
   NON_EXISTENT_PRIMARY_KEY_ERR,
   UNMODIFIABLE_PRIMARYKEY_WARN,
-  NON_EXISTENT_COLUMN_ERR,
+  NON_EXISTENT_COLUMN_WARN,
   INVALID_NAVIGATINO_TYPE_ERR,
   INVALID_ROW_TYPE_ERR,
   INVALID_FIELD_DES_ERR,
@@ -332,22 +332,22 @@ export class Database {
         }
 
         forEach(patch, (val, key) => {
-          const row = table[key]
+          const column = table[key]
           const virtualMeta = selectMetadata.virtualMeta.get(key)
 
-          if (typeof row === 'undefined') {
-            console.warn(NON_EXISTENT_COLUMN_ERR(key, tableName))
+          if (typeof column === 'undefined') {
+            NON_EXISTENT_COLUMN_WARN(key, tableName)
           } else if (key === pk) {
             UNMODIFIABLE_PRIMARYKEY_WARN()
           } else if (!virtualMeta) {
-            const hiddenRow = table[`${Database.__HIDDEN__}${key}`]
-            if (hiddenRow) {
+            const hiddenColumn = table[`${Database.__HIDDEN__}${key}`]
+            if (hiddenColumn) {
               const mapFn = selectMetadata.mapper.get(key)
               updateQuery = (updateQuery || db.update(table))
-                .set(hiddenRow, val)
-                .set(row, mapFn(val))
+                .set(hiddenColumn, val)
+                .set(column, mapFn(val))
             } else {
-              updateQuery = (updateQuery || db.update(table)).set(row, val)
+              updateQuery = (updateQuery || db.update(table)).set(column, val)
             }
           }
         })
@@ -727,7 +727,7 @@ export class Database {
         mainPredicate = new PredicateProvider(mainTable, queryClause.where).getPredicate()
       }
     } catch (e) {
-      BUILD_PREDICATE_FAILED_WARN(e)
+      BUILD_PREDICATE_FAILED_WARN(e.message)
     }
 
     const definition = this.tableShapeMap.get(tableName)

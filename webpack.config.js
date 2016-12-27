@@ -52,6 +52,11 @@ module.exports = {
       filename: 'index.html',
       template: `test/e2e/index.html`,
       inject: true
+    }),
+    new webpack.DefinePlugin({
+      'process.env': {
+        NODE_ENV: JSON.stringify('development')
+      }
     })
   ],
 

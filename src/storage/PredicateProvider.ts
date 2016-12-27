@@ -1,6 +1,6 @@
 'use strict'
 import * as lf from 'lovefield'
-import { NON_EXISTENT_COLUMN_ERR } from './RuntimeError'
+import { BUILD_PREDICATE_FAILED_WARN } from './RuntimeError'
 import { forEach } from '../utils'
 
 export type ValueLiteral = string | number | boolean
@@ -116,12 +116,10 @@ export class PredicateProvider {
       } else {
         const _column = column || this.table[key]
         if (!_column) {
-          throw NON_EXISTENT_COLUMN_ERR(key, this.table.getName())
-        }
-        if (this.checkMethod(key)) {
-          predicates.push(predicateFactory[key](_column, val))
+          BUILD_PREDICATE_FAILED_WARN('Column is non-existenet', this.table.getName(), key)
         } else {
-          predicates.push(_column.eq(val as ValueLiteral))
+          const predicate = this.checkMethod(key) ? predicateFactory[key](_column, val) : _column.eq(val as ValueLiteral)
+          predicates.push(predicate)
         }
       }
     })

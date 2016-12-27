@@ -1,3 +1,5 @@
+import { Logger } from '../utils'
+
 export interface ReactiveDBError extends Error { }
 
 export interface ReactiveDBErrorConstructor {
@@ -103,23 +105,28 @@ export const TOKEN_INVALID_ERR =
  */
 
 export const NON_DEFINED_PROPERTY_WARN =
- (prop: string) => console.warn(`WARNING: Property \`${prop}\` is not defined.`)
+ (prop: string) => Logger.warn(`Property \`${prop}\` is not defined.`)
 
 export const NON_EXISTENT_FIELD_WARN =
-  (field: string, virtualProp: string) => console.warn(`Field: \`${field}\` is not exist in table ${virtualProp}.`)
+  (field: string, virtualProp: string) => Logger.warn(`Field: \`${field}\` is not exist in table ${virtualProp}.`)
 
 export const BUILD_PREDICATE_FAILED_WARN =
-  (e: Error, tableName?: string, key?: string) => {
-    let message = `Build predicate faild due to: ${e.message}`
+  (reason: string, tableName?: string, key?: string) => {
+    let message = `Build predicate faild due to: ${reason}`
+
     if (tableName) {
       message += `, error was in ${tableName}`
     }
+
     if (key) {
-      message += `, ${key}`
+      message += `, column: ${key}`
     }
-    message += '.'
-    console.warn(message)
+
+    Logger.error(message + '.')
   }
 
 export const UNMODIFIABLE_PRIMARYKEY_WARN =
-  () => console.warn(`PrimaryKey is unmodifiable.`)
+  () => Logger.warn(`PrimaryKey is unmodifiable.`)
+
+export const NON_EXISTENT_COLUMN_WARN =
+  (column: string, tableName: string) => Logger.warn(`Column: \`${column}\` was not defined in table: \`${tableName}\` `)

@@ -1,7 +1,7 @@
 import * as lf from 'lovefield'
 import { describe, it, beforeEach } from 'tman'
 import { expect } from 'chai'
-import { PredicateProvider, lfFactory, NON_EXISTENT_COLUMN_ERR } from '../../index'
+import { PredicateProvider, lfFactory } from '../../index'
 
 export default describe('PredicateProvider test', () => {
   const dataLength = 1000
@@ -40,11 +40,14 @@ export default describe('PredicateProvider test', () => {
   })
 
   describe('PredicateProvider#getPredicate', () => {
-    it('invalid key should throw', () => {
+    it('invalid key should be ignored', function*() {
       const fn = () => new PredicateProvider(table, {
         nonExist: 'whatever'
       }).getPredicate()
-      expect(fn).to.throw(NON_EXISTENT_COLUMN_ERR('nonExist', table.getName()).message)
+
+      const expectResult = yield db.select().from(table).exec()
+      const result = yield db.select().from(table).where(fn()).exec()
+      expect(result).deep.equal(expectResult)
     })
 
     it('literal value should ok', function* () {
