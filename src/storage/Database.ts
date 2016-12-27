@@ -97,6 +97,12 @@ export interface JoinInfo {
   predicate: lf.Predicate
 }
 
+export type ShapeMatcher = {
+  id: boolean
+  column: string
+  type?: string
+}
+
 export class Database {
   /**
    * hidden row namespace
@@ -210,7 +216,7 @@ export class Database {
    * insertHooks 是一些 lovefield query
    * 它们将在一个 transaction 中被串行执行，任意一个失败回滚所有操作并抛出异常
    */
-  insert<T>(tableName: string, raw: T | T[]): Observable<T> | Observable<T[]> {
+  insert<T>(tableName: string, raw: T | T[]): Observable<T> | Observable<T[]> | Observable<void> {
     return this.database$
       .concatMap(db => {
         const table = db.getSchema().table(tableName)
@@ -258,8 +264,15 @@ export class Database {
             .into(table)
             .values(rows)])
         })
-        .flatMap(identity)
-        .catch(() => tx.rollback().then(() => []))
+          .catch(e => Promise.reject(HOOK_EXECUTE_FAILED('insert', e)))
+          .flatMap(identity)
+          .catch((e) => {
+            if (e instanceof ReactiveDBError) {
+              return Promise.reject(e)
+            }
+            return tx.rollback()
+              .then(() => Promise.reject(TRANSACTION_EXECUTE_FAILED(e)))
+          })
       })
   }
 
@@ -552,17 +565,23 @@ export class Database {
 
   private buildTableShape(tableName: string, metadata: SchemaDef) {
     const shape = Object.create(null)
+
     forEach(metadata, (value, key) => {
       const label = value.as ? value.as : key
-      const matcher = {
+      const matcher: ShapeMatcher = {
         column: `${tableName}__${key}`,
-        id: !!value.primaryKey
+        id: !!value.primaryKey,
       }
 
       if (!value.virtual) {
         if (shape[label] !== undefined) {
           throw ALIAS_CONFLICT_ERR(label, tableName)
         }
+
+        if (value.type === RDBType.LITERAL_ARRAY) {
+          matcher.type = 'LiteralArray'
+        }
+
         shape[label] = matcher
       } else {
         const virtualTableName = value.virtual.name
@@ -747,23 +766,28 @@ export class Database {
     nullable: string[],
     def: SchemaMetadata
   ): lf.schema.TableBuilder {
+    const hiddenName = `${Database.__HIDDEN__}${rowName}`
     switch (rdbType) {
       case RDBType.ARRAY_BUFFER:
         return tableBuilder.addColumn(rowName, lf.Type.ARRAY_BUFFER)
       case RDBType.BOOLEAN:
         return tableBuilder.addColumn(rowName, lf.Type.BOOLEAN)
       case RDBType.DATE_TIME:
-        const hiddenName = `${Database.__HIDDEN__}${rowName}`
-        nullable.push(hiddenName)
-        def['isHidden'] = true
-        def['hiddenMapper'] = (val: string) => val ? new Date(val) : new Date(0)
+        nullable.push(hiddenName);
+        (def as any).isHidden = true;
+        (def as any).hiddenMapper = (val: string) => val ? new Date(val) : new Date(0)
         return tableBuilder
           .addColumn(rowName, lf.Type.INTEGER)
           .addColumn(hiddenName, lf.Type.STRING)
       case RDBType.INTEGER:
         return tableBuilder.addColumn(rowName, lf.Type.INTEGER)
       case RDBType.LITERAL_ARRAY:
-        return tableBuilder.addColumn(rowName, lf.Type.OBJECT)
+        nullable.push(hiddenName);
+        (def as any).isHidden = true;
+        (def as any).hiddenMapper = (val: any[]) => val ? val.join('|') : ''
+        return tableBuilder
+          .addColumn(rowName, lf.Type.STRING)
+          .addColumn(hiddenName, lf.Type.OBJECT)
       case RDBType.NUMBER:
         return tableBuilder.addColumn(rowName, lf.Type.NUMBER)
       case RDBType.OBJECT:

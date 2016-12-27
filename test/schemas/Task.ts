@@ -86,7 +86,7 @@ export default (db: Database) => {
       }
     },
     involveMembers: {
-      type: RDBType.OBJECT
+      type: RDBType.LITERAL_ARRAY
     },
     created: {
       type: RDBType.DATE_TIME

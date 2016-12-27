@@ -1,10 +1,16 @@
 import { GRAPHIFY_ROWS_FAILED_ERR } from './RuntimeError'
-import { forEach } from '../utils'
+import { forEach, identity } from '../utils'
 
-const nest = require('nesthydrationjs')().nest
+const nestJS = require('nesthydrationjs')()
+
+nestJS.registerType('LiteralArray', identity)
 
 // filter the [[key]] with undefined
 function reduceUndef(obj: any) {
+  if (typeof obj !== 'object') {
+    return obj
+  }
+
   const ret = Array.isArray(obj) ? [] : Object.create(null)
 
   forEach(obj, (val, key) => {
@@ -15,7 +21,7 @@ function reduceUndef(obj: any) {
         const partial = val
           .map((v) => reduceUndef(v))
           .filter((v) => {
-            return !!v && Object.keys(v).length > 0
+            return !!v && (typeof v !== 'object' || Object.keys(v).length > 0)
           })
 
         if (partial.length > 0 || (val.length === partial.length && val.length === 0)) {
@@ -38,7 +44,7 @@ function reduceUndef(obj: any) {
 // primaryKey based, key: { id: true } must be given in definition.
 export default function<T>(rows: any[], definition: Object) {
   try {
-    const result = nest(rows, [definition])
+    const result = nestJS.nest(rows, [definition])
     return reduceUndef(result) as T[]
   } catch (e) {
     throw GRAPHIFY_ROWS_FAILED_ERR(e)
