@@ -211,7 +211,9 @@ export default describe('PredicateProvider test', () => {
         .exec()
 
       expect(result.length).to.equal(3)
-      result.forEach((r: any) => expect(r.times.match(new RegExp(`(\\|times: 10$)\|(times: 10\\|)`))).to.not.be.null)
+      result.forEach((r: any) => {
+        expect(r.times.match(/times: 10\b/)).to.not.be.null
+      })
     })
 
     it('$in should ok', function* () {
