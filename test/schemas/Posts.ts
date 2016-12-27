@@ -5,7 +5,7 @@ export interface PostSchema {
   name: string
 }
 
-export default Database.defineSchema('Post', {
+export default (db: Database) => db.defineSchema('Post', {
   _id: {
     type: RDBType.STRING,
     primaryKey: true

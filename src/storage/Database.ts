@@ -9,6 +9,7 @@ import { PredicateDescription, PredicateProvider } from './PredicateProvider'
 import { forEach, identity, clone } from '../utils'
 
 import {
+  ReactiveDBError,
   DEFINE_HOOK_ERR,
   NON_EXISTENT_TABLE_ERR,
   UNMODIFIABLE_TABLE_SCHEMA_ERR,
@@ -26,6 +27,7 @@ import {
   NOT_IMPLEMENT_ERR,
   UNEXPECTED_ASSOCIATION_ERR,
   TRANSACTION_EXECUTE_FAILED,
+  HOOK_EXECUTE_FAILED,
   INVALID_PATCH_TYPE_ERR
 } from './RuntimeError'
 
@@ -96,8 +98,6 @@ export interface JoinInfo {
 }
 
 export class Database {
-  private static hooks = new Map<string, HooksDef>()
-  private static schemaMetaData = new Map<string, SchemaDef>()
   /**
    * hidden row namespace
    * 比如 api 获取的 task.created 是 string 类型
@@ -111,20 +111,25 @@ export class Database {
 
   database$: Observable<lf.Database>
 
+  private hooks = new Map<string, HooksDef>()
+  private schemaMetaData = new Map<string, SchemaDef>()
+
   private primaryKeysMap = new Map<string, string>()
   private selectMetaData = new Map<string, SelectMetadata>()
   private tableShapeMap = new Map<string, Object>()
+  private schemaBuilder: lf.schema.Builder
+  private connected = false
 
   /**
    * 定义数据表的 metadata
    * 会根据这些 metadata 决定增删改查的时候如何处理关联数据
    */
-  static defineSchema(tableName: string, schemaMetaData: SchemaDef) {
-    if (!Database.schemaMetaData) {
+  defineSchema(tableName: string, schemaMetaData: SchemaDef) {
+    if (this.connected) {
       throw UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR()
     }
 
-    if (Database.schemaMetaData.has(tableName)) {
+    if (this.schemaMetaData.has(tableName)) {
       throw UNMODIFIABLE_TABLE_SCHEMA_ERR(tableName)
     }
 
@@ -141,21 +146,25 @@ export class Database {
       throw NON_EXISTENT_PRIMARY_KEY_ERR(schemaMetaData)
     }
 
-    Database.schemaMetaData.set(tableName, schemaMetaData)
-    Database.hooks.set(tableName, {
+    this.schemaMetaData.set(tableName, schemaMetaData)
+    this.hooks.set(tableName, {
       insert: [],
       destroy: []
     })
 
-    return Database
+    return this
   }
 
   /**
    * 在数据表上定义一些 hook
    * 这些 hook 的过程都会被放置在一个transaction中执行
    */
-  static defineHook(tableName: string, hookDef: HookDef) {
-    const hooks = Database.hooks.get(tableName)
+  defineHook(tableName: string, hookDef: HookDef) {
+    if (this.connected) {
+      throw UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR()
+    }
+
+    const hooks = this.hooks.get(tableName)
 
     if (!hooks) {
       throw DEFINE_HOOK_ERR(tableName)
@@ -180,9 +189,13 @@ export class Database {
     // database version
     version = 1
   ) {
-    const schemaBuilder = lf.schema.create(name, version)
-    this.database$ = lfFactory(schemaBuilder, { storeType, enableInspector })
-    this.buildTables(schemaBuilder)
+    this.schemaBuilder = lf.schema.create(name, version)
+    this.database$ = lfFactory(this.schemaBuilder, { storeType, enableInspector })
+  }
+
+  connect() {
+    this.buildTables(this.schemaBuilder)
+    this.connected = true
   }
 
   insert<T>(tableName: string, raw: T[]): Observable<T[]>
@@ -207,7 +220,7 @@ export class Database {
         const data = clone(raw)
         if (data instanceof Array) {
           const hookObservables: Observable<lf.Transaction>[] = []
-          const hooks = Database.hooks.get(tableName)
+          const hooks = this.hooks.get(tableName)
 
           data.forEach(r => {
             rows.push(table.createRow(r))
@@ -230,7 +243,7 @@ export class Database {
 
         } else {
           rows.push(table.createRow(data))
-          const hooks = Database.hooks.get(tableName)
+          const hooks = this.hooks.get(tableName)
 
           if (hooks && hooks.insert && hooks.insert.length) {
             hook = Observable.from(hooks.insert)
@@ -370,7 +383,7 @@ export class Database {
           }
         }
 
-        const hooks = Database.hooks.get(tableName)
+        const hooks = this.hooks.get(tableName)
         let hookStream = Observable.of(db)
         const query = {
           where: clause.where
@@ -384,11 +397,16 @@ export class Database {
             .concatMap(r => Observable.from(hooks.destroy)
               .map(fn => fn(db, r))
             )
+            .catch(e => Promise.reject(HOOK_EXECUTE_FAILED('delete', e)))
             .toArray()
             .concatMap(r => tx.exec(r))
-            .catch(e => tx.rollback()
-              .then(() => Promise.reject(TRANSACTION_EXECUTE_FAILED(e)))
-            )
+            .catch(e => {
+              if (e instanceof ReactiveDBError) {
+                return Promise.reject(e)
+              }
+              return tx.rollback()
+                .then(() => Promise.reject(TRANSACTION_EXECUTE_FAILED(e)))
+            })
             .mapTo(db)
         }
 
@@ -418,7 +436,7 @@ export class Database {
       .then(() => {
         // restore hooks
         // review: hooks似乎应该是跟随database实例更好？
-        Database.hooks.forEach(tableHookDef => {
+        this.hooks.forEach(tableHookDef => {
           tableHookDef.insert = []
           tableHookDef.destroy = []
         })
@@ -426,12 +444,10 @@ export class Database {
   }
 
   private buildTables(builder: lf.schema.Builder) {
-    Database.schemaMetaData.forEach((schemaDef, tableName) => {
+    this.schemaMetaData.forEach((schemaDef, tableName) => {
       const tableBuilder = builder.createTable(tableName)
       this.buildTableRows(tableName, schemaDef, tableBuilder)
     })
-
-    delete Database.schemaMetaData
   }
 
   /**
@@ -487,7 +503,7 @@ export class Database {
           name: def.virtual.name
         })
 
-        Database.defineHook(tableName, {
+        this.defineHook(tableName, {
           insert: (db: lf.Database, entity: any) => {
             return this.createInsertHook(db, tableName, key, def, entity)
           }
@@ -500,7 +516,7 @@ export class Database {
 
       // create a hidden column in table and make compare datetime easier
       // not elegant but it worked
-      Database.defineHook(tableName, {
+      this.defineHook(tableName, {
         insert: (_db: lf.Database, entity: any) => {
           return new Promise(resolve => {
             const hiddenVal = entity[key]

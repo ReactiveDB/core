@@ -24,79 +24,81 @@ export interface TaskSchema {
   involveMembers: string[]
 }
 
-export default Database.defineSchema('Task', {
-  _creatorId: {
-    type: RDBType.STRING
-  },
-  _executorId: {
-    type: RDBType.STRING
-  },
-  _projectId: {
-    type: RDBType.STRING
-  },
-  _id: {
-    type: RDBType.STRING,
-    primaryKey: true
-  },
-  _sourceId: {
-    type: RDBType.STRING
-  },
-  _stageId: {
-    type: RDBType.STRING,
-    index: true
-  },
-  _tasklistId: {
-    type: RDBType.STRING
-  },
-  accomplished: {
-    type: RDBType.STRING
-  },
-  content: {
-    type: RDBType.STRING,
-    unique: true
-  },
-  note: {
-    type: RDBType.STRING
-  },
-  project: {
-    type: Association.oneToOne,
-    virtual: {
-      name: 'Project',
-      where: (
-        projectTable: lf.schema.Table & TaskSchema
-      ) => {
-        return {
-          _projectId: projectTable._id
+export default (db: Database) => {
+  db.defineSchema('Task', {
+    _creatorId: {
+      type: RDBType.STRING
+    },
+    _executorId: {
+      type: RDBType.STRING
+    },
+    _projectId: {
+      type: RDBType.STRING
+    },
+    _id: {
+      type: RDBType.STRING,
+      primaryKey: true
+    },
+    _sourceId: {
+      type: RDBType.STRING
+    },
+    _stageId: {
+      type: RDBType.STRING,
+      index: true
+    },
+    _tasklistId: {
+      type: RDBType.STRING
+    },
+    accomplished: {
+      type: RDBType.STRING
+    },
+    content: {
+      type: RDBType.STRING,
+      unique: true
+    },
+    note: {
+      type: RDBType.STRING
+    },
+    project: {
+      type: Association.oneToOne,
+      virtual: {
+        name: 'Project',
+        where: (
+          projectTable: lf.schema.Table & TaskSchema
+        ) => {
+          return {
+            _projectId: projectTable._id
+          }
         }
       }
-    }
-  },
-  subtasks: {
-    type: Association.oneToMany,
-    virtual: {
-      name: 'Subtask',
-      where: (
-        subtaskTable: lf.schema.Table & SubtaskSchema
-      ) => {
-        return {
-          _id: subtaskTable._taskId
+    },
+    subtasks: {
+      type: Association.oneToMany,
+      virtual: {
+        name: 'Subtask',
+        where: (
+          subtaskTable: lf.schema.Table & SubtaskSchema
+        ) => {
+          return {
+            _id: subtaskTable._taskId
+          }
         }
       }
+    },
+    involveMembers: {
+      type: RDBType.OBJECT
+    },
+    created: {
+      type: RDBType.DATE_TIME
     }
-  },
-  involveMembers: {
-    type: RDBType.OBJECT
-  },
-  created: {
-    type: RDBType.DATE_TIME
-  }
-})
+  })
 
-Database.defineHook('Task', {
-  destroy(db, entity) {
-    const subtaskTable = db.getSchema().table('Subtask')
-    return db.delete()
-      .from(subtaskTable)
-      .where(subtaskTable['taskId'].eq(entity._id))
-  }
-})
+  return db.defineHook('Task', {
+    destroy(database, entity) {
+      const subtaskTable = database.getSchema().table('Subtask')
+      return database.delete()
+        .from(subtaskTable)
+        .where(subtaskTable['_taskId'].eq(entity._id))
+    }
+  })
+}

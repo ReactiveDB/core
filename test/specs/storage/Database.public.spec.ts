@@ -3,12 +3,14 @@ import * as moment from 'moment'
 import { describe, it, beforeEach, afterEach } from 'tman'
 import { expect, assert } from 'chai'
 import {
+  RDBType,
   Database,
   ProjectSchema,
   SubtaskSchema,
   TaskSchema,
   clone,
   INVALID_FIELD_DES_ERR,
+  HOOK_EXECUTE_FAILED,
   NON_EXISTENT_TABLE_ERR,
   ALIAS_CONFLICT_ERR,
   UNEXPECTED_ASSOCIATION_ERR,
@@ -16,18 +18,20 @@ import {
   INVALID_PATCH_TYPE_ERR
 } from '../../index'
 import taskGenerator from '../../utils/taskGenerator'
+import schemaFactory from '../../schemas'
 import { TestFixture, TestFixture2 } from '../../schemas/Test'
 
 export default describe('Database public Method', () => {
 
   let database: Database
 
-  require('../../schemas')
   const originMetaData = Database['schemaMetaData']
 
   beforeEach(() => {
     Database['schemaMetaData'] = originMetaData
     database = new Database()
+    schemaFactory(database)
+    database.connect()
   })
 
   afterEach(() => {
@@ -58,27 +62,21 @@ export default describe('Database public Method', () => {
 
     it('should store selectMetaData', () => {
       const taskSelectMetaData = database['selectMetaData'].get('Task')
+
       expect(taskSelectMetaData.fields).to.deep.equal(new Set(['_id', 'content', 'note', '_projectId']))
       expect(taskSelectMetaData.virtualMeta.get('project').name).to.equal('Project')
       assert.isFunction(taskSelectMetaData.virtualMeta.get('project').where)
     })
 
     it('should throw when alias conflict in table design', () => {
-      const meta = Database['schemaMetaData']
-      const hooks = Database['hooks']
-
-      Database['schemaMetaData'] = new Map()
-      TestFixture(true)
+      const testDb = new Database()
+      TestFixture(true)(testDb)
 
       const standardErr = ALIAS_CONFLICT_ERR('id', 'Fixture1')
       try {
-        const db = new Database()
-        expect(db).is.undefined
+        testDb.connect()
       } catch (err) {
         expect(err.message).to.equal(standardErr.message)
-      } finally {
-        Database['schemaMetaData'] = meta
-        Database['hooks'] = hooks
       }
     })
 
@@ -102,21 +100,15 @@ export default describe('Database public Method', () => {
     })
 
     it('should throw if RDBType is incorrect', () => {
-      const meta = Database['schemaMetaData']
-      const hooks = Database['hooks']
+      const testDb = new Database()
 
-      Database['schemaMetaData'] = new Map()
-      TestFixture2()
+      TestFixture2(testDb)
 
       const standardErr = INVALID_ROW_TYPE_ERR()
       try {
-        // tslint:disable-next-line
-        new Database()
+        testDb.connect()
       } catch (err) {
         expect(err.message).to.equal(standardErr.message)
-      } finally {
-        Database['schemaMetaData'] = meta
-        Database['hooks'] = hooks
       }
     })
 
@@ -530,6 +522,36 @@ export default describe('Database public Method', () => {
         yield database.delete(tableName)
       } catch (e) {
         expect(e.message).to.equal(NON_EXISTENT_TABLE_ERR(tableName).message)
+      }
+    })
+
+    it('should throw when delete hook execute failed', function* () {
+      const db = new Database(void 0, void 0, 'TestDeleteHookFail')
+      const typeErr = new TypeError('Oh error')
+      db.defineSchema('TestTable', {
+        pk: {
+          type: RDBType.STRING,
+          primaryKey: true
+        }
+      })
+      db.defineHook('TestTable', {
+        destroy: () => {
+          throw typeErr
+        }
+      })
+
+      db.connect()
+
+      yield db.insert('TestTable', { pk: '1111' })
+
+      const err = HOOK_EXECUTE_FAILED('delete', typeErr)
+
+      try {
+        yield db.delete('TestTable', {
+          where: { pk: '1111' }
+        })
+      } catch (error) {
+        expect(error.message).to.equal(err.message)
       }
     })
   })
