@@ -216,7 +216,7 @@ export class Database {
    * insertHooks 是一些 lovefield query
    * 它们将在一个 transaction 中被串行执行，任意一个失败回滚所有操作并抛出异常
    */
-  insert<T>(tableName: string, raw: T | T[]): Observable<T> | Observable<T[]> {
+  insert<T>(tableName: string, raw: T | T[]): Observable<T> | Observable<T[]> | Observable<void> {
     return this.database$
       .concatMap(db => {
         const table = db.getSchema().table(tableName)
@@ -264,8 +264,15 @@ export class Database {
             .into(table)
             .values(rows)])
         })
-        .flatMap(identity)
-        .catch(() => tx.rollback().then(() => []))
+          .catch(e => Promise.reject(HOOK_EXECUTE_FAILED('insert', e)))
+          .flatMap(identity)
+          .catch((e) => {
+            if (e instanceof ReactiveDBError) {
+              return Promise.reject(e)
+            }
+            return tx.rollback()
+              .then(() => Promise.reject(TRANSACTION_EXECUTE_FAILED(e)))
+          })
       })
   }
 

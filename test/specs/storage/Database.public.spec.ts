@@ -177,6 +177,32 @@ export default describe('Database public Method', () => {
         expect(result.name).to.equal(name)
       })
 
+      it('should throw when insert hook execute failed', function* () {
+        const db = new Database(void 0, void 0, 'TestInsertHookFail')
+        const typeErr = new TypeError('Oh error')
+        db.defineSchema('TestTable', {
+          pk: {
+            type: RDBType.STRING,
+            primaryKey: true
+          }
+        })
+        db.defineHook('TestTable', {
+          insert: () => {
+            throw typeErr
+          }
+        })
+
+        db.connect()
+
+        const err = HOOK_EXECUTE_FAILED('insert', typeErr)
+
+        try {
+          yield db.insert('TestTable', { pk: '1111' })
+        } catch (error) {
+          expect(error.message).to.equal(err.message)
+        }
+      })
+
       describe('insert data into table without any hooks', () => {
         it('should insert single row', function* () {
           const project = taskGenerator(1).pop().project
