@@ -59,6 +59,10 @@ const predicateFactory = {
     return colum.between(values[0], values[1])
   },
 
+  $has(colum: lf.schema.Column, value: string): lf.Predicate {
+    return colum.match(new RegExp(`(^${value}$)\|(\\|${value}$)\|(${value}\\|)`))
+  },
+
   $in (colum: lf.schema.Column, range: ValueLiteral[]): lf.Predicate {
     return colum.in(range)
   },

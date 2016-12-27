@@ -766,23 +766,28 @@ export class Database {
     nullable: string[],
     def: SchemaMetadata
   ): lf.schema.TableBuilder {
+    const hiddenName = `${Database.__HIDDEN__}${rowName}`
     switch (rdbType) {
       case RDBType.ARRAY_BUFFER:
         return tableBuilder.addColumn(rowName, lf.Type.ARRAY_BUFFER)
       case RDBType.BOOLEAN:
         return tableBuilder.addColumn(rowName, lf.Type.BOOLEAN)
       case RDBType.DATE_TIME:
-        const hiddenName = `${Database.__HIDDEN__}${rowName}`
-        nullable.push(hiddenName)
-        def['isHidden'] = true
-        def['hiddenMapper'] = (val: string) => val ? new Date(val) : new Date(0)
+        nullable.push(hiddenName);
+        (def as any).isHidden = true;
+        (def as any).hiddenMapper = (val: string) => val ? new Date(val) : new Date(0)
         return tableBuilder
           .addColumn(rowName, lf.Type.INTEGER)
           .addColumn(hiddenName, lf.Type.STRING)
       case RDBType.INTEGER:
         return tableBuilder.addColumn(rowName, lf.Type.INTEGER)
       case RDBType.LITERAL_ARRAY:
-        return tableBuilder.addColumn(rowName, lf.Type.OBJECT)
+        nullable.push(hiddenName);
+        (def as any).isHidden = true;
+        (def as any).hiddenMapper = (val: any[]) => val ? val.join('|') : ''
+        return tableBuilder
+          .addColumn(rowName, lf.Type.STRING)
+          .addColumn(hiddenName, lf.Type.OBJECT)
       case RDBType.NUMBER:
         return tableBuilder.addColumn(rowName, lf.Type.NUMBER)
       case RDBType.OBJECT:

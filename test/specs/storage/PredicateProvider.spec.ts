@@ -20,6 +20,7 @@ export default describe('PredicateProvider test', () => {
       .addColumn('name', lf.Type.STRING)
       .addColumn('time1', lf.Type.NUMBER)
       .addColumn('time2', lf.Type.NUMBER)
+      .addColumn('times', lf.Type.STRING)
       .addColumn('nullable', lf.Type.BOOLEAN)
       .addPrimaryKey(['_id'])
       .addNullable(['nullable'])
@@ -33,6 +34,7 @@ export default describe('PredicateProvider test', () => {
         name: `name:${i}`,
         time1: i,
         time2: dataLength - i,
+        times: [i - 1, i , i + 1].map(r => `times: ${r}`).join('|') ,
         nullable: i >= 300 ? null : false
       }))
     }
@@ -194,6 +196,22 @@ export default describe('PredicateProvider test', () => {
 
       expect(result.length).to.equal(20)
       result.forEach((r: any) => expect(r['time1'] > 0 && r['time1'] <= 20).to.be.true)
+    })
+
+    it('$has should ok', function* () {
+      const predicate = new PredicateProvider(table, {
+        times: {
+          $has: 'times: 10'
+        }
+      }).getPredicate()
+
+      const result = yield db.select()
+        .from(table)
+        .where(predicate)
+        .exec()
+
+      expect(result.length).to.equal(3)
+      result.forEach((r: any) => expect(r.times.match(new RegExp(`(\\|times: 10$)\|(times: 10\\|)`))).to.not.be.null)
     })
 
     it('$in should ok', function* () {
