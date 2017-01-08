@@ -9,8 +9,6 @@ import {
 import { identity } from '../utils'
 import graphify from './Graphify'
 
-export type GraphMapper = (data: any) => any
-
 export interface TableShape {
   pk: {
     name: string,
@@ -24,7 +22,7 @@ export class Selector <T> {
     const originalToken = metaDatas[0]
     const fakeQuery = { toSql: identity }
     // 初始化一个空的 QuerySelector，然后在初始化以后替换它上面的属性和方法
-    const dist = new Selector<U>(originalToken.db, fakeQuery as any, identity)
+    const dist = new Selector<U>(originalToken.db, fakeQuery as any, { } as any)
     dist.change$ = Observable.from(metaDatas)
       .map(metas => metas.change$)
       .combineAll()
@@ -48,8 +46,8 @@ export class Selector <T> {
   constructor(
     public db: lf.Database,
     select: lf.query.Select,
-    private shape: TableShape | GraphMapper,
     public predicate?: lf.Predicate
+    private shape: TableShape,
   ) {
     this.select = select.toSql()
     this.query = predicate ? select.where(predicate) : select
@@ -100,11 +98,6 @@ export class Selector <T> {
     return this.query
       .exec()
       .then((rows: any[]) => {
-        // manually provided mapper function
-        if (typeof this.shape === 'function') {
-          return this.shape(rows)
-        }
-
         const result = graphify<T>(rows, this.shape.definition)
         const col = this.shape.pk.name
 
