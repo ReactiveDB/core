@@ -114,7 +114,7 @@ export class Selector <T> {
 
   private removeKey(data: any[], key: string) {
     data.forEach((entity) => {
-        delete entity[key]
+      delete entity[key]
     })
 
     return data
