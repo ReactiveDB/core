@@ -2,14 +2,17 @@ import './RxOperator'
 import { Observer } from 'rxjs/Observer'
 import { Observable } from 'rxjs/Observable'
 import * as lf from 'lovefield'
+import { PredicateProvider } from './PredicateProvider'
 import {
   TOKEN_INVALID_ERR,
-  TOKEN_CONSUMED_ERR
+  TOKEN_CONSUMED_ERR,
+  BUILD_PREDICATE_FAILED_WARN
 } from './RuntimeError'
 import { identity } from '../utils'
 import graphify from './Graphify'
 
 export interface TableShape {
+  mainTable: lf.schema.Table
   pk: {
     name: string,
     queried: boolean
@@ -41,28 +44,83 @@ export class Selector <T> {
 
   private change$: Observable<T[]>
   private consumed = false
-  private query: lf.query.Select
+  private predicateBuildErr = false
+
+  private get rangeQuery(): lf.query.Select {
+    let predicate: lf.Predicate
+    const { predicateProvider } = this
+    if (predicateProvider && !this.predicateBuildErr) {
+      predicate = predicateProvider.getPredicate()
+    }
+    const { pk, mainTable } = this.shape
+    const rangeQuery = this.db.select(mainTable[pk.name])
+        .from(mainTable)
+        .limit(this.limit)
+        .skip(this.skip)
+    return predicate ? rangeQuery.where(predicate) : rangeQuery
+  }
+
+  private get query(): lf.query.Select {
+    return this.lselect.clone()
+  }
 
   constructor(
     public db: lf.Database,
-    select: lf.query.Select,
-    public predicate?: lf.Predicate
+    private lselect: lf.query.Select,
     private shape: TableShape,
+    public predicateProvider?: PredicateProvider,
+    private limit?: number,
+    private skip?: number
   ) {
-    this.select = select.toSql()
-    this.query = predicate ? select.where(predicate) : select
-
-    this.change$ = Observable.create((observer: Observer<T[]>) => {
-      const listener = () => {
-        this.getValue()
-          .then(r => observer.next(r as T[]))
-          .catch(e => observer.error(e))
+    let predicate: lf.Predicate
+    if (predicateProvider) {
+      try {
+        predicate = predicateProvider.getPredicate()
+        if (!predicate) {
+          this.predicateProvider = null
+          this.predicateBuildErr = true
+        }
+      } catch (e) {
+        this.predicateProvider = null
+        this.predicateBuildErr = true
+        BUILD_PREDICATE_FAILED_WARN(e, shape.mainTable.getName())
       }
-      listener()
-      db.observe(this.query, listener)
+    }
+    if (limit || skip) {
+      const { pk, mainTable } = this.shape
+      this.change$ = this.buildPrefetchingObserve()
+        .switchMap(pks => {
+          return Observable.create((observer: Observer<T[]>) => {
+            const listener = () => {
+              this.getValue(pks)
+                .then(r => observer.next(r as T[]))
+                .catch(e => observer.error(e))
+            }
+            listener()
+            const $in = mainTable[pk.name].in(pks)
+            predicate = predicate ? lf.op.and($in, predicate) : $in
+            const query = this.query
+              .where(predicate)
+            db.observe(query, listener)
+            return () => this.db.unobserve(query, listener)
+          })
+        })
+    } else {
+      this.change$ = Observable.create((observer: Observer<T[]>) => {
+        const listener = () => {
+          this.getValue()
+            .then(r => observer.next(r as T[]))
+            .catch(e => observer.error(e))
+        }
+        const query = predicate ? this.query
+          .where(predicate) : this.query
+        listener()
+        db.observe(query, listener)
 
-      return () => this.db.unobserve(this.query, listener)
-    })
+        return () => this.db.unobserve(query, listener)
+      })
+    }
+    this.select = lselect.toSql()
   }
 
   toString(): string {
@@ -75,7 +133,14 @@ export class Selector <T> {
     }
 
     this.consumed = true
-    return Observable.fromPromise(this.getValue() as Promise<T[]>)
+    if (this.limit || this.skip) {
+      const p = this.rangeQuery.exec()
+        .then(r => r.map(v => v[this.shape.pk.name]))
+        .then(pks => this.getValue(pks))
+      return Observable.fromPromise(p)
+    } else {
+      return Observable.fromPromise(this.getValue() as Promise<T[]>)
+    }
   }
 
   combine(... selectMetas: Selector<T>[]): Selector<T> {
@@ -94,13 +159,25 @@ export class Selector <T> {
     return this.change$
   }
 
-  private getValue() {
-    return this.query
-      .exec()
+  private getValue(pks?: (string | number)[]) {
+    let q: lf.query.Select
+    if (pks) {
+      const predIn = this.shape.mainTable[this.shape.pk.name].in(pks)
+      const predicate = !this.predicateProvider || this.predicateBuildErr ? predIn : lf.op.and(
+        predIn, this.predicateProvider.getPredicate()
+      )
+      q = this.query
+        .where(predicate)
+    } else {
+      q = this.query
+      if (!this.predicateBuildErr) {
+        q = q.where(this.predicateProvider.getPredicate())
+      }
+    }
+    return q.exec()
       .then((rows: any[]) => {
         const result = graphify<T>(rows, this.shape.definition)
         const col = this.shape.pk.name
-
         return !this.shape.pk.queried ? this.removeKey(result, col) : result
       })
   }
@@ -111,5 +188,18 @@ export class Selector <T> {
     })
 
     return data
+  }
+
+  private buildPrefetchingObserve(): Observable<(string | number)[]> {
+    return Observable.create((observer: Observer<(string | number)[]>) => {
+      const listener = () => {
+        this.rangeQuery.exec()
+          .then((r) => observer.next(r.map(v => v[this.shape.pk.name])))
+          .catch(e => observer.error(e))
+      }
+      listener()
+      this.db.observe(this.rangeQuery, listener)
+      return () => this.db.unobserve(this.rangeQuery, listener)
+    })
   }
 }

@@ -1,4 +1,4 @@
-import 'rxjs'
+import { Observable } from 'rxjs'
 import * as lf from 'lovefield'
 import { expect, use } from 'chai'
 import * as sinon from 'sinon'
@@ -129,7 +129,7 @@ export default describe('SelectMeta test', () => {
     }
   })
 
-  it('should get correct items when skip and limt', function* () {
+  it('should get correct items when skip and limit', function* () {
     const selector = new Selector(db,
       db.select().from(table),
       tableShape,
@@ -258,6 +258,92 @@ export default describe('SelectMeta test', () => {
         expect(e.message).to.equal(error.message)
       }
     })
+
+    it('should observe changes when skip and limit', function* () {
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20, 20
+      )
+
+      const newName = 'new test name'
+
+      const signal = selector.changes()
+        .publish()
+        .refCount()
+
+      yield signal.take(1)
+
+      yield db.update(table)
+        .set(table['name'], newName)
+        .where(table['_id'].eq('_id:71'))
+        .exec()
+
+      yield signal
+        .take(1)
+        .do((r: any) => {
+          expect(r[0].name).to.equal(newName)
+        })
+    })
+
+    it('should observe changes when prefetched data changed', function* () {
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20, 20
+      )
+
+      const signal = selector.changes()
+        .publish()
+        .refCount()
+
+      yield signal.take(1)
+
+      yield db.delete()
+        .from(table)
+        .where(lf.op.and(table['time'].gte(71), table['time'].lte(80)))
+        .exec()
+
+      yield signal.take(1)
+        .do(r => {
+          expect(r.length).to.equal(20)
+          r.forEach((v: any) => {
+            expect(v.time).to.gt(80)
+            expect(v.time).to.lte(100)
+          })
+        })
+    })
+
+    it('should observe changes when last page data changed', function* () {
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 960 } }),
+        20, 20
+      )
+
+      const signal = selector.changes()
+        .publish()
+        .refCount()
+
+      yield signal.take(1)
+
+      yield db.delete()
+        .from(table)
+        .where(lf.op.and(table['time'].gte(981), table['time'].lte(990)))
+        .exec()
+
+      yield signal.take(1)
+        .do(r => {
+          expect(r.length).to.equal(9)
+          r.forEach((v: any) => {
+            expect(v.time).to.gt(990)
+            expect(v.time).to.lt(1000)
+          })
+        })
+    })
   })
 
   describe('SelectMeta.prototype.combine', () => {
@@ -358,6 +444,81 @@ export default describe('SelectMeta test', () => {
 
       yield changes$.take(1)
         .do(r => expect(r[125].name).equal(update3))
+    })
+
+    it('changes should observe all values with limit and skip', function* () {
+      const selector5 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20, 20
+      )
+      const selector6 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 100 } }),
+        20, 20
+      )
+
+      const signal = selector5.combine(selector6)
+        .changes()
+        .publish()
+        .refCount()
+
+      yield signal.take(1)
+
+      yield db.delete()
+        .from(table)
+        .where(table['time'].eq(81))
+        .exec()
+
+      yield signal.take(1)
+        .do(r => {
+          expect(r.length).to.equal(40)
+          r.forEach(v => expect(v['time']).not.equal(81))
+          Observable.from(r)
+            .skip(19)
+            .take(1)
+            .subscribe(v => expect(v['time']).to.equal(91))
+        })
+
+      yield db.delete()
+        .from(table)
+        .where(table['time'].eq(135))
+        .exec()
+
+      yield signal.take(1)
+        .do(r => {
+          expect(r.length).to.equal(40)
+          r.forEach(v => expect(v['time']).not.equal(135))
+          Observable.from(r)
+            .last()
+            .subscribe(v => expect(v['time']).to.equal(141))
+        })
+
+      const newName = 'xxx'
+
+      yield db.update(table)
+        .set(table['name'], newName)
+        .where(table['time'].eq(82))
+        .exec()
+
+      yield signal.take(1)
+        .do(r => {
+          r.filter(v => v['time'] === 82)
+            .forEach(v => expect(v['name']).to.equal(newName))
+        })
+
+      yield db.update(table)
+        .set(table['name'], newName)
+        .where(table['time'].eq(136))
+        .exec()
+
+      yield signal.take(1)
+        .do(r => {
+          r.filter(v => v['time'] === 136)
+            .forEach(v => expect(v['name']).to.equal(newName))
+        })
     })
 
     it('should throw when combine two different SelectMetas', () => {

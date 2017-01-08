@@ -325,8 +325,10 @@ export default describe('Database public Method', () => {
         let result: any[]
         try {
           result = yield database.get<TaskSchema>('Task', <any>{
-            get where() {
-              throw new TypeError('error occured when build execute where clause function')
+            where: {
+              get whatever() {
+                throw new TypeError('error occured when build execute where clause function')
+              }
             }
           }).values()
         } catch (e) {
@@ -346,6 +348,27 @@ export default describe('Database public Method', () => {
         }).values()
 
         expect(_id).to.equal(task._id)
+      })
+
+      it('should ok with skip and limit', function* () {
+        yield database.delete('Task')
+
+        const tasks = taskGenerator(100)
+        yield database.insert('Task', tasks)
+
+        const result = yield database.get('Task', {
+          limit: 10,
+          skip: 20
+        })
+          .values()
+
+        yield Observable.from(tasks)
+          .skip(20)
+          .take(10)
+          .toArray()
+          .do(r => {
+            expect(r).to.deep.equal(result)
+          })
       })
     })
 
