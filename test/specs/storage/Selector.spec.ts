@@ -125,6 +125,19 @@ export default describe('SelectMeta test', () => {
     }
   })
 
+  it('should get sql string by toString method', () => {
+    const selector = new Selector(db,
+      db.select().from(table),
+      tableShape,
+      new PredicateProvider(table, { time: { $gt: 50 } }),
+      20, 20
+    )
+
+    const sql = selector.toString()
+
+    expect(sql).to.equal('SELECT * FROM TestSelectMetadata;')
+  })
+
   describe('SelectMeta.prototype.changes', () => {
     it('observe should ok', done => {
       const selector = new Selector(db, db.select().from(table), (values: any[]) => {

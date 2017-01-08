@@ -59,6 +59,10 @@ export default class MockSelector<T> {
 
   }
 
+  toString() {
+    return `MockSelector SQL`
+  }
+
   private notify() {
     this.subject.next(this.datas)
   }

@@ -31,4 +31,9 @@ export class QueryToken <T> {
       })
     return new QueryToken(newMeta$)
   }
+
+  toString() {
+    return this.selectMeta$
+      .map(r => r.toString())
+  }
 }
