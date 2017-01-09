@@ -90,6 +90,8 @@ export interface ClauseDescription {
 
 export interface QueryDescription extends ClauseDescription {
   fields?: FieldsValue[]
+  limit?: number
+  skip?: number
 }
 
 export interface JoinInfo {
@@ -724,7 +726,6 @@ export class Database {
   ) {
     const pk = this.primaryKeysMap.get(tableName)
     const selectMetadata = this.selectMetaData.get(tableName)
-    let mainPredicate: lf.Predicate | null
     const mainTable = db.getSchema().table(tableName)
     const hasQueryFields = !!queryClause.fields
 
@@ -739,22 +740,19 @@ export class Database {
       query.leftOuterJoin(table, info.predicate)
     })
 
-    try {
-      if (queryClause.where) {
-        mainPredicate = new PredicateProvider(mainTable, queryClause.where).getPredicate()
-      }
-    } catch (e) {
-      BUILD_PREDICATE_FAILED_WARN(e.message)
-    }
-
     const definition = this.tableShapeMap.get(tableName)
     return new Selector<T>(db, query, {
-      pk: {
-        queried: isKeyQueried,
-        name: pk
+        mainTable,
+        pk: {
+          queried: isKeyQueried,
+          name: pk
+        },
+        definition
       },
-      definition
-    }, mainPredicate)
+      new PredicateProvider(mainTable, queryClause.where),
+      queryClause.limit,
+      queryClause.skip
+    )
   }
 
   private addRow(

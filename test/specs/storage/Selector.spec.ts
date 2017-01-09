@@ -1,10 +1,17 @@
-import 'rxjs'
+import { Observable } from 'rxjs'
 import * as lf from 'lovefield'
 import { expect, use } from 'chai'
 import * as sinon from 'sinon'
 import * as SinonChai from 'sinon-chai'
 import { beforeEach, it, describe, afterEach } from 'tman'
-import { Selector, lfFactory, TOKEN_CONSUMED_ERR, TOKEN_INVALID_ERR } from '../../index'
+import {
+  Selector,
+  lfFactory,
+  TableShape,
+  PredicateProvider,
+  TOKEN_CONSUMED_ERR,
+  TOKEN_INVALID_ERR
+} from '../../index'
 
 use(SinonChai)
 
@@ -19,6 +26,9 @@ export default describe('SelectMeta test', () => {
   let db: lf.Database
   let table: lf.schema.Table
   let version = 1
+
+  let tableShape: TableShape
+  let storeData: any[]
 
   beforeEach(function * () {
     const schemaBuilder = lf.schema.create('SelectMetaTest', version ++)
@@ -39,53 +49,24 @@ export default describe('SelectMeta test', () => {
     })
 
     const rows: lf.Row[] = []
-
+    storeData = []
     for (let i = 0; i < 1000; i ++) {
-      rows.push(table.createRow({
+      const row = {
         _id: `_id:${i}`,
-        name: 'name:${i}',
+        name: `name:${i}`,
         time: i
-      }))
+      }
+      rows.push(table.createRow(row))
+      storeData.push(row)
     }
 
     yield db.insert().into(table).values(rows).exec()
-  })
 
-  afterEach(() => {
-    db.close()
-  })
-
-  it('should create a instance successfully', () => {
-    const selector = new Selector<Fixture>(db, db.select().from(table), (values: Fixture[]) => values)
-    expect(selector).to.be.instanceof(Selector)
-  })
-
-  it('should able to convert selector to sql', () => {
-    const selector = new Selector<Fixture>(db, db.select().from(table), (values: Fixture[]) => values)
-    expect(selector.toString()).to.equal('SELECT * FROM TestSelectMetadata;')
-  })
-
-  it('should getValues successfully via mapper', function* () {
-    const selector = new Selector<Fixture>(db, db.select().from(table), (values: Fixture[]) => {
-      return values.map(value => {
-        value.folded = true
-        return value
-      })
-    }, table['time'].gte(50))
-
-    const results = yield selector.values()
-
-    expect(results.length).to.equal(1000 - 50)
-    results.forEach((ret: any) => {
-      expect((ret).folded).to.equals(true)
-    })
-  })
-
-  it('should getValues successfully via table shape', function* () {
-    const selector = new Selector<Fixture>(db, db.select().from(table), {
+    tableShape = {
+      mainTable: table,
       pk: {
-        name: '_id',
-        queried: true
+        queried: true,
+        name: '_id'
       },
       definition: {
         _id: {
@@ -93,13 +74,37 @@ export default describe('SelectMeta test', () => {
           id: true
         },
         name: {
-          column: 'name'
+          column: 'name',
+          id: false
         },
         time: {
-          column: 'time'
+          column: 'time',
+          id: false
         }
       }
-    }, table['time'].gte(50))
+    }
+  })
+
+  afterEach(() => {
+    db.close()
+  })
+
+  it('should create a instance successfully', () => {
+    const selector = new Selector<Fixture>(db, db.select().from(table), tableShape)
+    expect(selector).to.be.instanceof(Selector)
+  })
+
+  it('should able to convert selector to sql', () => {
+    const selector = new Selector<Fixture>(db, db.select().from(table), tableShape)
+    expect(selector.toString()).to.equal('SELECT * FROM TestSelectMetadata;')
+  })
+
+  it('should getValues successfully via table shape', function* () {
+    const selector = new Selector<Fixture>(db,
+      db.select().from(table),
+      tableShape,
+      new PredicateProvider(table, { time: { $gte: 50 } })
+    )
 
     const results = yield selector.values()
 
@@ -110,12 +115,11 @@ export default describe('SelectMeta test', () => {
   })
 
   it('reconsume should throw', function* () {
-    const selector = new Selector(db, db.select().from(table), (rows: any[]) => {
-      return rows.map(row => {
-        row.folded = 'true'
-        return row
-      })
-    }, table['time'].gte(50))
+    const selector = new Selector(db,
+      db.select().from(table),
+      tableShape,
+      new PredicateProvider(table, { time: { $gte: 50 } })
+    )
     yield selector.values()
 
     try {
@@ -125,14 +129,42 @@ export default describe('SelectMeta test', () => {
     }
   })
 
+  it('should get correct items when skip and limit', function* () {
+    const selector = new Selector(db,
+      db.select().from(table),
+      tableShape,
+      new PredicateProvider(table, { time: { $gt: 50 } }),
+      20, 20
+    )
+    const result = yield selector.values()
+
+    expect(result.length).to.equal(20)
+
+    result.forEach((r: any) => {
+      expect(r.time).to.greaterThan(70)
+    })
+  })
+
+  it('should get sql string by toString method', () => {
+    const selector = new Selector(db,
+      db.select().from(table),
+      tableShape,
+      new PredicateProvider(table, { time: { $gt: 50 } }),
+      20, 20
+    )
+
+    const sql = selector.toString()
+
+    expect(sql).to.equal('SELECT * FROM TestSelectMetadata;')
+  })
+
   describe('SelectMeta.prototype.changes', () => {
     it('observe should ok', done => {
-      const selector = new Selector(db, db.select().from(table), (values: any[]) => {
-        return values.map(value => {
-          value.folded = 'true'
-          return value
-        })
-      }, table['time'].gte(50))
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } })
+      )
 
       const newName = 'test name change'
 
@@ -150,12 +182,11 @@ export default describe('SelectMeta test', () => {
     })
 
     it('unsubscribe should ok', function* () {
-      const selector = new Selector(db, db.select().from(table), (values: any[]) => {
-        return values.map(value => {
-          value.folded = 'true'
-          return value
-        })
-      }, table['time'].gte(50))
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } })
+      )
       const stub = sinon.spy((): void => void 0)
 
       const newName = 'test name change'
@@ -179,11 +210,11 @@ export default describe('SelectMeta test', () => {
     })
 
     it('reconsume should throw', () => {
-      const selector = new Selector(db, db.select().from(table), (values: any[]) => {
-        return values.map(value => {
-          return { ...value, folded: true }
-        })
-      }, table['time'].gte(50))
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } })
+      )
 
       selector.changes()
       const get = () => selector.changes()
@@ -192,11 +223,11 @@ export default describe('SelectMeta test', () => {
     })
 
     it('should throw when getValue error', function* () {
-      const selector = new Selector(db, db.select().from(table), (values: any[]) => {
-        return values.map(value => {
-          return { ...value, folded: true }
-        })
-      }, table['time'].gte(50))
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } })
+      )
 
       const changes = selector.changes()
         .publish()
@@ -227,6 +258,92 @@ export default describe('SelectMeta test', () => {
         expect(e.message).to.equal(error.message)
       }
     })
+
+    it('should observe changes when skip and limit', function* () {
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20, 20
+      )
+
+      const newName = 'new test name'
+
+      const signal = selector.changes()
+        .publish()
+        .refCount()
+
+      yield signal.take(1)
+
+      yield db.update(table)
+        .set(table['name'], newName)
+        .where(table['_id'].eq('_id:71'))
+        .exec()
+
+      yield signal
+        .take(1)
+        .do((r: any) => {
+          expect(r[0].name).to.equal(newName)
+        })
+    })
+
+    it('should observe changes when prefetched data changed', function* () {
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20, 20
+      )
+
+      const signal = selector.changes()
+        .publish()
+        .refCount()
+
+      yield signal.take(1)
+
+      yield db.delete()
+        .from(table)
+        .where(lf.op.and(table['time'].gte(71), table['time'].lte(80)))
+        .exec()
+
+      yield signal.take(1)
+        .do(r => {
+          expect(r.length).to.equal(20)
+          r.forEach((v: any) => {
+            expect(v.time).to.gt(80)
+            expect(v.time).to.lte(100)
+          })
+        })
+    })
+
+    it('should observe changes when last page data changed', function* () {
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 960 } }),
+        20, 20
+      )
+
+      const signal = selector.changes()
+        .publish()
+        .refCount()
+
+      yield signal.take(1)
+
+      yield db.delete()
+        .from(table)
+        .where(lf.op.and(table['time'].gte(981), table['time'].lte(990)))
+        .exec()
+
+      yield signal.take(1)
+        .do(r => {
+          expect(r.length).to.equal(9)
+          r.forEach((v: any) => {
+            expect(v.time).to.gt(990)
+            expect(v.time).to.lt(1000)
+          })
+        })
+    })
   })
 
   describe('SelectMeta.prototype.combine', () => {
@@ -237,30 +354,37 @@ export default describe('SelectMeta test', () => {
     let dist: Selector<any>
 
     beforeEach(() => {
-      selector1 = new Selector(db, db.select().from(table), (values: any[]) => {
-        return values.map(value => {
-          return { ...value, folded: 1 }
+      selector1 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $lt: 50 } })
+      )
+      selector2 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, {
+          time: {
+            $gte: 50,
+            $lt: 100
+          }
         })
-      }, table['time'].lt(50))
-      selector2 = new Selector(db, db.select().from(table), (values: any[]) => {
-        return values.map(value => {
-          return { ...value, folded: 2 }
-        })
-      }, lf.op.and(table['time'].gte(50), table['time'].lt(100)))
+      )
 
       const select1And2 = selector1.combine(selector2)
 
-      selector3 = new Selector(db, db.select().from(table), (values: any[]) => {
-        return values.map(value => {
-          return { ...value, folded: 3 }
-        })
-      }, lf.op.and(table['time'].gte(100), table['time'].lt(150)))
+      selector3 = new Selector(db, db.select().from(table), tableShape, new PredicateProvider(table, {
+        time: {
+          $gte: 100,
+          $lt: 150
+        }
+      }))
 
-      selector4 = new Selector(db, db.select().from(table), (values: any[]) => {
-        return values.map(value => {
-          return { ...value, folded: 4 }
-        })
-      }, lf.op.and(table['time'].gte(150), table['time'].lt(200)))
+      selector4 = new Selector(db, db.select().from(table), tableShape, new PredicateProvider(table, {
+        time: {
+          $gte: 150,
+          $lt: 200
+        }
+      }))
 
       dist = select1And2.combine(selector3, selector4)
     })
@@ -281,18 +405,9 @@ export default describe('SelectMeta test', () => {
       const result = yield dist.values()
       const count = 200
       expect(result.length).is.equals(count)
-
-      for (let i = 0; i < count; i++) {
-        if (i < 50) {
-          expect(result[i].folded).is.equals(1)
-        } else if (i >= 50 && i < 100) {
-          expect(result[i].folded).is.equals(2)
-        } else if (i >= 100 && i < 150) {
-          expect(result[i].folded).is.equals(3)
-        } else {
-          expect(result[i].folded).is.equals(4)
-        }
-      }
+      result.forEach((r: any, index: number) => {
+        expect(r).to.deep.equal(storeData[index])
+      })
     })
 
     it('changes should observe all values from original SelectMeta', function* () {
@@ -331,8 +446,83 @@ export default describe('SelectMeta test', () => {
         .do(r => expect(r[125].name).equal(update3))
     })
 
+    it('changes should observe all values with limit and skip', function* () {
+      const selector5 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20, 20
+      )
+      const selector6 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 100 } }),
+        20, 20
+      )
+
+      const signal = selector5.combine(selector6)
+        .changes()
+        .publish()
+        .refCount()
+
+      yield signal.take(1)
+
+      yield db.delete()
+        .from(table)
+        .where(table['time'].eq(81))
+        .exec()
+
+      yield signal.take(1)
+        .do(r => {
+          expect(r.length).to.equal(40)
+          r.forEach(v => expect(v['time']).not.equal(81))
+          Observable.from(r)
+            .skip(19)
+            .take(1)
+            .subscribe(v => expect(v['time']).to.equal(91))
+        })
+
+      yield db.delete()
+        .from(table)
+        .where(table['time'].eq(135))
+        .exec()
+
+      yield signal.take(1)
+        .do(r => {
+          expect(r.length).to.equal(40)
+          r.forEach(v => expect(v['time']).not.equal(135))
+          Observable.from(r)
+            .last()
+            .subscribe(v => expect(v['time']).to.equal(141))
+        })
+
+      const newName = 'xxx'
+
+      yield db.update(table)
+        .set(table['name'], newName)
+        .where(table['time'].eq(82))
+        .exec()
+
+      yield signal.take(1)
+        .do(r => {
+          r.filter(v => v['time'] === 82)
+            .forEach(v => expect(v['name']).to.equal(newName))
+        })
+
+      yield db.update(table)
+        .set(table['name'], newName)
+        .where(table['time'].eq(136))
+        .exec()
+
+      yield signal.take(1)
+        .do(r => {
+          r.filter(v => v['time'] === 136)
+            .forEach(v => expect(v['name']).to.equal(newName))
+        })
+    })
+
     it('should throw when combine two different SelectMetas', () => {
-      const different = new Selector(db, db.select(table['_id']).from(table), () => void 0)
+      const different = new Selector(db, db.select(table['_id']).from(table), tableShape)
       const fn = () => dist.combine(different)
       expect(fn).to.throw(TOKEN_INVALID_ERR().message)
     })

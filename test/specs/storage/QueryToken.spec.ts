@@ -68,6 +68,11 @@ export default describe('QueryToken test', () => {
     })
   })
 
+  it('QueryToken.prototype.toString', function* () {
+    const sql = yield queryToken.toString()
+    expect(sql).to.equal(mockSelectMeta.toString())
+  })
+
   describe('QueryToken.prototype.combine', () => {
     let tasks2: TaskSchema[]
     let mockSelectMeta2: MockSelectMeta<TaskSchema>
