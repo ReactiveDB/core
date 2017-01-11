@@ -1,4 +1,6 @@
 import './global'
 import * as lf from 'lovefield'
-export { Database } from './storage/Database'
+export * from './storage/Database'
+export * from './storage/DataType'
+export { PredicateDescription } from './storage/PredicateProvider'
 export const DataStoreType = lf.schema.DataStoreType

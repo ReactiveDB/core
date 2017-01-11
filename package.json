@@ -1,17 +1,18 @@
 {
-  "name": "reactive-database",
+  "name": "reactivedb",
   "version": "0.7.0",
   "description": "Reactive ORM for Lovefield",
   "main": "index.js",
   "scripts": {
-    "start": "webpack-dev-server --inline --colors --progress --display-error-details --display-cached --port 3000  --content-base src",
     "build_all": "npm run build_cjs && npm run build_test",
-    "build_cjs": "rm -rf dist/cjs && tsc src/index.ts -m commonjs --outDir dist/cjs --sourcemap --sourceRoot src --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --noImplicitThis --noUnusedLocals --noUnusedParameters --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
+    "build_cjs": "rm -rf dist && tsc src/index.ts -m commonjs --outDir dist --sourcemap --sourceRoot src --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --noImplicitThis --noUnusedLocals --noUnusedParameters --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
     "build_test": "rm -rf spec-js && tsc test/run.ts -m commonjs --outDir spec-js --sourcemap  --target ES2015 --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node",
-    "lint": "tslint -c tslint.json src/*.ts src/**/*.ts src/**/**/*.ts ./test/*.ts ./test/**/*.ts ./test/**/**/*.ts !./test/e2e/*.ts",
     "cover": "rm -rf ./.nyc_output ./coverage && nyc --reporter=html --reporter=lcov --exclude=node_modules --exclude=spec-js/test --exclude=spec-js/src/storage/lovefield.js --exclude=spec-js/src/utils/logger.js tman --mocha spec-js/test/run.js",
+    "lint": "tslint -c tslint.json src/*.ts src/**/*.ts src/**/**/*.ts ./test/*.ts ./test/**/*.ts ./test/**/**/*.ts !./test/e2e/*.ts",
+    "start": "webpack-dev-server --inline --colors --progress --display-error-details --display-cached --port 3000  --content-base src",
     "test": "npm run lint && tman --mocha spec-js/test/run.js",
-    "watch_cjs": "tsc src/index.ts -m commonjs --outDir dist/cjs --sourcemap --sourceRoot src --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom -w",
+    "version": "ts-node tools/version.ts && git add .",
+    "watch_cjs": "tsc src/index.ts -m commonjs --outDir dist --sourcemap --sourceRoot src --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom -w",
     "watch_test": "tsc test/run.ts -m commonjs --outDir spec-js --sourcemap  --target ES2015 --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node -w & ts-node ./tools/watch.ts"
   },
   "keywords": [
@@ -55,5 +56,11 @@
   },
   "peerDependencies": {
     "rxjs": "^5.0.3"
-  }
+  },
+  "files": [
+    "src/**",
+    "dist/**",
+    "docs"
+  ],
+  "typings": "./dist/index.d.ts"
 }

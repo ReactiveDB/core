@@ -106,6 +106,7 @@ export type ShapeMatcher = {
 }
 
 export class Database {
+  public static version = '0.7.0'
   /**
    * hidden row namespace
    * 比如 api 获取的 task.created 是 string 类型
@@ -116,6 +117,25 @@ export class Database {
    * 存储的时候将原始值存储为 new Date(task.created)
    */
   private static readonly __HIDDEN__ = '__hidden__'
+
+  private static unwrapPredicate(db: lf.Database, tableName: string, targetTableName: string, joinClause: Function) {
+    const [table, targetTable] = Database.getTable(db, tableName, targetTableName)
+    try {
+      return new PredicateProvider(targetTable, joinClause(table)).getPredicate()
+    } catch (e) {
+      BUILD_PREDICATE_FAILED_WARN(e, tableName)
+      return null
+    }
+  }
+
+  private static getTable(db: lf.Database, ...tableNames: string[]) {
+    const ret: lf.schema.Table[] = []
+    tableNames.forEach((name) => {
+      ret.push(db.getSchema().table(name))
+    })
+
+    return ret
+  }
 
   database$: Observable<lf.Database>
 
@@ -894,24 +914,4 @@ export class Database {
 
     return { columns, allFields, joinInfo }
   }
-
-  private static unwrapPredicate(db: lf.Database, tableName: string, targetTableName: string, joinClause: Function) {
-    const [table, targetTable] = Database.getTable(db, tableName, targetTableName)
-    try {
-      return new PredicateProvider(targetTable, joinClause(table)).getPredicate()
-    } catch (e) {
-      BUILD_PREDICATE_FAILED_WARN(e, tableName)
-      return null
-    }
-  }
-
-  private static getTable(db: lf.Database, ...tableNames: string[]) {
-    const ret: lf.schema.Table[] = []
-    tableNames.forEach((name) => {
-      ret.push(db.getSchema().table(name))
-    })
-
-    return ret
-  }
-
 }
