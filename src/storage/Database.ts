@@ -31,7 +31,7 @@ import {
   INVALID_PATCH_TYPE_ERR
 } from './RuntimeError'
 
-export interface SchemaMetadata {
+export interface SchemaMetadata<T> {
   type: RDBType | Association
   primaryKey?: boolean
   index?: boolean
@@ -51,8 +51,8 @@ export interface SchemaMetadata {
   // readonly hiddenMapper?: (val: any) => any
 }
 
-export interface SchemaDef {
-  [index: string]: SchemaMetadata
+export type SchemaDef<T> = {
+  [P in keyof T]: SchemaMetadata<T>
 }
 
 export interface HookDef {
@@ -140,7 +140,7 @@ export class Database {
   database$: Observable<lf.Database>
 
   private hooks = new Map<string, HooksDef>()
-  private schemaMetaData = new Map<string, SchemaDef>()
+  private schemaMetaData = new Map<string, SchemaDef<any>>()
 
   private primaryKeysMap = new Map<string, string>()
   private selectMetaData = new Map<string, SelectMetadata>()
@@ -152,7 +152,7 @@ export class Database {
    * 定义数据表的 metadata
    * 会根据这些 metadata 决定增删改查的时候如何处理关联数据
    */
-  defineSchema(tableName: string, schemaMetaData: SchemaDef) {
+  defineSchema<T>(tableName: string, schemaMetaData: SchemaDef<T>) {
     if (this.connected) {
       throw UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR()
     }
@@ -171,7 +171,7 @@ export class Database {
     })
 
     if (!hasPK) {
-      throw NON_EXISTENT_PRIMARY_KEY_ERR(schemaMetaData)
+      throw NON_EXISTENT_PRIMARY_KEY_ERR(schemaMetaData as any)
     }
 
     this.schemaMetaData.set(tableName, schemaMetaData)
@@ -490,7 +490,7 @@ export class Database {
    */
   private buildTableRows(
     tableName: string,
-    schemaMetaData: SchemaDef,
+    schemaMetaData: SchemaDef<any>,
     tableBuilder: lf.schema.TableBuilder
   ) {
     const uniques: string[] = []
@@ -583,7 +583,7 @@ export class Database {
     return selectResult
   }
 
-  private buildTableShape(tableName: string, metadata: SchemaDef) {
+  private buildTableShape(tableName: string, metadata: SchemaDef<any>) {
     const shape = Object.create(null)
 
     forEach(metadata, (value, key) => {
@@ -653,7 +653,7 @@ export class Database {
     db: lf.Database,
     tableName: string,
     key: string,
-    def: SchemaMetadata,
+    def: SchemaMetadata<any>,
     entity: any
   ) {
     const prop: any = entity[key]
@@ -780,7 +780,7 @@ export class Database {
     rowName: string,
     rdbType: RDBType,
     nullable: string[],
-    def: SchemaMetadata
+    def: SchemaMetadata<any>
   ): lf.schema.TableBuilder {
     const hiddenName = `${Database.__HIDDEN__}${rowName}`
     switch (rdbType) {
