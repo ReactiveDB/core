@@ -43,8 +43,9 @@ export interface SchemaMetadata<T> {
    * 这里需要定义表名，字段和查询条件
    */
   virtual?: {
-    name: string
+    name?: string
     where(virtualTable: lf.schema.Table): PredicateDescription
+    getName?(entity: T): string
   }
   // 被 Database.prototype.createRow 动态挂上去的
   // readonly isHidden?: boolean
@@ -621,7 +622,7 @@ export class Database {
               throw UNEXPECTED_ASSOCIATION_ERR()
           }
 
-          if (!this.tableShapeMap.get(virtualTableName)) {
+          if (!this.tableShapeMap.has(virtualTableName)) {
             this.tableShapeMap.set(virtualTableName, virtualRule)
           }
         } else {
@@ -666,10 +667,26 @@ export class Database {
       return Promise.reject(INVALID_NAVIGATINO_TYPE_ERR(prop, ['Object / Array', propType]))
     }
 
-    const pk = this.primaryKeysMap.get(def.virtual.name)
-    const virtualTable = db.getSchema().table(def.virtual.name)
+    let virtualTableName: string
+    if (typeof def.virtual.getName === 'function') {
+      virtualTableName = def.virtual.getName(entity)
+      const dynamicAssoc = clone(this.tableShapeMap.get(virtualTableName))
+      if (def.type === Association.oneToOne) {
+        forEach(dynamicAssoc, value => {
+          if (value.id) {
+            value.id = false
+          }
+        })
+      }
+      this.tableShapeMap.get(tableName)[key] = dynamicAssoc
+    } else {
+      virtualTableName = def.virtual.name
+    }
+    const pk = this.primaryKeysMap.get(virtualTableName)
+    const virtualTable = db.getSchema().table(virtualTableName)
     const virtualMetadata = this.selectMetaData.get(tableName).virtualMeta
     const recordType = virtualMetadata.get(key).association
+    virtualMetadata.get(key).name = virtualTableName
 
     switch (recordType) {
       case Association.oneToMany:

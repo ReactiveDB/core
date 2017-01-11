@@ -17,8 +17,9 @@ import {
   INVALID_ROW_TYPE_ERR,
   INVALID_PATCH_TYPE_ERR
 } from '../../index'
+import { uuid } from '../../utils/uuid'
 import taskGenerator from '../../utils/taskGenerator'
-import schemaFactory from '../../schemas'
+import schemaFactory, { ActivitySchema } from '../../schemas'
 import { TestFixture, TestFixture2 } from '../../schemas/Test'
 
 export default describe('Database public Method', () => {
@@ -229,6 +230,30 @@ export default describe('Database public Method', () => {
           expect(results).deep.equals(projects)
         })
       })
+
+      it('should ok when insert data to table with dynamic virtual table name', function* () {
+        const [ boundObject ] = taskGenerator(1)
+        const activityFixture: ActivitySchema = {
+          _boundToObjectId: boundObject._id as string,
+          _creatorId: boundObject._creatorId,
+          _id: uuid(),
+          action: 'haha',
+          boundToObjectType: 'Task',
+          content: { } as any,
+          created: Date.now(),
+          entity: boundObject
+        }
+
+        yield database.insert('Activity', activityFixture)
+
+        const [ result ] = yield database.get('Activity', {
+          where: { _boundToObjectId: boundObject._id as string }
+        })
+          .values()
+
+        expect(result).to.deep.equal(activityFixture)
+      })
+
     })
 
     describe('Database.prototype.get', () => {
