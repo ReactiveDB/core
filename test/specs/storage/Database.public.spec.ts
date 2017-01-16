@@ -17,9 +17,9 @@ import {
   INVALID_ROW_TYPE_ERR,
   INVALID_PATCH_TYPE_ERR
 } from '../../index'
-import { uuid } from '../../utils/uuid'
 import taskGenerator from '../../utils/taskGenerator'
-import schemaFactory, { ActivitySchema } from '../../schemas'
+import relationalDataGenerator from '../../utils/relationalDataGenerator'
+import schemaFactory from '../../schemas'
 import { TestFixture, TestFixture2 } from '../../schemas/Test'
 
 export default describe('Database public Method', () => {
@@ -231,29 +231,6 @@ export default describe('Database public Method', () => {
         })
       })
 
-      it('should ok when insert data to table with dynamic virtual table name', function* () {
-        const [ boundObject ] = taskGenerator(1)
-        const activityFixture: ActivitySchema = {
-          _boundToObjectId: boundObject._id as string,
-          _creatorId: boundObject._creatorId,
-          _id: uuid(),
-          action: 'haha',
-          boundToObjectType: 'Task',
-          content: { } as any,
-          created: Date.now(),
-          entity: boundObject
-        }
-
-        yield database.insert('Activity', activityFixture)
-
-        const [ result ] = yield database.get('Activity', {
-          where: { _boundToObjectId: boundObject._id as string }
-        })
-          .values()
-
-        expect(result).to.deep.equal(activityFixture)
-      })
-
     })
 
     describe('Database.prototype.get', () => {
@@ -349,13 +326,13 @@ export default describe('Database public Method', () => {
       it('should throw when build whereClause failed', function* () {
         let result: any[]
         try {
-          result = yield database.get<TaskSchema>('Task', <any>{
+          result = yield database.get<TaskSchema>('Task', {
             where: {
               get whatever() {
                 throw new TypeError('error occured when build execute where clause function')
               }
             }
-          }).values()
+          } as any).values()
         } catch (e) {
           throw new TypeError('Invalid code path reached.')
         }
@@ -395,6 +372,14 @@ export default describe('Database public Method', () => {
             expect(r).to.deep.equal(result)
           })
       })
+
+      it('should keep the idempotency of query', function* () {
+        const sqlA = yield database.get('Task').toString()
+        const sqlB = yield database.get('Task').toString()
+
+        expect(sqlA).to.deep.equal(sqlB)
+      })
+
     })
 
     describe('Database.prototype.update', () => {
@@ -440,7 +425,7 @@ export default describe('Database public Method', () => {
         const [{ project }] = yield database.get<TaskSchema>('Task', {
           fields: [
             '_id', {
-              project: ['_id', 'name', 'isArchived'],
+              project: ['_id', 'name', 'isArchived', 'posts'],
               subtasks: ['_id', 'name']
             }
           ],
@@ -633,17 +618,51 @@ export default describe('Database public Method', () => {
   })
 
   describe('Query relational data', () => {
-    const fixture = taskGenerator(1).pop()
+    const { program, modules, engineers } = relationalDataGenerator()
 
     beforeEach(function* () {
-      yield database.insert('Task', fixture)
+      yield database.insert('Program', program)
+      yield database.insert('Module', modules)
+      yield database.insert('Engineer', engineers)
     })
 
     it('should get correct result', function* () {
+      const task = taskGenerator(1).pop()
+      yield database.insert('Task', task)
+
       const rets = yield database.get<TaskSchema>('Task').values()
 
       expect(rets.length).to.equal(1)
-      expect(rets[rets.length - 1]).deep.equal(fixture)
+      expect(rets[rets.length - 1]).deep.equal(task)
+    })
+
+    it('should be able to handle self-join', function* () {
+      const [ ret ] = yield database.get('Program').values()
+
+      const programCopy = clone(program)
+      const modulesCopy = clone(modules)
+      const engineersCopy = clone(engineers)
+
+      programCopy.modules = modulesCopy.filter(m => m.parentId === programCopy._id)
+      programCopy.owner = engineersCopy.find(e => e._id === programCopy.ownerId)
+      modulesCopy.forEach(m => {
+        m.programmer = engineersCopy.find(e => e._id === m.ownerId)
+      })
+
+      expect(ret).to.deep.equal(programCopy)
+    })
+
+    it('should be able to handle circular reference', function* () {
+      const [ programRet ] = yield database.get('Program').values()
+      const [ engineerRet ] = yield database.get('Engineer', {
+        where: {
+          _id: program.ownerId
+        }
+      }).values()
+
+      expect(programRet._id).to.deep.equal(engineerRet.leadProgram[0]._id)
+      expect(programRet.owner.leadProgram).is.undefined
+      expect(engineerRet.leadProgram[0].owner).is.undefined
     })
   })
 
