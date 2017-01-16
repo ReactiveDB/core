@@ -1,10 +1,11 @@
-'use strict'
 import * as fs from 'fs'
 
 const version = require('../package.json').version
 
-const replace = fs
-  .readFileSync('src/storage/Database.ts', 'utf-8')
-  .replace(/version = '[\d\.]+'/g, `version = '${version}'`)
+const filePath = 'src/version.ts'
 
-fs.writeFileSync('src/storage/Database.ts', replace)
+const replace = fs
+  .readFileSync(filePath, 'utf-8')
+  .replace(/[\d\.]+/g, `${version}`)
+
+fs.writeFileSync(filePath, replace)
