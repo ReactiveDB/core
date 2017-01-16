@@ -9,3 +9,7 @@ export function random (percent: number) {
 export function randomNumber(from: number, to: number) {
   return parseInt(from as any) + Math.ceil( Math.random() * (to - from) )
 }
+
+export function randomString(length: number = 5) {
+  return Math.random().toString(36).substr(2, length)
+}
