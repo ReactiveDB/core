@@ -44,12 +44,16 @@ export interface SchemaMetadata<T> {
    */
   virtual?: {
     name?: string
-    where(virtualTable: lf.schema.Table): PredicateDescription
+    where(virtualTable: TableShap<T> ): PredicateDescription
     getName?(entity: T): string
   }
   // 被 Database.prototype.createRow 动态挂上去的
   // readonly isHidden?: boolean
   // readonly hiddenMapper?: (val: any) => any
+}
+
+export type TableShap<T> = lf.schema.Table & {
+  [P in keyof T]: lf.schema.Column
 }
 
 export type SchemaDef<T> = {
@@ -585,7 +589,7 @@ export class Database {
   }
 
   private buildTableShape(tableName: string, metadata: SchemaDef<any>) {
-    const shape = Object.create(null)
+    const shape = this.tableShapeMap.get(tableName) || Object.create(null)
 
     forEach(metadata, (value, key) => {
       const label = value.as ? value.as : key
