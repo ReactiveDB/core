@@ -1,4 +1,3 @@
-'use strict'
 import * as lf from 'lovefield'
 import { BUILD_PREDICATE_FAILED_WARN } from './RuntimeError'
 import { forEach } from '../utils'

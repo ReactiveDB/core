@@ -1,4 +1,3 @@
-'use strict'
 import * as lf from 'lovefield'
 import { Observable } from 'rxjs/Observable'
 import { ReplaySubject } from 'rxjs/ReplaySubject'

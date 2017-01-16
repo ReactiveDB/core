@@ -1,4 +1,3 @@
-'use strict'
 import { TeambitionTypes, Database, RDBType } from '../index'
 
 export interface ProjectSchema {

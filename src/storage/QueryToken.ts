@@ -1,4 +1,3 @@
-'use strict'
 import { Observable } from 'rxjs/Observable'
 import { Selector } from './Selector'
 

@@ -1,4 +1,3 @@
-'use strict'
 import { TeambitionTypes, Database, RDBType, Association } from '../index'
 import { ProjectSchema } from './Project'
 
