@@ -2,7 +2,9 @@
 if (typeof global !== 'undefined') {
   global['self'] = global
   // shim for SinonJS
-  global['location'] = Object.create(null)
+  if (!global['location']) {
+    global['location'] = Object.create(null)
+  }
 }
 
 import * as lf from 'lovefield'
