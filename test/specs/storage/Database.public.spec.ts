@@ -17,6 +17,7 @@ import {
   INVALID_ROW_TYPE_ERR,
   INVALID_PATCH_TYPE_ERR
 } from '../../index'
+import { uuid } from '../../utils/uuid'
 import taskGenerator from '../../utils/taskGenerator'
 import relationalDataGenerator from '../../utils/relationalDataGenerator'
 import schemaFactory from '../../schemas'
@@ -456,6 +457,38 @@ export default describe('Database public Method', () => {
         results.forEach((r: any) => {
           expect(r.created).to.deep.equal(newCreated.toISOString())
         })
+      })
+
+      it('update property twice should be ok', function* () {
+        const clause = {
+          where: { _id: taskData._id }
+        }
+
+        const u1 = uuid()
+        const u2 = uuid()
+
+        yield database.update('Task', clause, {
+          _stageId: u1
+        })
+
+        const [r1] = yield database.get('Task', {
+          where: {
+            _stageId: u1
+          }
+        }).values()
+
+        yield database.update('Task', clause, {
+          _stageId: u2
+        })
+
+        const [r2] = yield database.get('Task', {
+          where: {
+            _stageId: u2
+          }
+        }).values()
+
+        expect(r1._stageId).to.equal(u1)
+        expect(r2._stageId).to.equal(u2)
       })
 
       it('update hidden property should ok', function* () {
