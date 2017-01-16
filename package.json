@@ -51,7 +51,7 @@
     "webpack-dev-server": "^1.16.2"
   },
   "dependencies": {
-    "lovefield": "^2.1.11",
+    "lovefield": "git://github.com/google/lovefield.git#71b836acf0ede3d8704b26cb6490260e9b5785c0",
     "nesthydrationjs": "^1.0.0"
   },
   "peerDependencies": {
