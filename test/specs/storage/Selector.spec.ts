@@ -209,6 +209,43 @@ export default describe('SelectMeta test', () => {
       expect(spy.callCount).to.equal(1)
     })
 
+    it('predicate should be clone before use', function* () {
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } })
+      )
+
+      const newName = 'test name change'
+
+      const signal = selector.changes()
+        .publish()
+        .refCount()
+
+      yield signal.take(1)
+
+      yield db.update(table)
+        .set(table['name'], newName)
+        .where(table['_id'].eq('_id:50'))
+        .exec()
+
+      yield signal.take(1)
+        .do(([result]) => {
+          expect(result['name']).to.equal(newName)
+        })
+
+      yield db.update(table)
+        .set(table['name'], newName + newName)
+        .where(table['_id'].eq('_id:50'))
+        .exec()
+
+      yield signal.take(1)
+        .do(([result]) => {
+          expect(result['name']).to.equal(newName + newName)
+        })
+
+    })
+
     it('reconsume should throw', () => {
       const selector = new Selector(db,
         db.select().from(table),
@@ -284,6 +321,45 @@ export default describe('SelectMeta test', () => {
         .take(1)
         .do((r: any) => {
           expect(r[0].name).to.equal(newName)
+        })
+    })
+
+    it('predicate should be clone before use when skip and limit', function* () {
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20, 20
+      )
+
+      const newName = 'new test name'
+
+      const signal = selector.changes()
+        .publish()
+        .refCount()
+
+      yield signal.take(1)
+
+      yield db.update(table)
+        .set(table['name'], newName)
+        .where(table['_id'].eq('_id:71'))
+        .exec()
+
+      yield signal
+        .take(1)
+        .do(([r]) => {
+          expect(r['name']).to.equal(newName)
+        })
+
+      yield db.update(table)
+        .set(table['name'], newName + newName)
+        .where(table['_id'].eq('_id:71'))
+        .exec()
+
+      yield signal
+        .take(1)
+        .do(([r]) => {
+          expect(r['name']).to.equal(newName + newName)
         })
     })
 
