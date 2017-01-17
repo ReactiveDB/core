@@ -187,12 +187,12 @@ export default describe('SelectMeta test', () => {
         tableShape,
         new PredicateProvider(table, { time: { $gte: 50 } })
       )
-      const stub = sinon.spy((): void => void 0)
+      const spy = sinon.spy((): void => void 0)
 
       const newName = 'test name change'
 
       const subscription = selector.changes()
-        .subscribe(stub)
+        .subscribe(spy)
 
       yield db.update(table)
         .set(table['name'], newName)
@@ -206,7 +206,7 @@ export default describe('SelectMeta test', () => {
         .where(table['_id'].eq('_id:50'))
         .exec()
 
-      expect(stub).to.be.calledOnce
+      expect(spy.callCount).to.equal(1)
     })
 
     it('reconsume should throw', () => {
