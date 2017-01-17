@@ -2,7 +2,7 @@
   "name": "reactivedb",
   "version": "0.7.0",
   "description": "Reactive ORM for Lovefield",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "build_all": "npm run build_cjs && npm run build_test",
     "build_cjs": "rm -rf dist && tsc src/index.ts -m commonjs --outDir dist --sourcemap --sourceRoot src --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --noImplicitThis --noUnusedLocals --noUnusedParameters --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
@@ -13,7 +13,8 @@
     "test": "npm run lint && tman --mocha spec-js/test/run.js",
     "version": "ts-node tools/version.ts && git add .",
     "watch_cjs": "tsc src/index.ts -m commonjs --outDir dist --sourcemap --sourceRoot src --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom -w",
-    "watch_test": "tsc test/run.ts -m commonjs --outDir spec-js --sourcemap  --target ES2015 --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node -w & ts-node ./tools/watch.ts"
+    "watch_test": "tsc test/run.ts -m commonjs --outDir spec-js --sourcemap  --target ES2015 --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node -w & ts-node ./tools/watch.ts",
+    "prepublish": "npm run build_all"
   },
   "keywords": [
     "lovefield",
