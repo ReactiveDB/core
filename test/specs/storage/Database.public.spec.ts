@@ -374,6 +374,41 @@ export default describe('Database public Method', () => {
           })
       })
 
+      it('should get correct result with order', function* () {
+        yield database.delete('Task')
+
+        const tasks = taskGenerator(20)
+
+        yield database.insert('Task', tasks)
+
+        const result = yield database.get('Task', {
+          orderBy: [
+            { orderBy: 'ASC', fieldName: 'subtasksCount' },
+            { orderBy: 'DESC', fieldName: 'created' },
+          ]
+        }).values()
+
+        tasks.sort((a, b) => {
+          const created = new Date(b.created).valueOf() > new Date(a.created).valueOf() ? 1 : -1
+          let subtasksCount: number
+          if (a.subtasksCount > b.subtasksCount) {
+            subtasksCount = 1
+          } else if (a.subtasksCount === b.subtasksCount) {
+            subtasksCount = 0
+          } else {
+            subtasksCount = -1
+          }
+          return subtasksCount * 10 + created
+        })
+          .forEach((r, i) => {
+            delete r.subtasks
+            delete r.project
+            delete result[i].subtasks
+            delete result[i].project
+            expect(r).to.deep.equal(result[i])
+          })
+      })
+
       it('should keep the idempotency of query', function* () {
         const sqlA = yield database.get('Task').toString()
         const sqlB = yield database.get('Task').toString()

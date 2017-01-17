@@ -20,6 +20,7 @@ export interface TaskSchema {
     posts?: any[]
   }
   subtasks: SubtaskSchema[]
+  subtasksCount: number
   created: string,
   involveMembers: string[]
 }
@@ -84,6 +85,9 @@ export default (db: Database) => {
           }
         }
       }
+    },
+    subtasksCount: {
+      type: RDBType.NUMBER
     },
     involveMembers: {
       type: RDBType.LITERAL_ARRAY

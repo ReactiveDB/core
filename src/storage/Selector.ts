@@ -8,7 +8,7 @@ import {
   TOKEN_CONSUMED_ERR,
   BUILD_PREDICATE_FAILED_WARN
 } from './RuntimeError'
-import { identity } from '../utils'
+import { identity, forEach } from '../utils'
 import graphify from './Graphify'
 
 export interface TableShape {
@@ -18,6 +18,11 @@ export interface TableShape {
     queried: boolean
   }
   definition: Object
+}
+
+export interface OrderInfo {
+  column: lf.schema.Column
+  orderBy: lf.Order
 }
 
 export class Selector <T> {
@@ -55,13 +60,30 @@ export class Selector <T> {
     const { pk, mainTable } = this.shape
     const rangeQuery = this.db.select(mainTable[pk.name])
         .from(mainTable)
-        .limit(this.limit)
-        .skip(this.skip)
+
+    if (this.orderDescriptions && this.orderDescriptions.length) {
+      forEach(this.orderDescriptions, orderInfo =>
+        rangeQuery.orderBy(orderInfo.column, orderInfo.orderBy)
+      )
+    }
+
+    rangeQuery
+      .limit(this.limit)
+      .skip(this.skip)
+
     return predicate ? rangeQuery.where(predicate) : rangeQuery
   }
 
   private get query(): lf.query.Select {
-    return this.lselect.clone()
+    const q = this.lselect.clone()
+
+    if (this.orderDescriptions && this.orderDescriptions.length) {
+      forEach(this.orderDescriptions, orderInfo =>
+        q.orderBy(orderInfo.column, orderInfo.orderBy)
+      )
+    }
+
+    return q
   }
 
   constructor(
@@ -70,7 +92,8 @@ export class Selector <T> {
     private shape: TableShape,
     public predicateProvider?: PredicateProvider,
     private limit?: number,
-    private skip?: number
+    private skip?: number,
+    private orderDescriptions?: OrderInfo[]
   ) {
     let predicate: lf.Predicate
     if (predicateProvider) {

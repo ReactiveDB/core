@@ -91,10 +91,16 @@ export interface ClauseDescription {
   where?: PredicateDescription
 }
 
+export interface OrderDescription {
+  fieldName: string
+  orderBy?: 'DESC' | 'ASC'
+}
+
 export interface QueryDescription extends ClauseDescription {
   fields?: FieldsValue[]
   limit?: number
   skip?: number
+  orderBy?: OrderDescription[]
 }
 
 export interface JoinInfo {
@@ -743,6 +749,12 @@ export class Database {
       query.leftOuterJoin(info.table, info.predicate)
     })
 
+    const orderDesc = queryClause.orderBy ? queryClause.orderBy
+      .map(desc => ({
+        column: table[desc.fieldName],
+        orderBy: !desc.orderBy ? null : lf.Order[desc.orderBy]
+      })) : []
+
     return new Selector<T>(db, query, {
         mainTable: table,
         pk: {
@@ -753,7 +765,8 @@ export class Database {
       },
       new PredicateProvider(table, queryClause.where),
       queryClause.limit,
-      queryClause.skip
+      queryClause.skip,
+      orderDesc
     )
   }
 
