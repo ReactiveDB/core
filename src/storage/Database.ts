@@ -269,7 +269,7 @@ export class Database {
   insert<T>(tableName: string, raw: T | T[]): Observable<T> | Observable<T[]> | Observable<void> {
     return this.database$
       .concatMap(db => {
-        const [table] = Database.getTable(db, tableName)
+        const [ table ] = Database.getTable(db, tableName)
         let hook: Observable<any> = Observable.of(null)
         const rows: lf.Row[] = []
 
@@ -381,7 +381,7 @@ export class Database {
 
     return this.database$
       .concatMap<any, any>(db => {
-        const [table] = Database.getTable(db, tableName)
+        const [ table ] = Database.getTable(db, tableName)
         let updateQuery: lf.query.Update
 
         let predicate: lf.Predicate
@@ -436,7 +436,7 @@ export class Database {
 
     return this.database$
       .concatMap(db => {
-        const [table] = Database.getTable(db, tableName)
+        const [ table ] = Database.getTable(db, tableName)
         let predicate: lf.Predicate
         if (clause.where) {
           try {
@@ -487,7 +487,7 @@ export class Database {
     this.primaryKeysMap.forEach((_, tableName) => {
       const deleteQuery = this.database$
         .concatMap(db => {
-          const [table] = Database.getTable(db, tableName)
+          const [ table ] = Database.getTable(db, tableName)
           return db.delete().from(table).exec()
         })
         .toPromise()
@@ -644,7 +644,7 @@ export class Database {
 
     const virtualTableName = def.virtual.name
     const pk = this.primaryKeysMap.get(virtualTableName)
-    const [virtualTable] = Database.getTable(db, virtualTableName)
+    const [ virtualTable ] = Database.getTable(db, virtualTableName)
     const virtualMetadata = this.selectMetaData.get(tableName).virtualMeta
     const recordType = virtualMetadata.get(key).association
 

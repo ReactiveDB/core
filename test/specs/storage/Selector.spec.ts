@@ -230,7 +230,7 @@ export default describe('SelectMeta test', () => {
         .exec()
 
       yield signal.take(1)
-        .do(([result]) => {
+        .do(([ result ]) => {
           expect(result['name']).to.equal(newName)
         })
 
@@ -240,7 +240,7 @@ export default describe('SelectMeta test', () => {
         .exec()
 
       yield signal.take(1)
-        .do(([result]) => {
+        .do(([ result ]) => {
           expect(result['name']).to.equal(newName + newName)
         })
 
@@ -277,8 +277,10 @@ export default describe('SelectMeta test', () => {
         .where(table['_id'].eq('_id:50'))
         .exec()
 
-      const [result1] = yield changes.take(1)
-      expect(result1.name).to.equal(newName)
+      yield changes.take(1)
+        .do(([ result1 ]) => {
+          expect(result1['name']).to.equal(newName)
+        })
 
       const error = new TypeError('not happy')
 
@@ -347,7 +349,7 @@ export default describe('SelectMeta test', () => {
 
       yield signal
         .take(1)
-        .do(([r]) => {
+        .do(([ r ]) => {
           expect(r['name']).to.equal(newName)
         })
 
@@ -358,7 +360,7 @@ export default describe('SelectMeta test', () => {
 
       yield signal
         .take(1)
-        .do(([r]) => {
+        .do(([ r ]) => {
           expect(r['name']).to.equal(newName + newName)
         })
     })
