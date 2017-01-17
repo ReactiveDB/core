@@ -1,9 +1,8 @@
-'use strict'
 import { Observable } from 'rxjs/Observable'
 import { Selector } from './Selector'
 
 export class QueryToken <T> {
-  private selectMeta$: Observable<Selector<T>>
+  selectMeta$: Observable<Selector<T>>
 
   constructor(meta$: Observable<Selector<T>>) {
     this.selectMeta$ = meta$.publishReplay(1)

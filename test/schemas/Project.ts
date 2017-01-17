@@ -1,5 +1,4 @@
-'use strict'
-import { TeambitionTypes, Database, RDBType } from '../index'
+import { TeambitionTypes, Database, RDBType, Association } from '../index'
 
 export interface ProjectSchema {
   _id: TeambitionTypes.ProjectId
@@ -16,6 +15,17 @@ export default (db: Database) => db.defineSchema('Project', {
   isArchived: {
     type: RDBType.BOOLEAN
   },
+  posts: {
+    type: Association.oneToMany,
+    virtual: {
+      name: 'Post',
+      where: (
+        postTable: lf.schema.Table
+      ) => ({
+        _id: postTable['belongTo']
+      })
+    }
+  }
 })
 
 // waiting for next lovefield release

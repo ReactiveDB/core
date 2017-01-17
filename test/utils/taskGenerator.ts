@@ -2,7 +2,7 @@ import * as moment from 'moment'
 import { TaskSchema } from '../index'
 import { uuid } from './uuid'
 import subtaskGenerator from './subtaskGenerator'
-// import postGenerator from './postGenerator'
+import postGenerator from './postGenerator'
 import { randomNumber, random } from './random'
 import { generateInvolveMembers } from './involveMembersGenerator'
 
@@ -32,7 +32,8 @@ export default function (limit: number) {
       project: {
         _id: _projectId,
         name: 'project name: ' + uuid(),
-        isArchived: true
+        isArchived: true,
+        posts: postGenerator(5, _projectId)
       },
       involveMembers: generateInvolveMembers(15, involves),
       created: moment().add(6 - randomNumber(0, 12), 'month').add(30 - randomNumber(0, 30), 'day').toISOString()

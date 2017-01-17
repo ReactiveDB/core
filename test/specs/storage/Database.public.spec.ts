@@ -17,7 +17,9 @@ import {
   INVALID_ROW_TYPE_ERR,
   INVALID_PATCH_TYPE_ERR
 } from '../../index'
+import { uuid } from '../../utils/uuid'
 import taskGenerator from '../../utils/taskGenerator'
+import relationalDataGenerator from '../../utils/relationalDataGenerator'
 import schemaFactory from '../../schemas'
 import { TestFixture, TestFixture2 } from '../../schemas/Test'
 
@@ -143,7 +145,7 @@ export default describe('Database public Method', () => {
       it('virtual property should store seprately', function* () {
         const subtask = taskData.subtasks[0]
 
-        const [result1] = yield database.get<ProjectSchema>('Project', {
+        const [ result1 ] = yield database.get<ProjectSchema>('Project', {
           where: {
             _id: taskData.project._id as string
           }
@@ -152,7 +154,7 @@ export default describe('Database public Method', () => {
         expect(result1._id).to.equal(taskData.project._id)
         expect(result1.name).to.equal(taskData.project.name)
 
-        const [result2] = yield database.get<SubtaskSchema>('Subtask', {
+        const [ result2 ] = yield database.get<SubtaskSchema>('Subtask', {
           where: { _id: subtask._id as string }
         }).values()
 
@@ -162,13 +164,13 @@ export default describe('Database public Method', () => {
       })
 
       it('should be ok when insert data which its virtual property was already stored', function* () {
-        const [task] = taskGenerator(1)
+        const [ task ] = taskGenerator(1)
         const name = 'foo'
         task.project = { ...taskData.project, name: 'foo' }
 
         yield database.insert('Task', task)
 
-        const [result] = yield database.get('Project', {
+        const [ result ] = yield database.get('Project', {
           where: {
             _id: taskData.project._id
           }
@@ -207,7 +209,7 @@ export default describe('Database public Method', () => {
         it('should insert single row', function* () {
           const project = taskGenerator(1).pop().project
           yield database.insert('Project', project)
-          const [result] = yield database.get('Project', {
+          const [ result ] = yield database.get('Project', {
             where: {
               _id: project._id as string
             }
@@ -229,6 +231,7 @@ export default describe('Database public Method', () => {
           expect(results).deep.equals(projects)
         })
       })
+
     })
 
     describe('Database.prototype.get', () => {
@@ -241,7 +244,7 @@ export default describe('Database public Method', () => {
           _stageId: 'stageId'
         })
 
-        const [result] = yield database.get<TaskSchema>('Task', {
+        const [ result ] = yield database.get<TaskSchema>('Task', {
           where: { _id: '1112' }
         }).values()
 
@@ -261,7 +264,7 @@ export default describe('Database public Method', () => {
       })
 
       it('should get current fields when get with query', function* () {
-        const [result] = yield database.get<TaskSchema>('Task', {
+        const [ result ] = yield database.get<TaskSchema>('Task', {
           fields: ['note'], where: {
             _id: taskData._id
           }
@@ -273,7 +276,7 @@ export default describe('Database public Method', () => {
 
       it('should be ok when fileds include not exist field', function* () {
         const undef = 'UNDEF'
-        const [result] = yield database.get<TaskSchema>('Task', {
+        const [ result ] = yield database.get<TaskSchema>('Task', {
           fields: [undef, 'note'], where: { _id: taskData._id }
         }).values()
 
@@ -303,7 +306,7 @@ export default describe('Database public Method', () => {
       })
 
       it('should get correct result when passin partial query fields', function* () {
-        const [{ project }] = yield database.get<TaskSchema>('Task', {
+        const [ { project } ] = yield database.get<TaskSchema>('Task', {
           fields: [
             '_id', {
               project: ['_id'],
@@ -324,13 +327,13 @@ export default describe('Database public Method', () => {
       it('should throw when build whereClause failed', function* () {
         let result: any[]
         try {
-          result = yield database.get<TaskSchema>('Task', <any>{
+          result = yield database.get<TaskSchema>('Task', {
             where: {
               get whatever() {
                 throw new TypeError('error occured when build execute where clause function')
               }
             }
-          }).values()
+          } as any).values()
         } catch (e) {
           throw new TypeError('Invalid code path reached.')
         }
@@ -370,6 +373,14 @@ export default describe('Database public Method', () => {
             expect(r).to.deep.equal(result)
           })
       })
+
+      it('should keep the idempotency of query', function* () {
+        const sqlA = yield database.get('Task').toString()
+        const sqlB = yield database.get('Task').toString()
+
+        expect(sqlA).to.deep.equal(sqlB)
+      })
+
     })
 
     describe('Database.prototype.update', () => {
@@ -386,7 +397,7 @@ export default describe('Database public Method', () => {
           note
         })
 
-        const [result] = yield database.get('Task', {
+        const [ result ] = yield database.get('Task', {
           where: { _id: taskData._id }
         }).values()
 
@@ -412,10 +423,10 @@ export default describe('Database public Method', () => {
 
         expect(result2).deep.equal([])
 
-        const [{ project }] = yield database.get<TaskSchema>('Task', {
+        const [ { project } ] = yield database.get<TaskSchema>('Task', {
           fields: [
             '_id', {
-              project: ['_id', 'name', 'isArchived'],
+              project: ['_id', 'name', 'isArchived', 'posts'],
               subtasks: ['_id', 'name']
             }
           ],
@@ -439,7 +450,7 @@ export default describe('Database public Method', () => {
           }
         }, data)
 
-        const [...results] = yield database.get<TaskSchema>('Task', {
+        const results = yield database.get<TaskSchema>('Task', {
           fields: ['created']
         }).values()
 
@@ -448,13 +459,45 @@ export default describe('Database public Method', () => {
         })
       })
 
+      it('update property twice should be ok', function* () {
+        const clause = {
+          where: { _id: taskData._id }
+        }
+
+        const u1 = uuid()
+        const u2 = uuid()
+
+        yield database.update('Task', clause, {
+          _stageId: u1
+        })
+
+        const [ r1 ] = yield database.get('Task', {
+          where: {
+            _stageId: u1
+          }
+        }).values()
+
+        yield database.update('Task', clause, {
+          _stageId: u2
+        })
+
+        const [ r2 ] = yield database.get('Task', {
+          where: {
+            _stageId: u2
+          }
+        }).values()
+
+        expect(r1._stageId).to.equal(u1)
+        expect(r2._stageId).to.equal(u2)
+      })
+
       it('update hidden property should ok', function* () {
         const newCreated = new Date(2017, 1, 1)
         yield database.update('Task', taskData._id as string, {
           created: newCreated.toISOString()
         })
 
-        const [result] = yield database.get<TaskSchema>('Task', {
+        const [ result ] = yield database.get<TaskSchema>('Task', {
           fields: ['created']
         }).values()
 
@@ -472,7 +515,7 @@ export default describe('Database public Method', () => {
           where: { _id: task._id }
         }, patchData)
 
-        const [result] = yield database.get<TaskSchema>('Task', {
+        const [ result ] = yield database.get<TaskSchema>('Task', {
           where: {
             note: 'foo'
           }
@@ -493,7 +536,7 @@ export default describe('Database public Method', () => {
           }
         }, patch)
 
-        const [result] = yield database.get<TaskSchema>('Task', {
+        const [ result ] = yield database.get<TaskSchema>('Task', {
           where: {
             _id: task._id
           }
@@ -608,17 +651,51 @@ export default describe('Database public Method', () => {
   })
 
   describe('Query relational data', () => {
-    const fixture = taskGenerator(1).pop()
+    const { program, modules, engineers } = relationalDataGenerator()
 
     beforeEach(function* () {
-      yield database.insert('Task', fixture)
+      yield database.insert('Program', program)
+      yield database.insert('Module', modules)
+      yield database.insert('Engineer', engineers)
     })
 
     it('should get correct result', function* () {
+      const task = taskGenerator(1).pop()
+      yield database.insert('Task', task)
+
       const rets = yield database.get<TaskSchema>('Task').values()
 
       expect(rets.length).to.equal(1)
-      expect(rets[rets.length - 1]).deep.equal(fixture)
+      expect(rets[rets.length - 1]).deep.equal(task)
+    })
+
+    it('should be able to handle self-join', function* () {
+      const [ ret ] = yield database.get('Program').values()
+
+      const programCopy = clone(program)
+      const modulesCopy = clone(modules)
+      const engineersCopy = clone(engineers)
+
+      programCopy.modules = modulesCopy.filter(m => m.parentId === programCopy._id)
+      programCopy.owner = engineersCopy.find(e => e._id === programCopy.ownerId)
+      modulesCopy.forEach(m => {
+        m.programmer = engineersCopy.find(e => e._id === m.ownerId)
+      })
+
+      expect(ret).to.deep.equal(programCopy)
+    })
+
+    it('should be able to handle circular reference', function* () {
+      const [ programRet ] = yield database.get('Program').values()
+      const [ engineerRet ] = yield database.get('Engineer', {
+        where: {
+          _id: program.ownerId
+        }
+      }).values()
+
+      expect(programRet._id).to.deep.equal(engineerRet.leadProgram[0]._id)
+      expect(programRet.owner.leadProgram).is.undefined
+      expect(engineerRet.leadProgram[0].owner).is.undefined
     })
   })
 

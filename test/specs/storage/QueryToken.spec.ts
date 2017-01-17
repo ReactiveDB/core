@@ -34,7 +34,7 @@ export default describe('QueryToken test', () => {
     it('should return Observable of selectMeta values', done => {
       queryToken.values()
         .combineLatest(mockSelectMeta.values())
-        .subscribe(([r1, r2]) => {
+        .subscribe(([ r1, r2 ]) => {
           expect(r1).to.deep.equal(r2)
           done()
         })

@@ -192,14 +192,15 @@ export class Selector <T> {
 
   private buildPrefetchingObserve(): Observable<(string | number)[]> {
     return Observable.create((observer: Observer<(string | number)[]>) => {
+      const { rangeQuery } = this
       const listener = () => {
-        this.rangeQuery.exec()
+        rangeQuery.exec()
           .then((r) => observer.next(r.map(v => v[this.shape.pk.name])))
           .catch(e => observer.error(e))
       }
       listener()
-      this.db.observe(this.rangeQuery, listener)
-      return () => this.db.unobserve(this.rangeQuery, listener)
+      this.db.observe(rangeQuery, listener)
+      return () => this.db.unobserve(rangeQuery, listener)
     })
   }
 }
