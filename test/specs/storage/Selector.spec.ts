@@ -41,6 +41,7 @@ export default describe('SelectMeta test', () => {
     tableBuilder.addColumn('_id', lf.Type.STRING)
       .addColumn('name', lf.Type.STRING)
       .addColumn('time', lf.Type.NUMBER)
+      .addColumn('priority', lf.Type.NUMBER)
       .addPrimaryKey(['_id'])
 
     yield db$.do(r => {
@@ -51,10 +52,12 @@ export default describe('SelectMeta test', () => {
     const rows: lf.Row[] = []
     storeData = []
     for (let i = 0; i < 1000; i ++) {
+      const priority = Math.ceil(i / 100)
       const row = {
         _id: `_id:${i}`,
         name: `name:${i}`,
-        time: i
+        time: i,
+        priority: priority < 0 ? -priority : priority
       }
       rows.push(table.createRow(row))
       storeData.push(row)
@@ -79,6 +82,10 @@ export default describe('SelectMeta test', () => {
         },
         time: {
           column: 'time',
+          id: false
+        },
+        priority: {
+          column: 'priority',
           id: false
         }
       }
@@ -156,6 +163,39 @@ export default describe('SelectMeta test', () => {
     const sql = selector.toString()
 
     expect(sql).to.equal('SELECT * FROM TestSelectMetadata;')
+  })
+
+  it('should get correct results with orderBy', function* () {
+    const selector = new Selector(db,
+      db.select().from(table),
+      tableShape,
+      new PredicateProvider(table, { time: { $gte: 50 } }),
+      null, null,
+      [
+        { column: table['priority'], orderBy: lf.Order.ASC },
+        { column: table['time'], orderBy: lf.Order.DESC },
+      ]
+    )
+
+    yield selector.values()
+      .do(result => {
+        expect(result.length).to.equal(950)
+        const expectResult = storeData.filter(r => r.time >= 50)
+          .sort((a, b) => {
+            let priority: number
+            const time: number = b.time > a.time ? 1 : -1
+            if (a.priority > b.priority) {
+              priority = 1
+            } else if (a.priority === b.priority) {
+              priority = 0
+            } else {
+              priority = -1
+            }
+            return priority * 10 + time
+          })
+
+        expect(result).to.deep.equal(expectResult)
+      })
   })
 
   describe('SelectMeta.prototype.changes', () => {
@@ -323,6 +363,61 @@ export default describe('SelectMeta test', () => {
         .take(1)
         .do((r: any) => {
           expect(r[0].name).to.equal(newName)
+        })
+    })
+
+    it('should observe changes with skip and limit and sortBy', function* () {
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20, 20,
+        [
+          { column: table['priority'], orderBy: lf.Order.DESC },
+          { column: table['time'], orderBy: lf.Order.ASC }
+        ]
+      )
+
+      const newName = 'new test name'
+
+      const signal = selector.changes()
+        .publish()
+        .refCount()
+
+      yield signal.take(1)
+
+      yield db.update(table)
+        .set(table['name'], newName)
+        .where(table['_id'].eq('_id:921'))
+        .exec()
+
+      yield signal
+        .take(1)
+        .do((r: any) => {
+          expect(r[0].name).to.equal(newName)
+        })
+
+      const row = { _id: '_id:939.5', name: 'name:939.5', time: 939.5, priority: 10 }
+
+      yield db.insert()
+        .into(table)
+        .values([table.createRow(row)])
+        .exec()
+
+      yield signal
+        .take(1)
+        .do((r: any) => {
+          expect(r[r.length - 1]).to.deep.equal(row)
+        })
+
+      yield db.delete()
+        .from(table)
+        .where(table['_id'].eq('_id:930'))
+        .exec()
+
+      yield signal.take(1)
+        .do((r: any) => {
+          expect(r[r.length - 1]._id).to.equal('_id:940')
         })
     })
 

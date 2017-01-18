@@ -32,7 +32,7 @@ import {
   INVALID_PATCH_TYPE_ERR
 } from './RuntimeError'
 
-export interface SchemaMetadata {
+export interface SchemaMetadata<T> {
   type: RDBType | Association
   primaryKey?: boolean
   index?: boolean
@@ -43,7 +43,7 @@ export interface SchemaMetadata {
    */
   virtual?: {
     name?: string
-    where?(virtualTable: lf.schema.Table): PredicateDescription
+    where?(virtualTable: TableShap<T>): PredicateDescription
   }
   // 被 Database.prototype.createRow 动态挂上去的
   // readonly isHidden?: boolean
@@ -55,7 +55,7 @@ export type TableShap<T> = lf.schema.Table & {
 }
 
 export type SchemaDef<T> = {
-  [P in keyof T]: SchemaMetadata
+  [P in keyof T]: SchemaMetadata<T>
 }
 
 export interface HookDef {
@@ -91,10 +91,16 @@ export interface ClauseDescription {
   where?: PredicateDescription
 }
 
+export interface OrderDescription {
+  fieldName: string
+  orderBy?: 'DESC' | 'ASC'
+}
+
 export interface QueryDescription extends ClauseDescription {
   fields?: FieldsValue[]
   limit?: number
   skip?: number
+  orderBy?: OrderDescription[]
 }
 
 export interface JoinInfo {
@@ -629,7 +635,7 @@ export class Database {
     db: lf.Database,
     tableName: string,
     key: string,
-    def: SchemaMetadata,
+    def: SchemaMetadata<any>,
     entity: any
   ) {
     const prop: any = entity[key]
@@ -743,6 +749,12 @@ export class Database {
       query.leftOuterJoin(info.table, info.predicate)
     })
 
+    const orderDesc = queryClause.orderBy ? queryClause.orderBy
+      .map(desc => ({
+        column: table[desc.fieldName],
+        orderBy: !desc.orderBy ? null : lf.Order[desc.orderBy]
+      })) : []
+
     return new Selector<T>(db, query, {
         mainTable: table,
         pk: {
@@ -753,7 +765,8 @@ export class Database {
       },
       new PredicateProvider(table, queryClause.where),
       queryClause.limit,
-      queryClause.skip
+      queryClause.skip,
+      orderDesc
     )
   }
 
@@ -762,7 +775,7 @@ export class Database {
     rowName: string,
     rdbType: RDBType,
     nullable: string[],
-    def: SchemaMetadata
+    def: SchemaMetadata<any>
   ): lf.schema.TableBuilder {
     const hiddenName = `${Database.__HIDDEN__}${rowName}`
 
@@ -774,7 +787,7 @@ export class Database {
       case RDBType.DATE_TIME:
         nullable.push(hiddenName);
         (def as any).isHidden = true;
-        (def as any).hiddenMapper = (val: string) => val ? new Date(val) : new Date(0)
+        (def as any).hiddenMapper = (val: string) => val ? new Date(val).valueOf() : new Date(0).valueOf()
         return tableBuilder
           .addColumn(rowName, lf.Type.INTEGER)
           .addColumn(hiddenName, lf.Type.STRING)

@@ -129,7 +129,7 @@ export default describe('Database public Method', () => {
       delete expectResult.subtasks
       delete expectResult.project
       expectResult['__hidden__created'] = expectResult.created
-      expectResult.created = new Date(expectResult.created) as any
+      expectResult.created = new Date(expectResult.created).valueOf() as any
       expectResult['__hidden__involveMembers'] = expectResult.involveMembers
       expectResult.involveMembers = expectResult.involveMembers.join('|') as any
       storeResult = yield database.insert('Task', storeTask)
@@ -371,6 +371,41 @@ export default describe('Database public Method', () => {
           .toArray()
           .do(r => {
             expect(r).to.deep.equal(result)
+          })
+      })
+
+      it('should get correct result with order', function* () {
+        yield database.delete('Task')
+
+        const tasks = taskGenerator(20)
+
+        yield database.insert('Task', tasks)
+
+        const result = yield database.get('Task', {
+          orderBy: [
+            { orderBy: 'ASC', fieldName: 'subtasksCount' },
+            { orderBy: 'DESC', fieldName: 'created' },
+          ]
+        }).values()
+
+        tasks.sort((a, b) => {
+          const created = new Date(b.created).valueOf() > new Date(a.created).valueOf() ? 1 : -1
+          let subtasksCount: number
+          if (a.subtasksCount > b.subtasksCount) {
+            subtasksCount = 1
+          } else if (a.subtasksCount === b.subtasksCount) {
+            subtasksCount = 0
+          } else {
+            subtasksCount = -1
+          }
+          return subtasksCount * 10 + created
+        })
+          .forEach((r, i) => {
+            delete r.subtasks
+            delete r.project
+            delete result[i].subtasks
+            delete result[i].project
+            expect(r).to.deep.equal(result[i])
           })
       })
 

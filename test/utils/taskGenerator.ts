@@ -19,6 +19,7 @@ export default function (limit: number) {
     if (_creatorId !== _executorId) {
       involves.push(_creatorId)
     }
+    const subtasks = subtaskGenerator(randomNumber(1, 20), _id)
     result.push({
       _id, _projectId,
       _stageId, _creatorId,
@@ -26,7 +27,8 @@ export default function (limit: number) {
       _tasklistId: uuid(),
       _sourceId: null,
       accomplished: null,
-      subtasks: subtaskGenerator(randomNumber(1, 20), _id),
+      subtasks,
+      subtasksCount: subtasks.length,
       content: 'content: ' + uuid(),
       note: 'note: ' + uuid(),
       project: {
