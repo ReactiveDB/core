@@ -787,7 +787,7 @@ export class Database {
       case RDBType.DATE_TIME:
         nullable.push(hiddenName);
         (def as any).isHidden = true;
-        (def as any).hiddenMapper = (val: string) => val ? new Date(val) : new Date(0)
+        (def as any).hiddenMapper = (val: string) => val ? new Date(val).valueOf() : new Date(0).valueOf()
         return tableBuilder
           .addColumn(rowName, lf.Type.INTEGER)
           .addColumn(hiddenName, lf.Type.STRING)

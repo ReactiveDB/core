@@ -129,7 +129,7 @@ export default describe('Database public Method', () => {
       delete expectResult.subtasks
       delete expectResult.project
       expectResult['__hidden__created'] = expectResult.created
-      expectResult.created = new Date(expectResult.created) as any
+      expectResult.created = new Date(expectResult.created).valueOf() as any
       expectResult['__hidden__involveMembers'] = expectResult.involveMembers
       expectResult.involveMembers = expectResult.involveMembers.join('|') as any
       storeResult = yield database.insert('Task', storeTask)
