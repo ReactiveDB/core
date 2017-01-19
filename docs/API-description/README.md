@@ -418,7 +418,7 @@ constructor(
   </tr>
 </table>
 
-## Database.prototype.disose()
+## Database.prototype.dispose()
 ```ts
   database.dispose()
 ```
