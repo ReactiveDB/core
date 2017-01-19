@@ -162,7 +162,7 @@ export default describe('SelectMeta test', () => {
 
     const sql = selector.toString()
 
-    expect(sql).to.equal('SELECT * FROM TestSelectMetadata;')
+    expect(sql).to.equal('SELECT * FROM TestSelectMetadata WHERE TestSelectMetadata.time > 50;')
   })
 
   it('should get correct results with orderBy', function* () {

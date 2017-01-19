@@ -147,7 +147,12 @@ export class Selector <T> {
   }
 
   toString(): string {
-    return this.query.toSql()
+    let predicate: lf.Predicate
+    const { predicateProvider } = this
+    if (predicateProvider && !this.predicateBuildErr) {
+      predicate = predicateProvider.getPredicate()
+    }
+    return predicate ? this.query.where(predicate).toSql() : this.query.toSql()
   }
 
   values(): Observable<T[]> | never {
