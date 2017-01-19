@@ -125,9 +125,9 @@ export class Database {
    * 比如 api 获取的 task.created 是 string 类型
    * 我们希望它存储为 number 类型（方便我们 Select 的时候对它进行一系列的条件运算
    * 那么可以在 Schema 上将它定义为:
-   * RDBType.DATA_TIME
+   * RDBType.DATE_TIME
    * 然后 Database 类会将原始值存储到 __hidden__created 字段上
-   * 存储的时候将原始值存储为 new Date(task.created)
+   * 存储的时候将原始值存储为 new Date(task.created).valueOf()
    */
   private static readonly __HIDDEN__ = '__hidden__'
 
@@ -328,30 +328,32 @@ export class Database {
   }
 
   /**
-   * 根据 SelectMetadata 中的元信息 join 出正确的数据结构
-   * 比如 TaskTable 中是这样的结构:
-   * TaskTable: {
-   *   _id: PrimaryKey,
-   *   _projectId: string, //Index
-   *   note: string,
-   *   content: string
-   * }
-   *
-   * 根据 Schema 定义的 SelectMetadata 返回的结果是:
+   * 根据 SchemaMetadata 中的元信息 join 出正确的数据结构
+   * 设有一表有如下结构：
    * {
-   *   _id: string,
-   *   _projectId: string,
+   *   _id: PrimaryKey,
    *   note: string,
    *   content: string,
-   *   project: {
-   *     _id: string,
-   *     name: string
-   *   },
    *   subtasks: {
-   *     _id: string,
-   *     name: string,
-   *     taskId: string
-   *   }[]
+   *     type: Association.oneToMany
+   *     virtual: {
+   *       name: 'SubTask',
+   *       where: (table) => ({
+   *         _id: table.taskId
+   *       })
+   *     }
+   *   }
+   *
+   * }
+   *
+   * 根据 Schema 定义的 metadata, 在`SELECT`时将会返回如下结果:
+   * {
+   *   _id: string,
+   *   note: string,
+   *   content: string,
+   *   subtasks: [{
+   *    ...subtask attribute
+   *   }]
    * }
    */
   get<T>(tableName: string, query: QueryDescription = {}): QueryToken<T> {
@@ -620,16 +622,7 @@ export class Database {
    * 在 normalize 的时候定义 insertHook
    * 在 insert 数据到这个 table 的时候调用
    * 这里新建的 hook 是把 schemaMetaData 中的关联的数据剥离，单独存储
-   * 存储的时候会验证 virtual props 的类型与之前存储时是否一致。比如：
-   * 第一次存的时候是 Object 类型，第二次却存了 Array 类型
-   * 比如第一次存:
-   * {
-   *   project: { _id: '03a9f4' }
-   * },
-   * 第二次:
-   * {
-   *   project: [ { _id: '03a9f4' } ]
-   * }
+   * 存储的时候会验证 virtual props 的类型与定义时候明确的关联关系是否一致
    */
   private createInsertHook(
     db: lf.Database,
