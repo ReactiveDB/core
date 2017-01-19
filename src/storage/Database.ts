@@ -43,14 +43,14 @@ export interface SchemaMetadata<T> {
    */
   virtual?: {
     name?: string
-    where?(virtualTable: TableShap<T>): PredicateDescription
+    where?(virtualTable: TableShape<T>): PredicateDescription
   }
   // 被 Database.prototype.createRow 动态挂上去的
   // readonly isHidden?: boolean
   // readonly hiddenMapper?: (val: any) => any
 }
 
-export type TableShap<T> = lf.schema.Table & {
+export type TableShape<T> = lf.schema.Table & {
   [P in keyof T]: lf.schema.Column
 }
 
@@ -141,12 +141,7 @@ export class Database {
   }
 
   private static getTable(db: lf.Database, ...tableNames: string[]) {
-    const ret: lf.schema.Table[] = []
-    tableNames.forEach((name) => {
-      ret.push(db.getSchema().table(name))
-    })
-
-    return ret
+    return tableNames.map((name) => db.getSchema().table(name))
   }
 
   private static reviseAssocDefinition(assoc: Association, def: Object) {
@@ -368,7 +363,7 @@ export class Database {
     const selectMeta$ = this.database$
       .map(db => this.buildSelector<T>(db, tableName, query))
 
-    return new QueryToken(selectMeta$)
+    return new QueryToken<T>(selectMeta$)
   }
 
   update(tableName: string, clause: ClauseDescription, patch: Object) {
@@ -410,13 +405,16 @@ export class Database {
             UNMODIFIABLE_PRIMARYKEY_WARN()
           } else if (!virtualMeta) {
             const hiddenColumn = table[`${Database.__HIDDEN__}${key}`]
+            updateQuery = (updateQuery || db.update(table))
+
             if (hiddenColumn) {
               const mapFn = selectMetadata.mapper.get(key)
-              updateQuery = (updateQuery || db.update(table))
+              updateQuery
                 .set(hiddenColumn, val)
                 .set(column, mapFn(val))
             } else {
-              updateQuery = (updateQuery || db.update(table)).set(column, val)
+              updateQuery
+                .set(column, val)
             }
           }
         })
@@ -480,8 +478,10 @@ export class Database {
         }
 
         return hookStream.concatMap(() => {
-          let deleteQuery = db.delete().from(table)
-          deleteQuery = predicate ? deleteQuery.where(predicate) : deleteQuery
+          const deleteQuery = db.delete().from(table)
+          if (predicate) {
+            deleteQuery.where(predicate)
+          }
           return deleteQuery.exec()
         })
       })
@@ -716,9 +716,9 @@ export class Database {
       .exec()
       .then((rows) => {
         if (rows.length) {
-          return this.update(table.getName(), {
-            where: clause
-          }, data).toPromise()
+          return this
+            .update(table.getName(), { where: clause }, data)
+            .toPromise()
         } else {
           return this.insert<T>(table.getName(), data).toPromise()
         }
@@ -899,10 +899,10 @@ export class Database {
       } else if (typeof field === 'object') {
         forEach(field, (value, key) => {
           let associationName: string
-          const association = tableInfo.virtualMeta.get(key)
+          const assocDesc = tableInfo.virtualMeta.get(key)
 
-          if (association) {
-            associationName = association.name
+          if (assocDesc) {
+            associationName = assocDesc.name
           } else {
             NON_DEFINED_PROPERTY_WARN(key)
             return
@@ -927,9 +927,9 @@ export class Database {
             if (definition[key]) {
               throw ALIAS_CONFLICT_ERR(key, tableName)
             }
-            definition[key] = Database.reviseAssocDefinition(association.association, ret.definition)
+            definition[key] = Database.reviseAssocDefinition(assocDesc.association, ret.definition)
 
-            const predicate = Database.unwrapPredicate(ret.table, currentTable, association.where)
+            const predicate = Database.unwrapPredicate(ret.table, currentTable, assocDesc.where)
             if (predicate) {
               joinInfo.push({ table: ret.table, predicate })
             }
@@ -939,13 +939,14 @@ export class Database {
         })
       } else if (typeof field === 'string' && associationMeta.indexOf(field) > -1) {
           let associationName: string
-          const association = tableInfo.virtualMeta.get(field)
+          const assocDesc = tableInfo.virtualMeta.get(field)
 
-          if (association) {
+          if (assocDesc) {
             associationName = tableInfo.virtualMeta.get(field).name
           } else {
             NON_DEFINED_PROPERTY_WARN(field)
             return
+            // return the outter forEach loop
           }
 
           const nestFields = this.selectMetaData.get(associationName).fields
@@ -966,9 +967,9 @@ export class Database {
             if (definition[field]) {
               throw ALIAS_CONFLICT_ERR(field, tableName)
             }
-            definition[field] = Database.reviseAssocDefinition(association.association, ret.definition)
+            definition[field] = Database.reviseAssocDefinition(assocDesc.association, ret.definition)
 
-            const predicate = Database.unwrapPredicate(ret.table, currentTable, association.where)
+            const predicate = Database.unwrapPredicate(ret.table, currentTable, assocDesc.where)
             if (predicate) {
               joinInfo.push({ table: ret.table, predicate })
             }
