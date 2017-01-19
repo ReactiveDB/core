@@ -43,14 +43,14 @@ export interface SchemaMetadata<T> {
    */
   virtual?: {
     name?: string
-    where?(virtualTable: TableShap<T>): PredicateDescription
+    where?(virtualTable: TableShape<T>): PredicateDescription
   }
   // 被 Database.prototype.createRow 动态挂上去的
   // readonly isHidden?: boolean
   // readonly hiddenMapper?: (val: any) => any
 }
 
-export type TableShap<T> = lf.schema.Table & {
+export type TableShape<T> = lf.schema.Table & {
   [P in keyof T]: lf.schema.Column
 }
 
@@ -125,9 +125,9 @@ export class Database {
    * 比如 api 获取的 task.created 是 string 类型
    * 我们希望它存储为 number 类型（方便我们 Select 的时候对它进行一系列的条件运算
    * 那么可以在 Schema 上将它定义为:
-   * RDBType.DATA_TIME
+   * RDBType.DATE_TIME
    * 然后 Database 类会将原始值存储到 __hidden__created 字段上
-   * 存储的时候将原始值存储为 new Date(task.created)
+   * 存储的时候将原始值存储为 new Date(task.created).valueOf()
    */
   private static readonly __HIDDEN__ = '__hidden__'
 
@@ -141,12 +141,7 @@ export class Database {
   }
 
   private static getTable(db: lf.Database, ...tableNames: string[]) {
-    const ret: lf.schema.Table[] = []
-    tableNames.forEach((name) => {
-      ret.push(db.getSchema().table(name))
-    })
-
-    return ret
+    return tableNames.map((name) => db.getSchema().table(name))
   }
 
   private static reviseAssocDefinition(assoc: Association, def: Object) {
@@ -333,30 +328,32 @@ export class Database {
   }
 
   /**
-   * 根据 SelectMetadata 中的元信息 join 出正确的数据结构
-   * 比如 TaskTable 中是这样的结构:
-   * TaskTable: {
-   *   _id: PrimaryKey,
-   *   _projectId: string, //Index
-   *   note: string,
-   *   content: string
-   * }
-   *
-   * 根据 Schema 定义的 SelectMetadata 返回的结果是:
+   * 根据 SchemaMetadata 中的元信息 join 出正确的数据结构
+   * 设有一表有如下结构：
    * {
-   *   _id: string,
-   *   _projectId: string,
+   *   _id: PrimaryKey,
    *   note: string,
    *   content: string,
-   *   project: {
-   *     _id: string,
-   *     name: string
-   *   },
    *   subtasks: {
-   *     _id: string,
-   *     name: string,
-   *     taskId: string
-   *   }[]
+   *     type: Association.oneToMany
+   *     virtual: {
+   *       name: 'SubTask',
+   *       where: (table) => ({
+   *         _id: table.taskId
+   *       })
+   *     }
+   *   }
+   *
+   * }
+   *
+   * 根据 Schema 定义的 metadata, 在`SELECT`时将会返回如下结果:
+   * {
+   *   _id: string,
+   *   note: string,
+   *   content: string,
+   *   subtasks: [{
+   *    ...subtask attribute
+   *   }]
    * }
    */
   get<T>(tableName: string, query: QueryDescription = {}): QueryToken<T> {
@@ -368,7 +365,7 @@ export class Database {
     const selectMeta$ = this.database$
       .map(db => this.buildSelector<T>(db, tableName, query))
 
-    return new QueryToken(selectMeta$)
+    return new QueryToken<T>(selectMeta$)
   }
 
   update(tableName: string, clause: ClauseDescription, patch: Object) {
@@ -410,13 +407,16 @@ export class Database {
             UNMODIFIABLE_PRIMARYKEY_WARN()
           } else if (!virtualMeta) {
             const hiddenColumn = table[`${Database.__HIDDEN__}${key}`]
+            updateQuery = (updateQuery || db.update(table))
+
             if (hiddenColumn) {
               const mapFn = selectMetadata.mapper.get(key)
-              updateQuery = (updateQuery || db.update(table))
+              updateQuery
                 .set(hiddenColumn, val)
                 .set(column, mapFn(val))
             } else {
-              updateQuery = (updateQuery || db.update(table)).set(column, val)
+              updateQuery
+                .set(column, val)
             }
           }
         })
@@ -480,8 +480,10 @@ export class Database {
         }
 
         return hookStream.concatMap(() => {
-          let deleteQuery = db.delete().from(table)
-          deleteQuery = predicate ? deleteQuery.where(predicate) : deleteQuery
+          const deleteQuery = db.delete().from(table)
+          if (predicate) {
+            deleteQuery.where(predicate)
+          }
           return deleteQuery.exec()
         })
       })
@@ -620,16 +622,7 @@ export class Database {
    * 在 normalize 的时候定义 insertHook
    * 在 insert 数据到这个 table 的时候调用
    * 这里新建的 hook 是把 schemaMetaData 中的关联的数据剥离，单独存储
-   * 存储的时候会验证 virtual props 的类型与之前存储时是否一致。比如：
-   * 第一次存的时候是 Object 类型，第二次却存了 Array 类型
-   * 比如第一次存:
-   * {
-   *   project: { _id: '03a9f4' }
-   * },
-   * 第二次:
-   * {
-   *   project: [ { _id: '03a9f4' } ]
-   * }
+   * 存储的时候会验证 virtual props 的类型与定义时候明确的关联关系是否一致
    */
   private createInsertHook(
     db: lf.Database,
@@ -716,9 +709,9 @@ export class Database {
       .exec()
       .then((rows) => {
         if (rows.length) {
-          return this.update(table.getName(), {
-            where: clause
-          }, data).toPromise()
+          return this
+            .update(table.getName(), { where: clause }, data)
+            .toPromise()
         } else {
           return this.insert<T>(table.getName(), data).toPromise()
         }
@@ -899,10 +892,10 @@ export class Database {
       } else if (typeof field === 'object') {
         forEach(field, (value, key) => {
           let associationName: string
-          const association = tableInfo.virtualMeta.get(key)
+          const assocDesc = tableInfo.virtualMeta.get(key)
 
-          if (association) {
-            associationName = association.name
+          if (assocDesc) {
+            associationName = assocDesc.name
           } else {
             NON_DEFINED_PROPERTY_WARN(key)
             return
@@ -927,9 +920,9 @@ export class Database {
             if (definition[key]) {
               throw ALIAS_CONFLICT_ERR(key, tableName)
             }
-            definition[key] = Database.reviseAssocDefinition(association.association, ret.definition)
+            definition[key] = Database.reviseAssocDefinition(assocDesc.association, ret.definition)
 
-            const predicate = Database.unwrapPredicate(ret.table, currentTable, association.where)
+            const predicate = Database.unwrapPredicate(ret.table, currentTable, assocDesc.where)
             if (predicate) {
               joinInfo.push({ table: ret.table, predicate })
             }
@@ -939,13 +932,14 @@ export class Database {
         })
       } else if (typeof field === 'string' && associationMeta.indexOf(field) > -1) {
           let associationName: string
-          const association = tableInfo.virtualMeta.get(field)
+          const assocDesc = tableInfo.virtualMeta.get(field)
 
-          if (association) {
+          if (assocDesc) {
             associationName = tableInfo.virtualMeta.get(field).name
           } else {
             NON_DEFINED_PROPERTY_WARN(field)
             return
+            // return the outter forEach loop
           }
 
           const nestFields = this.selectMetaData.get(associationName).fields
@@ -966,9 +960,9 @@ export class Database {
             if (definition[field]) {
               throw ALIAS_CONFLICT_ERR(field, tableName)
             }
-            definition[field] = Database.reviseAssocDefinition(association.association, ret.definition)
+            definition[field] = Database.reviseAssocDefinition(assocDesc.association, ret.definition)
 
-            const predicate = Database.unwrapPredicate(ret.table, currentTable, association.where)
+            const predicate = Database.unwrapPredicate(ret.table, currentTable, assocDesc.where)
             if (predicate) {
               joinInfo.push({ table: ret.table, predicate })
             }

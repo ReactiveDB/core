@@ -8,7 +8,12 @@ export enum Level {
 export type Formatter = (name: string, level: Level, message: string) => string
 
 export class ContextLogger {
-  constructor(private name: string, private level: Level, private formatter?: Formatter) { }
+
+  constructor(
+    private name: string,
+    private level: Level,
+    private formatter?: Formatter
+  ) { }
 
   private invoke(method: string, message: string[]) {
     let output = message.join(' ,')
@@ -42,9 +47,11 @@ export class ContextLogger {
       this.invoke('debug', message)
     }
   }
+
 }
 
 export class Logger {
+
   private static contextMap = new Map<string, ContextLogger>()
   private static level = Level.debug
   private static outputLogger: ContextLogger = null
@@ -90,11 +97,7 @@ export class Logger {
 
 const envifyLevel = () => {
   const isProduction = (process && process.env && process.env.NODE_ENV) === 'production'
-  if (isProduction) {
-    return Level.error
-  } else {
-    return Level.debug
-  }
+  return isProduction ? Level.error : Level.debug
 }
 
 Logger.setLevel(envifyLevel())
