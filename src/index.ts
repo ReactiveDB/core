@@ -1,4 +1,5 @@
 import './global'
+import 'tslib'
 import * as lf from 'lovefield'
 export * from './storage/Database'
 export * from './storage/DataType'
