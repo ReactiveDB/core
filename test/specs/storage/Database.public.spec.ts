@@ -389,16 +389,10 @@ export default describe('Database public Method', () => {
         }).values()
 
         tasks.sort((a, b) => {
-          const created = new Date(b.created).valueOf() > new Date(a.created).valueOf() ? 1 : -1
-          let subtasksCount: number
-          if (a.subtasksCount > b.subtasksCount) {
-            subtasksCount = 1
-          } else if (a.subtasksCount === b.subtasksCount) {
-            subtasksCount = 0
-          } else {
-            subtasksCount = -1
-          }
-          return subtasksCount * 10 + created
+          const moreSubtasks = Math.sign(a.subtasksCount - b.subtasksCount)
+          const earlier = -Math.sign(new Date(a.created).valueOf()
+                                     - new Date(b.created).valueOf())
+          return moreSubtasks * 10 + earlier
         })
           .forEach((r, i) => {
             delete r.subtasks

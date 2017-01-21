@@ -182,16 +182,9 @@ export default describe('SelectMeta test', () => {
         expect(result.length).to.equal(950)
         const expectResult = storeData.filter(r => r.time >= 50)
           .sort((a, b) => {
-            let priority: number
-            const time: number = b.time > a.time ? 1 : -1
-            if (a.priority > b.priority) {
-              priority = 1
-            } else if (a.priority === b.priority) {
-              priority = 0
-            } else {
-              priority = -1
-            }
-            return priority * 10 + time
+            const higherPriority = Math.sign(a.priority - b.priority)
+            const earlier = -Math.sign(a.time - b.time)
+            return higherPriority * 10 + earlier
           })
 
         expect(result).to.deep.equal(expectResult)
