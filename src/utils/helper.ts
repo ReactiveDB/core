@@ -9,7 +9,7 @@ export function forEach<T> (
 
 export function forEach (target: any, eachFunc: (val: any, key: any) => void, inverse?: boolean): void
 
-export function forEach (target: any, eachFunc: (val: any, key: any) => any, inverse?: boolean) {
+export function forEach (target: any, eachFunc: (val: any, key: any) => any, inverse?: boolean): void {
   let length: number
   if (target instanceof Array) {
     length = target.length
@@ -41,7 +41,6 @@ export function forEach (target: any, eachFunc: (val: any, key: any) => any, inv
       }
     }
   }
-  return target
 }
 
 export const clone = <T>(origin: T): T | null => {
