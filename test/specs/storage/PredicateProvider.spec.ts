@@ -62,7 +62,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(1)
+      expect(result).to.have.lengthOf(1)
       expect(result[0]['time1']).to.equal(20)
     })
 
@@ -78,7 +78,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(dataLength - 1)
+      expect(result).to.have.lengthOf(dataLength - 1)
 
       result.forEach((r: any) => expect(r['time1'] === 20).to.be.false)
     })
@@ -95,7 +95,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(20)
+      expect(result).to.have.lengthOf(20)
       result.forEach((r: any) => expect(r['time1'] < 20).to.be.true)
     })
 
@@ -111,7 +111,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(20)
+      expect(result).to.have.lengthOf(20)
       result.forEach((r: any) => expect(r['time1'] <= 19).to.be.true)
     })
 
@@ -127,7 +127,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(dataLength - 20)
+      expect(result).to.have.lengthOf(dataLength - 20)
       result.forEach((r: any) => expect(r['time2'] > 20).to.be.true)
     })
 
@@ -143,7 +143,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(dataLength - 20)
+      expect(result).to.have.lengthOf(dataLength - 20)
       result.forEach((r: any) => expect(r['time2'] >= 21).to.be.true)
     })
 
@@ -160,7 +160,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(10)
+      expect(result).to.have.lengthOf(10)
       result.forEach((r: any) => expect(regExp.test(r['name'])).to.be.true)
     })
 
@@ -178,7 +178,7 @@ export default describe('PredicateProvider test', () => {
         .exec()
 
       // 上一个测试中结果长度是 10
-      expect(result.length).to.equal(dataLength - 10)
+      expect(result).to.have.lengthOf(dataLength - 10)
       result.forEach((r: any) => expect(regExp.test(r['name'])).to.be.false)
     })
 
@@ -194,7 +194,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(20)
+      expect(result).to.have.lengthOf(20)
       result.forEach((r: any) => expect(r['time1'] > 0 && r['time1'] <= 20).to.be.true)
     })
 
@@ -210,7 +210,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(3)
+      expect(result).to.have.lengthOf(3)
       result.forEach((r: any) => {
         expect(r.times.match(/times: 10\b/)).to.not.be.null
       })
@@ -229,7 +229,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(3)
+      expect(result).to.have.lengthOf(3)
       result.forEach((r: any) => expect(seed.indexOf(r['time1']) !== -1).to.be.true)
     })
 
@@ -245,7 +245,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(700)
+      expect(result).to.have.lengthOf(700)
       result.forEach((r: any) => expect(r['nullable']).to.be.null)
     })
 
@@ -261,7 +261,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(300)
+      expect(result).to.have.lengthOf(300)
       result.forEach((r: any) => expect(r['nullable']).to.not.be.null)
     })
 
@@ -277,7 +277,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(dataLength - 1)
+      expect(result).to.have.lengthOf(dataLength - 1)
     })
 
     it('$and should ok', function* () {
@@ -295,7 +295,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(150)
+      expect(result).to.have.lengthOf(150)
       result.forEach((r: any) => expect(r['time1'] >= 50 && r['time1'] < 200).to.be.true)
     })
 
@@ -314,7 +314,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(100)
+      expect(result).to.have.lengthOf(100)
       result.forEach((r: any) => expect(r['time1'] >= dataLength - 50 || r['time1'] < 50).to.be.true)
     })
 
@@ -343,7 +343,7 @@ export default describe('PredicateProvider test', () => {
         .where(predicate)
         .exec()
 
-      expect(result.length).to.equal(5)
+      expect(result).to.have.lengthOf(5)
 
       result.forEach((r: any) => {
         const pred1 = r['time1'] >= dataLength - 50 || r['time1'] < 50
