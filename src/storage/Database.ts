@@ -189,6 +189,8 @@ export class Database {
     }
 
     let hasPK = false
+    // src: schemaMetaData; dest: hasPK;
+    // short-curcuiting at the first meta that has primaryKey
     forEach(schemaMetaData, meta => {
       if (meta.primaryKey) {
         hasPK = true
@@ -397,6 +399,8 @@ export class Database {
           }
         }
 
+        // source: patch; dest: updateQuery;
+        // no short-curcuiting
         forEach(patch, (val, key) => {
           const column = table[key]
           const virtualMeta = selectMetadata.virtualMeta.get(key)
@@ -537,6 +541,8 @@ export class Database {
     const virtualMeta = new Map<string, VirtualMetadata>()
     const mapper = new Map<string, Function>()
 
+    // src: schemaMetaData; dest: uniques, indexes, primaryKey, nullable, fields, vitualMeta, mapper
+    // no short-curcuiting
     forEach(schemaMetaData, (def, key) => {
       if (!def.virtual) {
         tableBuilder = this.addRow(tableBuilder, key, def.type as RDBType, nullable, def)
