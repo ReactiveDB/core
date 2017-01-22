@@ -586,7 +586,7 @@ export class Database {
       }
 
       if (!def['isHidden']) {
-        return null
+        return
       }
 
       // create a hidden column in table and make compare datetime easier

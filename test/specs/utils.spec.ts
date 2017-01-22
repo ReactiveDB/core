@@ -64,9 +64,7 @@ export default describe('utils test', () => {
     forEach(arr, (val) => {
       result.push(val)
     }, true)
-    for (let i = 0; i < arr.length ; i ++) {
-      expect(result[5 - i]).to.equal(arr[i])
-    }
+    expect(result).to.eql(arr.slice(0).reverse())
   })
 
   it('inverse forEach break should ok', () => {
