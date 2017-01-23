@@ -338,7 +338,7 @@ export default describe('Database public Method', () => {
           throw new TypeError('Invalid code path reached.')
         }
 
-        expect(result.length).to.greaterThan(0)
+        expect(result).to.have.length.above(0)
       })
 
       it('should get value when both pk and whereClause were specified', function* () {
@@ -620,7 +620,7 @@ export default describe('Database public Method', () => {
 
       const result = yield database.get<TaskSchema>('Task').values()
       if (result.length) {
-        expect(result.length).to.equal(count)
+        expect(result).to.have.lengthOf(count)
       } else {
         expect(result).deep.equal([])
       }
@@ -694,7 +694,7 @@ export default describe('Database public Method', () => {
 
       const rets = yield database.get<TaskSchema>('Task').values()
 
-      expect(rets.length).to.equal(1)
+      expect(rets).to.have.lengthOf(1)
       expect(rets[rets.length - 1]).deep.equal(task)
     })
 

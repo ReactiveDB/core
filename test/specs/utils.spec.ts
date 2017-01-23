@@ -48,7 +48,7 @@ export default describe('utils test', () => {
       }
       return dest.push(ele)
     })
-    expect(dest.length).to.equal(2)
+    expect(dest).to.have.lengthOf(2)
   })
 
   it('inverse forEach should ok', () => {
@@ -64,9 +64,7 @@ export default describe('utils test', () => {
     forEach(arr, (val) => {
       result.push(val)
     }, true)
-    for (let i = 0; i < arr.length ; i ++) {
-      expect(result[5 - i]).to.equal(arr[i])
-    }
+    expect(result).to.eql(arr.slice(0).reverse())
   })
 
   it('inverse forEach break should ok', () => {
@@ -78,7 +76,7 @@ export default describe('utils test', () => {
       }
       return dest.push(ele)
     }, true)
-    expect(dest.length).to.equal(3)
+    expect(dest).to.have.lengthOf(3)
   })
 
   it('forEach object should ok', () => {

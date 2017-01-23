@@ -115,7 +115,7 @@ export default describe('SelectMeta test', () => {
 
     const results = yield selector.values()
 
-    expect(results.length).to.equal(1000 - 50)
+    expect(results).to.have.lengthOf(1000 - 50)
     results.forEach((ret: any) => {
       expect(ret.time >= 50).to.equals(true)
     })
@@ -145,7 +145,7 @@ export default describe('SelectMeta test', () => {
     )
     const result = yield selector.values()
 
-    expect(result.length).to.equal(20)
+    expect(result).to.have.lengthOf(20)
 
     result.forEach((r: any) => {
       expect(r.time).to.greaterThan(70)
@@ -179,7 +179,7 @@ export default describe('SelectMeta test', () => {
 
     yield selector.values()
       .do(result => {
-        expect(result.length).to.equal(950)
+        expect(result).to.have.lengthOf(950)
         const expectResult = storeData.filter(r => r.time >= 50)
           .sort((a, b) => {
             const higherPriority = Math.sign(a.priority - b.priority)
@@ -474,7 +474,7 @@ export default describe('SelectMeta test', () => {
 
       yield signal.take(1)
         .do(r => {
-          expect(r.length).to.equal(20)
+          expect(r).to.have.lengthOf(20)
           r.forEach((v: any) => {
             expect(v.time).to.gt(80)
             expect(v.time).to.lte(100)
@@ -503,7 +503,7 @@ export default describe('SelectMeta test', () => {
 
       yield signal.take(1)
         .do(r => {
-          expect(r.length).to.equal(9)
+          expect(r).to.have.lengthOf(9)
           r.forEach((v: any) => {
             expect(v.time).to.gt(990)
             expect(v.time).to.lt(1000)
@@ -562,7 +562,7 @@ export default describe('SelectMeta test', () => {
     it('result metadata should combine all results', done => {
       dist.values()
         .subscribe(r => {
-          expect(r.length).to.equal(200)
+          expect(r).to.have.lengthOf(200)
           done()
         })
     })
@@ -570,7 +570,7 @@ export default describe('SelectMeta test', () => {
     it('result should be combined', function* () {
       const result = yield dist.values()
       const count = 200
-      expect(result.length).is.equals(count)
+      expect(result).to.have.lengthOf(count)
       result.forEach((r: any, index: number) => {
         expect(r).to.deep.equal(storeData[index])
       })
@@ -640,7 +640,7 @@ export default describe('SelectMeta test', () => {
 
       yield signal.take(1)
         .do(r => {
-          expect(r.length).to.equal(40)
+          expect(r).to.have.lengthOf(40)
           r.forEach(v => expect(v['time']).not.equal(81))
           Observable.from(r)
             .skip(19)
@@ -655,7 +655,7 @@ export default describe('SelectMeta test', () => {
 
       yield signal.take(1)
         .do(r => {
-          expect(r.length).to.equal(40)
+          expect(r).to.have.lengthOf(40)
           r.forEach(v => expect(v['time']).not.equal(135))
           Observable.from(r)
             .last()

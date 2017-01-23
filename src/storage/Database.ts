@@ -189,6 +189,8 @@ export class Database {
     }
 
     let hasPK = false
+    // src: schemaMetaData; dest: hasPK;
+    // short-curcuiting at the first meta that has primaryKey
     forEach(schemaMetaData, meta => {
       if (meta.primaryKey) {
         hasPK = true
@@ -397,6 +399,8 @@ export class Database {
           }
         }
 
+        // source: patch; dest: updateQuery;
+        // no short-curcuiting
         forEach(patch, (val, key) => {
           const column = table[key]
           const virtualMeta = selectMetadata.virtualMeta.get(key)
@@ -537,6 +541,8 @@ export class Database {
     const virtualMeta = new Map<string, VirtualMetadata>()
     const mapper = new Map<string, Function>()
 
+    // src: schemaMetaData; dest: uniques, indexes, primaryKey, nullable, fields, vitualMeta, mapper
+    // no short-curcuiting
     forEach(schemaMetaData, (def, key) => {
       if (!def.virtual) {
         tableBuilder = this.addRow(tableBuilder, key, def.type as RDBType, nullable, def)
@@ -580,7 +586,7 @@ export class Database {
       }
 
       if (!def['isHidden']) {
-        return null
+        return
       }
 
       // create a hidden column in table and make compare datetime easier
@@ -842,7 +848,7 @@ export class Database {
     })
 
     if (fieldTree.size === associationMeta.length
-      && associationMeta.every((assoc) => fieldTree.has(assoc))) {
+        && associationMeta.every((assoc) => fieldTree.has(assoc))) {
       throw INVALID_FIELD_DES_ERR()
     }
 
@@ -856,10 +862,25 @@ export class Database {
     const contextName = `${tableName}@${suffix}`
     const currentTable = Database.getTable(db, tableName)[0].as(contextName)
 
+    const handleAdvanced = (ret: any, key: string, assocDesc: VirtualMetadata) => {
+      columns = columns.concat(ret.columns)
+      allFields[key] = ret.allFields
+
+      if (definition[key]) {
+        throw ALIAS_CONFLICT_ERR(key, tableName)
+      }
+      definition[key] = Database.reviseAssocDefinition(assocDesc.association, ret.definition)
+
+      const predicate = Database.unwrapPredicate(ret.table, currentTable, assocDesc.where)
+      const joinLink = predicate ?
+        [{ table: ret.table, predicate }, ...ret.joinInfo] : ret.joinInfo
+      joinInfo = joinInfo.concat(joinLink)
+    }
+
     fieldTree.forEach(field => {
       if (typeof field === 'string'
-      && associationItem.indexOf(field) === -1
-      && associationMeta.indexOf(field) === -1) {
+          && associationItem.indexOf(field) === -1
+          && associationMeta.indexOf(field) === -1) {
         const column = currentTable[field]
         if (column) {
           const schema = this.schemaMetaData.get(tableName)
@@ -891,18 +912,15 @@ export class Database {
         }
       } else if (typeof field === 'object') {
         forEach(field, (value, key) => {
-          let associationName: string
           const assocDesc = tableInfo.virtualMeta.get(key)
-
-          if (assocDesc) {
-            associationName = assocDesc.name
-          } else {
+          if (!assocDesc) {
             NON_DEFINED_PROPERTY_WARN(key)
             return
           }
 
           const pk = this.primaryKeysMap.get(key)
           const keyInFields = value.indexOf(pk) > -1
+          const associationName = assocDesc.name
           const ret = this.traverseFields(
             db,
             associationName,
@@ -914,61 +932,30 @@ export class Database {
           )
 
           if (ret.advanced) {
-            columns = columns.concat(ret.columns)
-            allFields[key] = ret.allFields
-
-            if (definition[key]) {
-              throw ALIAS_CONFLICT_ERR(key, tableName)
-            }
-            definition[key] = Database.reviseAssocDefinition(assocDesc.association, ret.definition)
-
-            const predicate = Database.unwrapPredicate(ret.table, currentTable, assocDesc.where)
-            if (predicate) {
-              joinInfo.push({ table: ret.table, predicate })
-            }
-
-            joinInfo = joinInfo.concat(ret.joinInfo)
+            handleAdvanced(ret, key, assocDesc)
           }
         })
       } else if (typeof field === 'string' && associationMeta.indexOf(field) > -1) {
-          let associationName: string
-          const assocDesc = tableInfo.virtualMeta.get(field)
+        const assocDesc = tableInfo.virtualMeta.get(field)
+        if (!assocDesc) {
+          NON_DEFINED_PROPERTY_WARN(field)
+          return
+        }
 
-          if (assocDesc) {
-            associationName = tableInfo.virtualMeta.get(field).name
-          } else {
-            NON_DEFINED_PROPERTY_WARN(field)
-            return
-            // return the outter forEach loop
-          }
+        const associationName = assocDesc.name
+        const ret = this.traverseFields(
+          db,
+          associationName,
+          this.selectMetaData.get(associationName).fields,
+          true,
+          true,
+          path.slice(0),
+          context
+        )
 
-          const nestFields = this.selectMetaData.get(associationName).fields
-          const ret = this.traverseFields(
-            db,
-            associationName,
-            new Set(nestFields),
-            true,
-            true,
-            path.slice(0),
-            context
-          )
-
-          if (ret.advanced) {
-            columns = columns.concat(ret.columns)
-            allFields[field] = ret.allFields
-
-            if (definition[field]) {
-              throw ALIAS_CONFLICT_ERR(field, tableName)
-            }
-            definition[field] = Database.reviseAssocDefinition(assocDesc.association, ret.definition)
-
-            const predicate = Database.unwrapPredicate(ret.table, currentTable, assocDesc.where)
-            if (predicate) {
-              joinInfo.push({ table: ret.table, predicate })
-            }
-
-            joinInfo = joinInfo.concat(ret.joinInfo)
-          }
+        if (ret.advanced) {
+          handleAdvanced(ret, field, assocDesc)
+        }
       }
     })
 
