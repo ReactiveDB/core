@@ -872,11 +872,9 @@ export class Database {
       definition[key] = Database.reviseAssocDefinition(assocDesc.association, ret.definition)
 
       const predicate = Database.unwrapPredicate(ret.table, currentTable, assocDesc.where)
-      if (predicate) {
-        joinInfo.push({ table: ret.table, predicate })
-      }
-
-      joinInfo = joinInfo.concat(ret.joinInfo)
+      const joinLink = predicate ?
+        [{ table: ret.table, predicate }, ...ret.joinInfo] : ret.joinInfo
+      joinInfo = joinInfo.concat(joinLink)
     }
 
     fieldTree.forEach(field => {
