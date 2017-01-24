@@ -426,7 +426,11 @@ export class Database {
         })
 
         if (updateQuery) {
-          return updateQuery.where(predicate).exec()
+          if (predicate) {
+            return updateQuery.where(predicate).exec()
+          } else {
+            return updateQuery.exec()
+          }
         } else {
           return Promise.resolve()
         }

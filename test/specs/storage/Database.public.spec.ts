@@ -574,6 +574,26 @@ export default describe('Database public Method', () => {
         expect(result.project.name).to.equal(name)
       })
 
+      it('update without clause should not throw', function* () {
+        yield database.delete('Task')
+
+        const [ fixture ] = taskGenerator(1)
+
+        yield database.insert('Task', fixture)
+
+        const newContent = 'new test content'
+
+        yield database.update('Task', { }, {
+          content: newContent
+        })
+
+        yield database.get<TaskSchema>('Task')
+          .values()
+          .do(([t]) => {
+            expect(t.content).to.equal(newContent)
+          })
+      })
+
       it('should throw when patched data is not a single record', function* () {
         const results = yield database.get<TaskSchema>('Task').values()
         const patch = results.map((ret: TaskSchema) => {
