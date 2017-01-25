@@ -77,4 +77,4 @@ export const clone = <T>(origin: T): T | null => {
   return target
 }
 
-export function identity (r: any) { return r }
+export function identity<T> (r: T) { return r }
