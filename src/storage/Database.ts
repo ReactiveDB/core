@@ -552,25 +552,25 @@ export class Database {
         tableBuilder = this.addRow(tableBuilder, key, def.type as RDBType, nullable, def)
         fields.add(key)
 
-        const tags: boolean[] = []
+        let flag = false
 
         if (def.primaryKey) {
           primaryKey.push(key)
           this.primaryKeysMap.set(tableName, key)
-          tags.push(true)
+          flag = flag || true
         }
 
         if (def.unique) {
           uniques.push(key)
-          tags.push(true)
+          flag = flag || true
         }
 
         if (def.index) {
           indexes.push(key)
-          tags.push(true)
+          flag = flag || true
         }
 
-        if (tags.length === 0) {
+        if (!flag) {
           nullable.push(key)
         }
 
