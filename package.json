@@ -39,7 +39,7 @@
     "moment": "^2.17.1",
     "nyc": "^10.0.0",
     "raw-loader": "^0.5.1",
-    "rxjs": "^5.0.3",
+    "rxjs": "^5.1.0",
     "sinon": "^1.17.7",
     "sinon-chai": "^2.8.0",
     "source-map-loader": "^0.1.5",
@@ -56,11 +56,11 @@
     "webpack-dev-server": "^1.16.2"
   },
   "dependencies": {
-    "lovefield": "git://github.com/google/lovefield.git#71b836acf0ede3d8704b26cb6490260e9b5785c0",
+    "lovefield": "2.1.12",
     "nesthydrationjs": "^1.0.0"
   },
   "peerDependencies": {
-    "rxjs": "^5.0.3"
+    "rxjs": "^5.1.0"
   },
   "files": [
     "src/**",
