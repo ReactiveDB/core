@@ -7,19 +7,19 @@ const HtmlWebpackPlugin = require('html-webpack-plugin')
 module.exports = {
   entry: {
     'main': './test/e2e/app.ts',
-    'vendor': [ 'lovefield', 'rxjs', 'sinon', 'tman' ]
+    'vendor': [ 'lovefield', 'rxjs', 'sinon', 'tman', 'tslib' ]
   },
   devtool: 'cheap-module-source-map',
   cache: true,
-  debug: true,
   output: {
-    path: './dist',
-    filename: '[name].js'
+    filename: '[name].js',
+    path: path.resolve(__dirname, 'dist'),
+    publicPath: '/'
   },
 
   resolve: {
-    root: [ path.join(__dirname, 'src') ],
-    extensions: ['', '.ts', '.js'],
+    modules: [ path.join(__dirname, 'src'), 'node_modules' ],
+    extensions: ['.ts', '.js'],
     alias: {
       'lovefield': path.join(process.cwd(), 'node_modules/lovefield/dist/lovefield.js'),
       'sinon': path.join(process.cwd(), 'node_modules/sinon/pkg/sinon.js'),
@@ -29,25 +29,32 @@ module.exports = {
   },
 
   devServer: {
+    hot: true,
+    // enable HMR on the server
+
+    contentBase: path.resolve(__dirname, 'dist'),
+    // match the output path
+
+    publicPath: '/',
+    // match the output `publicPath`
+
     historyApiFallback: true,
-    watchOptions: { aggregateTimeout: 300, poll: 1000 }
+
+    watchOptions: { aggregateTimeout: 300, poll: 1000 },
   },
 
   node: {
-    global: 1,
-    crypto: 'empty',
-    module: 0,
-    Buffer: 0,
-    clearImmediate: 0,
-    setImmediate: 0
+    global: true
   },
 
   plugins: [
-    new webpack.optimize.OccurenceOrderPlugin(true),
+    new webpack.LoaderOptionsPlugin({
+      debug: true
+    }),
     new webpack.optimize.CommonsChunkPlugin({ name: ['main', 'vendor'], minChunks: Infinity }),
-    new ExtractTextPlugin('style.css'),
+    new ExtractTextPlugin({ filename: 'style.css' }),
     new webpack.HotModuleReplacementPlugin(),
-    new webpack.NoErrorsPlugin(),
+    new webpack.NoEmitOnErrorsPlugin(),
     new HtmlWebpackPlugin({
       filename: 'index.html',
       template: `test/e2e/index.html`,
@@ -62,18 +69,25 @@ module.exports = {
 
   module: {
     noParse: [/tman\/browser\/tman\.js/, /sinon\/pkg\/sinon\.js/],
-    preLoaders: [
+    rules: [
       {
         test: /\.tsx?$/,
+        enforce: 'pre',
         exclude: /node_modules/,
-        loader: 'tslint'
+        loader: 'tslint-loader'
       },
-      { test: /\.js$/, loader: 'source-map-loader', include: /rxjs/ }
-    ],
-    loaders: [
-      { test: /\.ts$/, loader: 'ts' },
-      { test: /\.css$/, loader: ExtractTextPlugin.extract('style-loader', 'css-loader') },
-      { test: /\.html$/, loader: 'raw-loader' }
+      {
+        test: /\.js$/,
+        enforce: 'pre',
+        loader: 'source-map-loader', include: /rxjs/
+      },
+      {
+        test: /\.ts$/,
+        use: 'awesome-typescript-loader',
+        exclude: /node_modules/
+      },
+      { test: /\.css$/, use: ExtractTextPlugin.extract({ fallback: 'style-loader', use: 'css-loader'}) },
+      { test: /\.html$/, use: 'raw-loader' }
     ]
   }
 }
