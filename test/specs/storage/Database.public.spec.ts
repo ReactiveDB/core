@@ -435,7 +435,7 @@ export default describe('Database public Method', () => {
       })
 
       it('update virtual props should do nothing', function* () {
-        const result1 = yield database.update('Task', {
+        const result1 = yield database.update<TaskSchema>('Task', {
           where: { _id: taskData._id }
         }, {
           project: {
@@ -540,7 +540,7 @@ export default describe('Database public Method', () => {
           note: 'foo'
         }
 
-        yield database.update('Task', {
+        yield database.update<TaskSchema>('Task', {
           where: { _id: task._id }
         }, patchData)
 
@@ -559,7 +559,7 @@ export default describe('Database public Method', () => {
         const name = 'bar'
         const patch = { name }
 
-        yield database.update('Project', {
+        yield database.update<TaskSchema>('Project', {
           where: {
             _id: project._id
           }

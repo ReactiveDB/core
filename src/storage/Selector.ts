@@ -90,7 +90,7 @@ export class Selector <T> {
     public db: lf.Database,
     private lselect: lf.query.Select,
     private shape: TableShape,
-    public predicateProvider?: PredicateProvider,
+    public predicateProvider?: PredicateProvider<T>,
     private limit?: number,
     private skip?: number,
     private orderDescriptions?: OrderInfo[]

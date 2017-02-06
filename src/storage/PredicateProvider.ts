@@ -5,23 +5,27 @@ import { forEach } from '../utils'
 export type ValueLiteral = string | number | boolean
 export type VaildEqType = ValueLiteral | lf.schema.Column | lf.Binder
 
-export interface PredicateMeta {
+export interface PredicateMeta<T> {
+  $ne: ValueLiteral
   $eq: ValueLiteral
-  $and: PredicateDescription
-  $or: PredicateDescription
-  $not: PredicateDescription
+  $and: PredicateDescription<T>
+  $or: PredicateDescription<T>
+  $not: PredicateDescription<T>
   $lt: ValueLiteral
   $lte: ValueLiteral
   $gt: ValueLiteral
   $gte: ValueLiteral
   $match: RegExp
+  $notMatch: RegExp
+  $has: ValueLiteral
   $between: [ number, number ]
   $in: ValueLiteral[]
   $isNull: boolean
+  $isNotNull: boolean
 }
 
-export interface PredicateDescription {
-  [index: string]: Partial<PredicateMeta> | ValueLiteral | PredicateDescription
+export type PredicateDescription<T> = {
+  [P in keyof T]?: Partial<PredicateMeta<T>> | ValueLiteral | PredicateDescription<T[P]>
 }
 
 const predicateFactory = {
@@ -89,11 +93,11 @@ const compoundPredicateFactory = {
   },
 }
 
-export class PredicateProvider {
+export class PredicateProvider<T> {
 
   constructor(
     private table: lf.schema.Table,
-    private meta: PredicateDescription
+    private meta: PredicateDescription<T>
   ) { }
 
   getPredicate(): lf.Predicate {
@@ -109,13 +113,13 @@ export class PredicateProvider {
     }
   }
 
-  private normalizeMeta(meta: PredicateDescription, column?: lf.schema.Column) {
+  private normalizeMeta(meta: PredicateDescription<T>, column?: lf.schema.Column) {
     let predicates: lf.Predicate[] = []
     forEach(meta, (val, key) => {
       if (this.checkCompound(key)) {
-        predicates.push(compoundPredicateFactory[key](this.normalizeMeta(val as PredicateDescription, column)))
+        predicates.push(compoundPredicateFactory[key](this.normalizeMeta(val as PredicateDescription<T>, column)))
       } else if (this.checkPredicate(val)) {
-        predicates = predicates.concat(this.normalizeMeta(val as PredicateDescription, this.table[key]))
+        predicates = predicates.concat(this.normalizeMeta(val as PredicateDescription<any>, this.table[key]))
       } else {
         const _column = column || this.table[key]
         if (!_column) {
@@ -137,7 +141,7 @@ export class PredicateProvider {
     return typeof compoundPredicateFactory[methodName] === 'function'
   }
 
-  private checkPredicate(val: Partial<PredicateMeta> | ValueLiteral) {
+  private checkPredicate(val: Partial<PredicateMeta<T>> | ValueLiteral) {
     return typeof val === 'object' &&
           !(val instanceof Array) &&
           !(val instanceof RegExp) &&
