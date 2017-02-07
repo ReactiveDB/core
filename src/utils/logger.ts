@@ -78,19 +78,19 @@ export class Logger {
   }
 
   static warn(...message: string[]) {
-    this.outputLogger.warn.apply(this.outputLogger, message)
+    this.outputLogger.warn(...message)
   }
 
   static info(...message: string[]) {
-    this.outputLogger.info.apply(this.outputLogger, message)
+    this.outputLogger.info(...message)
   }
 
   static debug(...message: string[]) {
-    this.outputLogger.debug.apply(this.outputLogger, message)
+    this.outputLogger.debug(...message)
   }
 
   static error(...message: string[]) {
-    this.outputLogger.error.apply(this.outputLogger, message)
+    this.outputLogger.error(...message)
   }
 
 }

@@ -747,7 +747,7 @@ export class Database {
       definition
     } = this.traverseFields(db, tableName, queriedFields, isKeyQueried, !hasQueryFields)
 
-    const query = (db.select.apply(db, columns) as lf.query.Select).from(table)
+    const query = db.select(...columns).from(table)
     joinInfo.forEach((info: JoinInfo) => {
       query.leftOuterJoin(info.table, info.predicate)
     })
