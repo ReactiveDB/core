@@ -77,11 +77,11 @@ const predicateFactory = {
 
 const compoundPredicateFactory = {
   $and (predicates: lf.Predicate[]): lf.Predicate {
-    return lf.op.and.apply(lf.op, predicates)
+    return lf.op.and(...predicates)
   },
 
   $or (predicates: lf.Predicate[]): lf.Predicate {
-    return lf.op.or.apply(lf.op, predicates)
+    return lf.op.or(...predicates)
   },
 
   $not (predicates: lf.Predicate[]): lf.Predicate {
@@ -102,7 +102,7 @@ export class PredicateProvider {
       if (predicates.length === 1) {
         return predicates[0]
       } else {
-        return lf.op.and.apply(lf.op, predicates)
+        return lf.op.and(...predicates)
       }
     } else {
       return null
