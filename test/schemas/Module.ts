@@ -14,7 +14,8 @@ export default (db: Database) => db.defineSchema('Module', {
     primaryKey: true
   },
   name: {
-    type: RDBType.STRING
+    type: RDBType.STRING,
+    unique: true
   },
   ownerId: {
     type: RDBType.STRING

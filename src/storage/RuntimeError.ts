@@ -45,9 +45,6 @@ export const UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR =
 export const NON_EXISTENT_PRIMARY_KEY_ERR =
   (meta: Object) => new ReactiveDBError(`PrimaryKey is required in schema defination: ${JSON.stringify(meta, null, 2)}`)
 
-export const NON_EXISTENT_COLUMN_ERR =
-  (column: string, tableName: string) => new ReactiveDBError(`Column: \`${column}\` was not defined in table: \`${tableName}\` `)
-
 export const INVALID_NAVIGATINO_TYPE_ERR =
   (column: string, expect?: string[]) => {
     let message = `Invalid type of navigation properties: \`${column}\``
@@ -89,6 +86,9 @@ export const HOOK_EXECUTE_FAILED =
 
 export const INVALID_PATCH_TYPE_ERR =
   (errType: string) => new ReactiveDBError(`Unexpected type of data, expect Object but got ${errType}`)
+
+export const PRIMARY_KEY_NOT_PROVIDED_ERR =
+  () => new ReactiveDBError(`Primary key was not provided`)
 
 /**
  * SelectMeta Error

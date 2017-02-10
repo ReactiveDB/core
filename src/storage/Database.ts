@@ -7,7 +7,8 @@ import * as Graphify from './Graphify'
 import { Selector } from './Selector'
 import { QueryToken } from './QueryToken'
 import { PredicateDescription, PredicateProvider } from './PredicateProvider'
-import { forEach, identity, clone } from '../utils'
+import { forEach, identity, clone, Logger } from '../utils'
+import { Modifier } from './Modifier'
 import version from '../version'
 
 import {
@@ -30,7 +31,8 @@ import {
   UNEXPECTED_ASSOCIATION_ERR,
   TRANSACTION_EXECUTE_FAILED,
   HOOK_EXECUTE_FAILED,
-  INVALID_PATCH_TYPE_ERR
+  INVALID_PATCH_TYPE_ERR,
+  PRIMARY_KEY_NOT_PROVIDED_ERR
 } from './RuntimeError'
 
 export interface SchemaMetadata<T> {
@@ -123,6 +125,25 @@ export type DeepPartial<T> = {
   [K in keyof T]?: Partial<T[K]>
 }
 
+export interface TraverseBuilder {
+  insert: lf.query.Insert[],
+  update: lf.query.Update[],
+  keys?: Set<string>
+}
+
+export enum UpsertOps {
+  insert,
+  update
+}
+
+export interface ExecutorResult {
+  result: boolean
+  insert: number
+  delete: number
+  update: number
+  select: number
+}
+
 export class Database {
   public static version = version
   /**
@@ -170,6 +191,29 @@ export class Database {
     return def
   }
 
+  private static mergeQueriesType(queries: lf.query.Builder[], transactionResult: any[]) {
+    const ret = {
+      insert: 0,
+      update: 0,
+      delete: 0,
+      select: 0
+    }
+
+    queries.forEach((q, index) => {
+      if (q instanceof lf.query.SelectBuilder) {
+        ret.select++
+      } else if (q instanceof lf.query.InsertBuilder) {
+        ret.insert += Array.isArray(transactionResult[index]) ? transactionResult[index].length : 1
+      } else if (q instanceof lf.query.UpdateBuilder) {
+        ret.update++
+      } else if (q instanceof lf.query.DeleteBuilder) {
+        ret.delete++
+      }
+    })
+
+    return ret
+  }
+
   database$: Observable<lf.Database>
 
   private hooks = new Map<string, HooksDef>()
@@ -179,6 +223,7 @@ export class Database {
   private selectMetaData = new Map<string, SelectMetadata>()
   private schemaBuilder: lf.schema.Builder
   private connected = false
+  private storedIds = new Set<string>()
 
   /**
    * 定义数据表的 metadata
@@ -321,6 +366,16 @@ export class Database {
           return tx.exec([db.insertOrReplace()
             .into(table)
             .values(rows)])
+            .then(ret => {
+              const pk = this.primaryKeysMap.get(tableName)
+
+              if (Array.isArray(data)) {
+                data.forEach(item => this.storedIds.add(item[pk]))
+              } else {
+                this.storedIds.add(data[pk])
+              }
+              return ret
+            })
         })
           .catch(e => Promise.reject(HOOK_EXECUTE_FAILED('insert', e)))
           .flatMap(identity)
@@ -465,63 +520,94 @@ export class Database {
           }
         }
 
+        // let hookStream = Observable.of(db)
+        let preparedData: any[] = []
         const hooks = this.hooks.get(tableName)
-        let hookStream = Observable.of(db)
         const query = {
           where: clause.where
         }
 
-        if (hooks.destroy && hooks.destroy.length) {
-          const tx = db.createTransaction()
-          hookStream = this.get(tableName, query)
-            .values()
-            .flatMap(identity)
-            .concatMap(r => Observable.from(hooks.destroy)
+        return this.get(tableName, query).values().do((res) => {
+          preparedData = res.map(r => r[pk])
+        })
+        .flatMap(identity)
+        .concatMap((r) => {
+          if (hooks.destroy && hooks.destroy.length) {
+            const tx = db.createTransaction()
+            return Observable
+              .from(hooks.destroy)
               .map(fn => fn(db, r))
-            )
-            .catch(e => Promise.reject(HOOK_EXECUTE_FAILED('delete', e)))
-            .toArray()
-            .concatMap(r => tx.exec(r))
-            .catch(e => {
-              if (e instanceof ReactiveDBError) {
-                return Promise.reject(e)
-              }
-              return tx.rollback()
-                .then(() => Promise.reject(TRANSACTION_EXECUTE_FAILED(e)))
-            })
-            .mapTo(db)
-        }
-
-        return hookStream.concatMap(() => {
+              .catch(e => Promise.reject(HOOK_EXECUTE_FAILED('delete', e)))
+              .toArray()
+              .concatMap(r2 => tx.exec(r2))
+              .catch(e => {
+                if (e instanceof ReactiveDBError) {
+                  return Promise.reject(e)
+                }
+                return tx.rollback()
+                  .then(() => Promise.reject(TRANSACTION_EXECUTE_FAILED(e)))
+              })
+              .mapTo(db)
+          }
+          return Observable.of(db)
+        })
+        .concatMap(() => {
           const deleteQuery = db.delete().from(table)
           if (predicate) {
             deleteQuery.where(predicate)
           }
-          return deleteQuery.exec()
+
+          return deleteQuery.exec().then(ret => {
+            preparedData.forEach(id => this.storedIds.delete(id))
+            return ret
+          })
         })
       })
   }
 
+  upsert<T>(tableName: string, raw: T): Observable<ExecutorResult>
+
+  upsert<T>(tableName: string, raw: T[]): Observable<ExecutorResult>
+
+  upsert<T>(tableName: string, raw: T | T[]): Observable<ExecutorResult>
+
+  upsert<T>(tableName: string, raw: T | T[]): Observable<ExecutorResult> {
+    return this.database$.concatMap(db => {
+      const sharing = new Map<any, Modifier>()
+      const insertMods: Modifier[] = []
+      const updateMods: Modifier[] = []
+
+      this.traverseData(db, tableName, clone(raw), insertMods, updateMods, sharing)
+
+      const { preparedKeys, insertQueries } = Modifier.concatToInserter(db, insertMods)
+      const updateQueries = updateMods.map((m) => m.toUpdater())
+
+      return this.executor([...insertQueries, ...updateQueries])
+        .do(() => {
+          preparedKeys.forEach(key => this.storedIds.add(key))
+        })
+    })
+  }
+
   dispose() {
-    const disposeQueue: Promise<any>[] = []
+    const queue: Observable<lf.query.Delete>[] = []
 
     this.primaryKeysMap.forEach((_, tableName) => {
-      const deleteQuery = this.database$
-        .concatMap(db => {
-          const [ table ] = Database.getTable(db, tableName)
-          return db.delete().from(table).exec()
-        })
-        .toPromise()
-
-      disposeQueue.push(deleteQuery)
+      queue.push(this.database$.map(db => {
+        const [ table ] = Database.getTable(db, tableName)
+        return db.delete().from(table)
+      }))
     })
 
-    return Promise.all(disposeQueue)
-      .then(() => {
+    return Observable.forkJoin(queue)
+      .concatMap(queries => this.executor(queries))
+      .do(() => {
         this.hooks.forEach(tableHookDef => {
           tableHookDef.insert = []
           tableHookDef.destroy = []
         })
+
+        this.storedIds.clear()
       })
   }
 
@@ -830,7 +916,6 @@ export class Database {
     path: string[] = [],
     context: TraverseContext = {}
   ) {
-
     const tableInfo = this.selectMetaData.get(tableName)
     const allFields = Object.create(null)
     const definition = Object.create(null)
@@ -965,4 +1050,88 @@ export class Database {
 
     return { columns, allFields, joinInfo, advanced, table: currentTable, definition }
   }
+
+  private traverseData(
+    db: lf.Database,
+    tableName: string,
+    data: any,
+    insertMods: Modifier[],
+    updateMods: Modifier[],
+    sharing: Map<string, Modifier> = new Map<string, Modifier>()
+  ) {
+    if (Array.isArray(data)) {
+      data.map((item) =>
+        this.traverseData(db, tableName, item, insertMods, updateMods, sharing))
+    } else {
+      const schema = this.schemaMetaData.get(tableName)
+      const pk = this.primaryKeysMap.get(tableName)
+      const pkVal = data[pk]
+
+      if (pkVal === undefined) {
+        throw PRIMARY_KEY_NOT_PROVIDED_ERR()
+      }
+
+      const [ table ] = Database.getTable(db, tableName)
+      const identifier = `${tableName}@${pkVal}`
+
+      const isTraversed = sharing.has(identifier)
+      const op = (this.storedIds.has(pkVal) || isTraversed) ? UpsertOps.update : UpsertOps.insert
+      const modifier = isTraversed ? sharing.get(identifier) : new Modifier(db, table)
+
+      if (!isTraversed) {
+        sharing.set(identifier, modifier)
+      }
+
+      forEach(data, (val, key) => {
+        if (schema[key] === undefined) {
+          return
+        }
+
+        if (typeof schema[key].virtual === 'object') {
+          this.traverseData(db, schema[key].virtual.name, val, insertMods, updateMods, sharing)
+          return
+        }
+
+        if (key !== pk && table[key]) {
+          if (schema[key].isHidden) {
+            modifier.patch({
+              [key]: schema[key].hiddenMapper(val),
+              [`${Database.__HIDDEN__}${key}`]: val
+            })
+          } else {
+            modifier.patch({ [key]: val })
+          }
+        } else if (key === pk && !isTraversed) {
+          modifier.assignPk(key, val)
+        }
+      })
+
+      if (isTraversed) {
+        return
+      }
+
+      (op === UpsertOps.update ? updateMods : insertMods).push(modifier)
+    }
+  }
+
+  private executor(queries: lf.query.Builder[]) {
+    return this.database$.concatMap(db => {
+      const tx = db.createTransaction()
+      const handler = {
+        error: () => {
+          Logger.warn('Execute failed, transaction is already marked for rollback.')
+        }
+      }
+
+      return Observable.from(tx.exec(queries))
+        .map((ret) => {
+          return {
+            result: true,
+            ...Database.mergeQueriesType(queries, ret)
+          }
+        })
+        .do(handler)
+    })
+  }
+
 }

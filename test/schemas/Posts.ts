@@ -2,7 +2,9 @@ import { Database, RDBType } from '../index'
 
 export interface PostSchema {
   _id: string
-  name: string
+  content: string
+  belongTo: string
+  created: Date
 }
 
 export default (db: Database) => db.defineSchema('Post', {
