@@ -42,8 +42,8 @@ export interface SchemaMetadata<T> {
    * 这里需要定义表名，字段和查询条件
    */
   virtual?: {
-    name?: string
-    where? (virtualTable: TableShape<T>): PredicateDescription<T>
+    name: string
+    where(virtualTable: TableShape<T>): PredicateDescription<T>
   }
   // 被 Database.prototype.createRow 动态挂上去的
   // readonly isHidden?: boolean
