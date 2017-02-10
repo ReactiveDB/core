@@ -97,8 +97,11 @@ export const INVALID_PATCH_TYPE_ERR =
 export const TOKEN_CONSUMED_ERR =
   () => new ReactiveDBError('QueryToken was already consumed.')
 
-export const TOKEN_INVALID_ERR =
-  () => new ReactiveDBError(`Token cannot be combined.`)
+export const TOKEN_CONCAT_ERR =
+  (msg?: string) => {
+    const errMsg = 'Token cannot be concated' + `${ msg ? ' due to: ' + msg : '' }.`
+    return new ReactiveDBError(errMsg)
+  }
 
 /**
  * Warning

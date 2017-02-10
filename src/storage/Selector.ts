@@ -4,7 +4,7 @@ import { Observable } from 'rxjs/Observable'
 import * as lf from 'lovefield'
 import { PredicateProvider } from './PredicateProvider'
 import {
-  TOKEN_INVALID_ERR,
+  TOKEN_CONCAT_ERR,
   TOKEN_CONSUMED_ERR,
   BUILD_PREDICATE_FAILED_WARN
 } from './RuntimeError'
@@ -26,8 +26,27 @@ export interface OrderInfo {
 }
 
 export class Selector <T> {
-  static factory<U>(... metaDatas: Selector<U>[]) {
-    const originalToken = metaDatas[0]
+  static concatFactory<U>(... metaDatas: Selector<U>[]) {
+    const [ meta ] = metaDatas
+    const skips = metaDatas
+      .map(m => m.skip)
+      .sort((x, y) => x - y)
+    const { db, lselect, shape, predicateProvider, limit } = meta
+    const [ minSkip ] = skips
+    if (!skips.every((s, i) => s === limit * i) ) {
+      throw TOKEN_CONCAT_ERR(`
+        skip should be serial,
+        expect:
+        ${ JSON.stringify(skips.map((_, i) => i * limit), null, 2) }, limit = ${ limit }
+        actual:
+        ${ JSON.stringify(skips, null, 2) }
+      `)
+    }
+    return new Selector(db, lselect, shape, predicateProvider, limit * skips.length, minSkip)
+  }
+
+  static combineFactory<U>(... metaDatas: Selector<U>[]) {
+    const [ originalToken ] = metaDatas
     const fakeQuery = { toSql: identity }
     // 初始化一个空的 QuerySelector，然后在初始化以后替换它上面的属性和方法
     const dist = new Selector<U>(originalToken.db, fakeQuery as any, { } as any)
@@ -172,11 +191,19 @@ export class Selector <T> {
   }
 
   combine(... selectMetas: Selector<T>[]): Selector<T> {
-    const isEqual = selectMetas.every(meta => meta.select === this.select)
-    if (!isEqual) {
-      throw TOKEN_INVALID_ERR()
+    return Selector.combineFactory(this, ... selectMetas)
+  }
+
+  concat(... selectMetas: Selector<T>[]): Selector<T> {
+    const equal = selectMetas.every(m =>
+      m.limit === this.limit &&
+      m.select === this.select &&
+      m.predicateProvider.toString() === this.predicateProvider.toString()
+    )
+    if (!equal) {
+      throw TOKEN_CONCAT_ERR()
     }
-    return Selector.factory(this, ... selectMetas)
+    return Selector.concatFactory(this, ... selectMetas)
   }
 
   changes(): Observable<T[]> | never {
