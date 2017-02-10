@@ -22,7 +22,7 @@ interface Fixture {
   folded?: boolean
 }
 
-export default describe('SelectMeta test', () => {
+export default describe('Selector test', () => {
   let db: lf.Database
   let table: lf.schema.Table
   let version = 1
@@ -31,7 +31,7 @@ export default describe('SelectMeta test', () => {
   let storeData: any[]
 
   beforeEach(function * () {
-    const schemaBuilder = lf.schema.create('SelectMetaTest', version ++)
+    const schemaBuilder = lf.schema.create('SelectorTest', version ++)
     const db$ = lfFactory(schemaBuilder, {
       storeType: lf.schema.DataStoreType.MEMORY,
       enableInspector: false
@@ -191,7 +191,7 @@ export default describe('SelectMeta test', () => {
       })
   })
 
-  describe('SelectMeta.prototype.changes', () => {
+  describe('Selector.prototype.changes', () => {
     it('observe should ok', done => {
       const selector = new Selector(db,
         db.select().from(table),
@@ -512,7 +512,7 @@ export default describe('SelectMeta test', () => {
     })
   })
 
-  describe('SelectMeta.prototype.combine', () => {
+  describe('Selector.prototype.combine', () => {
     let selector1: Selector<any>
     let selector2: Selector<any>
     let selector3: Selector<any>
