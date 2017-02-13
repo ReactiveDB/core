@@ -146,7 +146,7 @@ export class PredicateProvider<T> {
   }
 
   private checkPredicate(val: Partial<PredicateMeta<T>> | ValueLiteral) {
-    return typeof val === 'object' &&
+    return val && typeof val === 'object' &&
           !(val instanceof Array) &&
           !(val instanceof RegExp) &&
           !(val instanceof (lf.schema as any).BaseColumn)
