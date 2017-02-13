@@ -43,7 +43,7 @@ export interface SchemaMetadata<T> {
    */
   virtual?: {
     name?: string
-    where?(virtualTable: TableShape<T>): PredicateDescription
+    where? (virtualTable: TableShape<T>): PredicateDescription<T>
   }
   // 被 Database.prototype.createRow 动态挂上去的
   // readonly isHidden?: boolean
@@ -55,7 +55,7 @@ export type TableShape<T> = lf.schema.Table & {
 }
 
 export type SchemaDef<T> = {
-  [P in keyof T]: SchemaMetadata<T>
+  [P in keyof T]: SchemaMetadata<T[P]>
 }
 
 export interface HookDef {
@@ -87,8 +87,8 @@ export interface SelectMetadata {
 
 export type FieldsValue = string | { [index: string]: FieldsValue[] }
 
-export interface ClauseDescription {
-  where?: PredicateDescription
+export interface ClauseDescription<T> {
+  where?: PredicateDescription<T>
 }
 
 export interface OrderDescription {
@@ -96,7 +96,7 @@ export interface OrderDescription {
   orderBy?: 'DESC' | 'ASC'
 }
 
-export interface QueryDescription extends ClauseDescription {
+export interface QueryDescription<T> extends ClauseDescription<T> {
   fields?: FieldsValue[]
   limit?: number
   skip?: number
@@ -116,6 +116,10 @@ export type ShapeMatcher = {
 
 export interface TraverseContext {
   [property: string]: number
+}
+
+export type DeepPartial<T> = {
+  [K in keyof T]?: Partial<T[K]>
 }
 
 export class Database {
@@ -358,7 +362,7 @@ export class Database {
    *   }]
    * }
    */
-  get<T>(tableName: string, query: QueryDescription = {}): QueryToken<T> {
+  get<T>(tableName: string, query: QueryDescription<T> = {}): QueryToken<T> {
     const pk = this.primaryKeysMap.get(tableName)
     if (!pk) {
       throw NON_EXISTENT_TABLE_ERR(tableName)
@@ -370,7 +374,7 @@ export class Database {
     return new QueryToken<T>(selectMeta$)
   }
 
-  update(tableName: string, clause: ClauseDescription, patch: Object) {
+  update<T>(tableName: string, clause: ClauseDescription<T>, patch: Partial<T> | DeepPartial<T>) {
     const selectMetadata = this.selectMetaData.get(tableName)
     const pk = this.primaryKeysMap.get(tableName)
 
@@ -442,7 +446,7 @@ export class Database {
    * 如果没有则直接删除
    * hook 中任意一个执行失败即会回滚，并抛出异常
    */
-  delete<T>(tableName: string, clause: ClauseDescription = {}): Observable<T[]> {
+  delete<T>(tableName: string, clause: ClauseDescription<T> = {}): Observable<T[]> {
     const pk = this.primaryKeysMap.get(tableName)
     if (!pk) {
       return Observable.throw(NON_EXISTENT_TABLE_ERR(tableName))
@@ -731,7 +735,7 @@ export class Database {
   private buildSelector<T>(
     db: lf.Database,
     tableName: string,
-    queryClause: QueryDescription
+    queryClause: QueryDescription<T>
   ) {
     const pk = this.primaryKeysMap.get(tableName)
     const selectMetadata = this.selectMetaData.get(tableName)
