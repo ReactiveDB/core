@@ -10,7 +10,7 @@ import {
   TableShape,
   PredicateProvider,
   TOKEN_CONSUMED_ERR,
-  TOKEN_INVALID_ERR
+  TOKEN_CONCAT_ERR
 } from '../../index'
 
 use(SinonChai)
@@ -22,7 +22,7 @@ interface Fixture {
   folded?: boolean
 }
 
-export default describe('SelectMeta test', () => {
+export default describe('Selector test', () => {
   let db: lf.Database
   let table: lf.schema.Table
   let version = 1
@@ -31,7 +31,7 @@ export default describe('SelectMeta test', () => {
   let storeData: any[]
 
   beforeEach(function * () {
-    const schemaBuilder = lf.schema.create('SelectMetaTest', version ++)
+    const schemaBuilder = lf.schema.create('SelectorTest', version ++)
     const db$ = lfFactory(schemaBuilder, {
       storeType: lf.schema.DataStoreType.MEMORY,
       enableInspector: false
@@ -191,7 +191,7 @@ export default describe('SelectMeta test', () => {
       })
   })
 
-  describe('SelectMeta.prototype.changes', () => {
+  describe('Selector.prototype.changes', () => {
     it('observe should ok', done => {
       const selector = new Selector(db,
         db.select().from(table),
@@ -512,7 +512,7 @@ export default describe('SelectMeta test', () => {
     })
   })
 
-  describe('SelectMeta.prototype.combine', () => {
+  describe('Selector.prototype.combine', () => {
     let selector1: Selector<any>
     let selector2: Selector<any>
     let selector3: Selector<any>
@@ -687,12 +687,187 @@ export default describe('SelectMeta test', () => {
         })
     })
 
-    it('should throw when combine two different SelectMetas', () => {
-      const different = new Selector(db, db.select(table['_id']).from(table), tableShape)
-      const fn = () => dist.combine(different)
-      expect(fn).to.throw(TOKEN_INVALID_ERR().message)
+  })
+
+  describe('Selector.prototype.concat', () => {
+    let selector1: Selector<any>
+    let selector2: Selector<any>
+    let selector3: Selector<any>
+    let selector4: Selector<any>
+    let dist: Selector<any>
+
+    beforeEach(() => {
+      selector1 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } }),
+        20, 0
+      )
+      selector2 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } }),
+        20, 20
+      )
+
+      selector3 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } }),
+        20, 40
+      )
+
+      selector4 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } }),
+        20, 60
+      )
+
+      dist = selector1.concat(selector3, selector4, selector2)
     })
 
+    it('should return SelectMeta', () => {
+      expect(dist).instanceof(Selector)
+    })
+
+    it('result metadata should combine all results', done => {
+      dist.values()
+        .subscribe(r => {
+          expect(r).to.have.lengthOf(80)
+          done()
+        })
+    })
+
+    it('result should be combined', function* () {
+      const result = yield dist.values()
+      const count = 80
+      expect(result).to.have.lengthOf(count)
+      result.forEach((r: any, index: number) => {
+        expect(r).to.deep.equal(storeData[index + 50])
+      })
+    })
+
+    it('changes should observe all values from original Selector', function* () {
+      const changes$ = dist.changes()
+        .publish()
+        .refCount()
+
+      changes$.subscribe()
+
+      const update1 = 'test update name 1'
+      const update2 = 'test update name 2'
+      const update3 = 'test update name 3'
+
+      yield db.update(table)
+        .set(table['name'], update1)
+        .where(table['_id'].eq('_id:51'))
+        .exec()
+
+      yield changes$.take(1)
+        .do(r => expect(r[1].name).equal(update1))
+
+      yield db.update(table)
+        .set(table['name'], update2)
+        .where(table['_id'].eq('_id:55'))
+        .exec()
+
+      yield changes$.take(1)
+        .do(r => expect(r[5].name).equal(update2))
+
+      yield db.update(table)
+        .set(table['name'], update3)
+        .where(table['_id'].eq('_id:125'))
+        .exec()
+
+      yield changes$.take(1)
+        .do(r => expect(r[75].name).equal(update3))
+    })
+
+    it('concat two selector limit not match should throw', () => {
+      const selector5 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } }),
+        20, 0
+      )
+      const selector6 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } }),
+        21, 20
+      )
+
+      const fn = () => selector5.concat(selector6)
+      const error = TOKEN_CONCAT_ERR()
+
+      expect(fn).to.throw(error.message)
+    })
+
+    it('concat two selector predicate not match should throw', () => {
+      const selector5 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20, 0
+      )
+      const selector6 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } }),
+        20, 20
+      )
+
+      const fn = () => selector5.concat(selector6)
+      const error = TOKEN_CONCAT_ERR()
+
+      expect(fn).to.throw(error.message)
+    })
+
+    it('concat two selector select not match should throw', () => {
+      const selector5 = new Selector(db,
+        db.select(table['name']).from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20, 0
+      )
+      const selector6 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20, 20
+      )
+
+      const fn = () => selector5.concat(selector6)
+      const error = TOKEN_CONCAT_ERR()
+
+      expect(fn).to.throw(error.message)
+    })
+
+    it('concat two selector skip not serial should throw', () => {
+      const selector5 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20, 0
+      )
+      const selector6 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20, 40
+      )
+
+      const fn = () => selector5.concat(selector6)
+
+      expect(fn).to.throw(`
+        skip should be serial,
+        expect:
+        ${ JSON.stringify([0, 20], null, 2) }, limit = ${ 20 }
+        actual:
+        ${ JSON.stringify([0, 40], null, 2) }
+      `)
+    })
   })
 
 })

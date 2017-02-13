@@ -113,6 +113,10 @@ export class PredicateProvider<T> {
     }
   }
 
+  toString(): string {
+    return this.getPredicate().toString()
+  }
+
   private normalizeMeta(meta: PredicateDescription<T>, column?: lf.schema.Column) {
     let predicates: lf.Predicate[] = []
     forEach(meta, (val, key) => {

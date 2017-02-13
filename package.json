@@ -15,8 +15,9 @@
     "start": "webpack-dev-server --inline --colors --progress --port 3000  --content-base src",
     "test": "npm run lint && tman --mocha spec-js/test/run.js",
     "version": "ts-node tools/version.ts && git add .",
+    "watch": "ts-node ./tools/watch.ts & npm run watch_test",
     "watch_cjs": "tsc src/index.ts -m commonjs --outDir dist --sourcemap --sourceRoot src --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom -w",
-    "watch_test": "tsc test/run.ts -m commonjs --outDir spec-js --sourcemap  --target ES2015 --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node -w & ts-node ./tools/watch.ts"
+    "watch_test": "tsc test/run.ts -m commonjs --outDir spec-js --sourcemap  --target ES2015 --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node -w"
   },
   "keywords": [
     "lovefield",
