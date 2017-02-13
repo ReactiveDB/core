@@ -128,6 +128,7 @@ export class Selector <T> {
         BUILD_PREDICATE_FAILED_WARN(e, shape.mainTable.getName())
       }
     }
+    skip = limit && !skip ? 0 : skip
     if (limit || skip) {
       const { pk, mainTable } = this.shape
       this.change$ = this.buildPrefetchingObserve()
