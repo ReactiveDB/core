@@ -46,7 +46,7 @@
     "sinon-chai": "^2.8.0",
     "source-map-loader": "^0.1.5",
     "style-loader": "^0.13.1",
-    "tman": "^1.6.4",
+    "tman": "^1.6.6",
     "ts-node": "^2.0.0",
     "tslib": "^1.5.0",
     "tslint": "^4.3.1",
