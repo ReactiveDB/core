@@ -60,6 +60,10 @@ export class Selector <T> {
         .flatMap(identity)
         .reduce((acc: U[], val: U[]) => acc.concat(val))
     }
+    dist.toString = () => {
+      const querys = metaDatas.map(m => m.toString())
+      return JSON.stringify(querys, null, 2)
+    }
     dist.select = originalToken.select
     return dist
   }

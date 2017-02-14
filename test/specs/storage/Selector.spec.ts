@@ -688,6 +688,28 @@ export default describe('Selector test', () => {
         })
     })
 
+    it('combined Selector#toString should return query String', () => {
+      const _selector1 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } })
+      )
+
+      const _selector2 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $lte: 250 } })
+      )
+
+      const selector = _selector1.combine(_selector2)
+
+      const sql = selector.toString()
+
+      expect(sql).to.deep.equal(JSON.stringify([
+        _selector1.toString(),
+        _selector2.toString()
+      ], null, 2))
+    })
   })
 
   describe('Selector.prototype.concat', () => {
