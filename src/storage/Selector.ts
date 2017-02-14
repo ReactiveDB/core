@@ -56,8 +56,7 @@ export class Selector <T> {
       .map((r: U[][]) => r.reduce((acc, val) => acc.concat(val)))
     dist.values = () => {
       return Observable.from(metaDatas)
-        .map(metaData => metaData.values())
-        .flatMap(identity)
+        .flatMap(metaData => metaData.values())
         .reduce((acc: U[], val: U[]) => acc.concat(val))
     }
     dist.toString = () => {
