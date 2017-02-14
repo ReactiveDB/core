@@ -688,6 +688,31 @@ export default describe('Selector test', () => {
         })
     })
 
+    it('reconsume combined Selector should throw', function* () {
+      const _selector1 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } })
+      )
+
+      const _selector2 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $lte: 250 } })
+      )
+
+      const selector = _selector1.combine(_selector2)
+
+      yield selector.values()
+
+      try {
+        yield selector.values()
+        throw 1
+      } catch (e) {
+        expect(e.message).to.equal(TOKEN_CONSUMED_ERR().message)
+      }
+    })
+
     it('combined Selector#toString should return query String', () => {
       const _selector1 = new Selector(db,
         db.select().from(table),

@@ -55,6 +55,10 @@ export class Selector <T> {
       .combineAll()
       .map((r: U[][]) => r.reduce((acc, val) => acc.concat(val)))
     dist.values = () => {
+      if (dist.consumed) {
+        throw TOKEN_CONSUMED_ERR()
+      }
+      dist.consumed = true
       return Observable.from(metaDatas)
         .flatMap(metaData => metaData.values())
         .reduce((acc: U[], val: U[]) => acc.concat(val))
