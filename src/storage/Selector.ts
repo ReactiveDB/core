@@ -55,10 +55,17 @@ export class Selector <T> {
       .combineAll()
       .map((r: U[][]) => r.reduce((acc, val) => acc.concat(val)))
     dist.values = () => {
+      if (dist.consumed) {
+        throw TOKEN_CONSUMED_ERR()
+      }
+      dist.consumed = true
       return Observable.from(metaDatas)
-        .map(metaData => metaData.values())
-        .flatMap(identity)
+        .flatMap(metaData => metaData.values())
         .reduce((acc: U[], val: U[]) => acc.concat(val))
+    }
+    dist.toString = () => {
+      const querys = metaDatas.map(m => m.toString())
+      return JSON.stringify(querys, null, 2)
     }
     dist.select = originalToken.select
     return dist

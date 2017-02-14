@@ -318,6 +318,25 @@ export default describe('PredicateProvider test', () => {
       result.forEach((r: any) => expect(r['time1'] >= dataLength - 50 || r['time1'] < 50).to.be.true)
     })
 
+    it('compoundPredicate should skip null/undefined property', function* () {
+      const predicate = new PredicateProvider(table, {
+        time1: {
+          $or: {
+            $gte: dataLength - 50,
+            $lt: null,
+          }
+        }
+      }).getPredicate()
+
+      const result = yield db.select()
+        .from(table)
+        .where(predicate)
+        .exec()
+
+      expect(result).to.have.lengthOf(50)
+      result.forEach((r: any) => expect(r['time1'] >= dataLength - 50).to.be.true)
+    })
+
     it('complex PredicateDescription should ok', function* () {
       const reg = /\:(\d{0,1}1$)/
       const predicate = new PredicateProvider(table, {

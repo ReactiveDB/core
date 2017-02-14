@@ -9,7 +9,7 @@ export interface PredicateMeta<T> {
   $ne: ValueLiteral
   $eq: ValueLiteral
   $and: PredicateDescription<T>
-  $or: PredicateDescription<T>
+  $or: PredicateDescription<T> | PredicateDescription<T>[]
   $not: PredicateDescription<T>
   $lt: ValueLiteral
   $lte: ValueLiteral
@@ -25,7 +25,7 @@ export interface PredicateMeta<T> {
 }
 
 export type PredicateDescription<T> = {
-  [P in keyof T]?: Partial<PredicateMeta<T>> | ValueLiteral | PredicateDescription<T[P]>
+  [P in keyof T & PredicateMeta<T>]?: Partial<PredicateMeta<T>> | ValueLiteral | PredicateDescription<T[P]>
 }
 
 const predicateFactory = {
@@ -123,7 +123,7 @@ export class PredicateProvider<T> {
       if (this.checkCompound(key)) {
         predicates.push(compoundPredicateFactory[key](this.normalizeMeta(val as PredicateDescription<T>, column)))
       } else if (this.checkPredicate(val)) {
-        predicates = predicates.concat(this.normalizeMeta(val as PredicateDescription<any>, this.table[key]))
+        predicates = predicates.concat(this.normalizeMeta(val as any, this.table[key]))
       } else {
         const _column = column || this.table[key]
         if (!_column) {
@@ -146,7 +146,7 @@ export class PredicateProvider<T> {
   }
 
   private checkPredicate(val: Partial<PredicateMeta<T>> | ValueLiteral) {
-    return typeof val === 'object' &&
+    return val && typeof val === 'object' &&
           !(val instanceof Array) &&
           !(val instanceof RegExp) &&
           !(val instanceof (lf.schema as any).BaseColumn)
