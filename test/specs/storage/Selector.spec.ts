@@ -131,6 +131,7 @@ export default describe('Selector test', () => {
 
     try {
       yield selector.values()
+      throw 1
     } catch (e) {
       expect(e.message).to.equal(TOKEN_CONSUMED_ERR().message)
     }
