@@ -15,5 +15,9 @@ declare module 'lovefield' {
     export interface Select extends lf.query.Builder {
       clone(): lf.query.Select
     }
+    export function InsertBuilder(): lf.query.Insert
+    export function SelectBuilder(): lf.query.Select
+    export function UpdateBuilder(): lf.query.Update
+    export function DeleteBuilder(): lf.query.Delete
   }
 }
