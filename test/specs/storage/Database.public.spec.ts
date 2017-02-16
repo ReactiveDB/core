@@ -269,6 +269,18 @@ export default describe('Database public Method', () => {
         }
       })
 
+      it('should be able to get result correctly with a not exactly right query', function* () {
+        const [ result ] = yield database.get<TaskSchema>('Task', {
+          fields: ['_id', {
+            ['__NON_EXISTENT_FIELD__'] : ['_id']
+          }], where: {
+            _id: taskData._id
+          }
+        }).values()
+
+        expect(result).have.property('_id', taskData._id)
+      })
+
       it('should get current fields when get with query', function* () {
         const [ result ] = yield database.get<TaskSchema>('Task', {
           fields: ['note'], where: {
