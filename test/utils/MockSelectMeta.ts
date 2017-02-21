@@ -15,6 +15,7 @@ export default class MockSelector<T> {
   }
 
   private subject = new ReplaySubject<T[]>(1)
+  private change$ = this.subject
   private datas: T[]
 
   constructor(datas: Map<string, T>) {
@@ -32,11 +33,11 @@ export default class MockSelector<T> {
   }
 
   changes(): Observable<T[]> {
-    return this.subject
+    return this.change$
   }
 
   values () {
-    return this.subject.take(1)
+    return this.change$.take(1)
   }
 
   concat = this.combine
