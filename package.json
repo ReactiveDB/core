@@ -27,7 +27,6 @@
   "license": "MIT",
   "devDependencies": {
     "@types/chai": "^3.4.34",
-    "@types/lovefield": "^2.0.32",
     "@types/node": "^6.0.58",
     "@types/sinon": "^1.16.34",
     "@types/sinon-chai": "^2.7.27",
@@ -57,6 +56,7 @@
     "webpack-dev-server": "^2.3.0"
   },
   "dependencies": {
+    "@types/lovefield": "^2.0.32",
     "lovefield": "2.1.12",
     "nesthydrationjs": "^1.0.0"
   },
