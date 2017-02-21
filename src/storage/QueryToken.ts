@@ -19,6 +19,18 @@ export class QueryToken <T> {
       .flatMap(meta => meta.changes())
   }
 
+  concat(... tokens: QueryToken<T>[]) {
+    tokens.unshift(this)
+    const newMeta$ = Observable.from(tokens)
+      .map(token => token.selectMeta$)
+      .combineAll()
+      .map((r: Selector<T>[]) => {
+        const first = r.shift()
+        return first.concat(...r)
+      })
+    return new QueryToken(newMeta$)
+  }
+
   combine(... tokens: QueryToken<T>[]) {
     tokens.unshift(this)
     const newMeta$ = Observable.from(tokens)

@@ -39,14 +39,15 @@ export default class MockSelector<T> {
     return this.subject.take(1)
   }
 
+  concat = this.combine
+
   combine(... metas: MockSelector<T>[]) {
     metas.unshift(this)
     const dist = new MockSelector(new Map)
     dist.values = () => {
       return Observable.from(metas)
-        .map(meta => meta.values())
-        .combineAll()
-        .map((r: T[][]) => r.reduce((acc, val) => acc.concat(val)))
+        .flatMap(meta => meta.values())
+        .reduce((acc: T[], val: T[]) => acc.concat(val))
     }
 
     dist.changes = () => {

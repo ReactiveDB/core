@@ -124,4 +124,56 @@ export default describe('QueryToken test', () => {
         })
     })
   })
+
+  describe('QueryToken.prototype.concat', () => {
+    let tasks2: TaskSchema[]
+    let mockSelectMeta2: MockSelectMeta<TaskSchema>
+    let queryToken2: QueryToken<TaskSchema>
+    let concated: QueryToken<TaskSchema>
+
+    beforeEach(() => {
+      tasks2 = taskGenerator(25)
+      mockSelectMeta2 = new MockSelectMeta(generateMockTestdata(tasks2))
+      queryToken2 = new QueryToken(Observable.of(mockSelectMeta2) as any)
+      concated = queryToken.concat(queryToken2)
+    })
+
+    it('should return new QueryToken', () => {
+      expect(concated).to.be.instanceof(QueryToken)
+    })
+
+    it('concated.values should return concated values', function* () {
+      const result = yield concated.values()
+      expect(result).to.deep.equal(tasks.concat(tasks2))
+    })
+
+    it('should notified when origin SelectMeta updated', function* () {
+      const source$ = concated.changes()
+        .publishReplay(1)
+        .refCount()
+
+      source$.subscribe()
+
+      const newNote1 = 'test note 1'
+      const newNote2 = 'test note 2'
+
+      MockSelectMeta.update(tasks[0]._id as string, {
+        note: newNote1
+      })
+
+      yield source$.take(1)
+        .do(r => {
+          expect(r[0].note).to.equal(newNote1)
+        })
+
+      MockSelectMeta.update(tasks2[0]._id as string, {
+        note: newNote2
+      })
+
+      yield source$.take(1)
+        .do(r => {
+          expect(r[tasks.length].note).to.equal(newNote2)
+        })
+    })
+  })
 })
