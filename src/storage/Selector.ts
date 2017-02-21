@@ -73,7 +73,7 @@ export class Selector <T> {
 
   public select: string
 
-  private change$: Observable<T[]>
+  public change$: Observable<T[]>
   private consumed = false
   private predicateBuildErr = false
 

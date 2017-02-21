@@ -124,4 +124,133 @@ export default describe('QueryToken test', () => {
         })
     })
   })
+
+  describe('QueryToken.prototype.concat', () => {
+    let tasks2: TaskSchema[]
+    let mockSelectMeta2: MockSelectMeta<TaskSchema>
+    let queryToken2: QueryToken<TaskSchema>
+    let concated: QueryToken<TaskSchema>
+
+    beforeEach(() => {
+      tasks2 = taskGenerator(25)
+      mockSelectMeta2 = new MockSelectMeta(generateMockTestdata(tasks2))
+      queryToken2 = new QueryToken(Observable.of(mockSelectMeta2) as any)
+      concated = queryToken.concat(queryToken2)
+    })
+
+    it('should return new QueryToken', () => {
+      expect(concated).to.be.instanceof(QueryToken)
+    })
+
+    it('concated.values should return concated values', function* () {
+      const result = yield concated.values()
+      expect(result).to.deep.equal(tasks.concat(tasks2))
+    })
+
+    it('should notified when origin SelectMeta updated', function* () {
+      const source$ = concated.changes()
+        .publishReplay(1)
+        .refCount()
+
+      source$.subscribe()
+
+      const newNote1 = 'test note 1'
+      const newNote2 = 'test note 2'
+
+      MockSelectMeta.update(tasks[0]._id as string, {
+        note: newNote1
+      })
+
+      yield source$.take(1)
+        .do(r => {
+          expect(r[0].note).to.equal(newNote1)
+        })
+
+      MockSelectMeta.update(tasks2[0]._id as string, {
+        note: newNote2
+      })
+
+      yield source$.take(1)
+        .do(r => {
+          expect(r[tasks.length].note).to.equal(newNote2)
+        })
+    })
+  })
+
+  describe('QueryToken.prototype.map', () => {
+    it('should replace values', function* () {
+      const q1 = queryToken.map((_: any) => 1)
+
+      yield q1.values()
+        .do(r => {
+          r.forEach(v => expect(v).to.equal(1))
+        })
+    })
+
+    it('should replace changes', function* () {
+      const q2 = queryToken.map((_: any) => 2)
+
+      const signal = q2.changes()
+        .publish()
+        .refCount()
+
+      yield signal.take(1)
+        .do(r => {
+          r.forEach(v => expect(v).to.equal(2))
+        })
+
+      MockSelectMeta.update(tasks[0]._id as string, {
+        note: 'new note'
+      })
+
+      yield signal.take(1)
+        .do(r => {
+          r.forEach(v => expect(v).to.equal(2))
+        })
+    })
+
+    it('combined QueryToken#values should be replace', function* () {
+      const tasks1 = taskGenerator(25)
+      const mockSelectMeta1 = new MockSelectMeta(generateMockTestdata(tasks1))
+      const queryToken1 = new QueryToken(Observable.of(mockSelectMeta1) as any)
+
+      const q3 = queryToken1.map((_: any) => 3)
+
+      const distToken = q3.combine(queryToken1)
+      yield distToken.values()
+        .do(r => {
+          r.splice(25, 50)
+            .forEach(v => expect(v).to.equal(3))
+        })
+    })
+
+    it('combined QueryToken#changes should be replace', function* () {
+      const tasks1 = taskGenerator(25)
+      const mockSelectMeta1 = new MockSelectMeta(generateMockTestdata(tasks1))
+      const queryToken1 = new QueryToken(Observable.of(mockSelectMeta1) as any)
+
+      const q4 = queryToken1.map((_: any) => 4)
+
+      const distToken = q4.combine(queryToken1)
+      const signal = distToken.changes()
+        .publish()
+        .refCount()
+
+      yield signal.take(1)
+        .do(r => {
+          r.splice(25, 50)
+            .forEach(v => expect(v).to.equal(4))
+      })
+
+      MockSelectMeta.update(tasks1[0]._id as string, {
+        note: 'new note'
+      })
+
+      yield signal.take(1)
+        .do(r => {
+          r.splice(25, 50)
+            .forEach(v => expect(v).to.equal(4))
+      })
+    })
+  })
 })
