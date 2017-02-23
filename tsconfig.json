@@ -19,7 +19,8 @@
   "exclude": [
     "node_modules",
     "tools/build",
-    "dist"
+    "dist",
+    "coverage"
   ],
   "compileOnSave": false,
   "awesomeTypescriptLoaderOptions": {

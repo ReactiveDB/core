@@ -1,19 +1,24 @@
 const webpack = require('webpack')
 const path = require('path')
+const os = require('os')
 const ExtractTextPlugin = require('extract-text-webpack-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
+const HappyPack = require('happypack')
+const { CheckerPlugin } = require('awesome-typescript-loader')
+
+const happyThreadPool = HappyPack.ThreadPool({ size: os.cpus().length })
 
 // Webpack Config
 module.exports = {
   entry: {
     'main': './test/e2e/app.ts',
-    'vendor': [ 'lovefield', 'rxjs', 'sinon', 'tman', 'tslib' ]
+    'vendor': [ 'lovefield', 'rxjs', 'sinon', 'tman', 'chai', 'sinon-chai', 'tslib' ]
   },
   devtool: 'cheap-module-source-map',
   cache: true,
   output: {
     filename: '[name].js',
-    path: path.resolve(__dirname, 'dist'),
+    path: path.join(__dirname, 'dist'),
     publicPath: '/'
   },
 
@@ -38,8 +43,6 @@ module.exports = {
     publicPath: '/',
     // match the output `publicPath`
 
-    historyApiFallback: true,
-
     watchOptions: { aggregateTimeout: 300, poll: 1000 },
   },
 
@@ -48,6 +51,7 @@ module.exports = {
   },
 
   plugins: [
+    new CheckerPlugin(),
     new webpack.LoaderOptionsPlugin({
       debug: true
     }),
@@ -64,6 +68,23 @@ module.exports = {
       'process.env': {
         NODE_ENV: JSON.stringify('development')
       }
+    }),
+    new HappyPack({
+      id: 'css',
+      loaders: [ 'style-loader', 'css-loader' ],
+      threadPool: happyThreadPool
+    }),
+
+    new HappyPack({
+      id: 'sourceMap',
+      loaders: [ 'source-map-loader' ],
+      threadPool: happyThreadPool
+    }),
+
+    new HappyPack({
+      id: 'raw',
+      loaders: ['raw-loader'],
+      threadPool: happyThreadPool
     })
   ],
 
@@ -79,15 +100,16 @@ module.exports = {
       {
         test: /\.js$/,
         enforce: 'pre',
-        loader: 'source-map-loader', include: /rxjs/
+        loader: 'happypack/loader?id=sourceMap',
+        include: /rxjs/
       },
       {
         test: /\.ts$/,
         use: 'awesome-typescript-loader',
         exclude: /node_modules/
       },
-      { test: /\.css$/, use: ExtractTextPlugin.extract({ fallback: 'style-loader', use: 'css-loader'}) },
-      { test: /\.html$/, use: 'raw-loader' }
+      { test: /\.css$/, use: 'happypack/loader?id=css' },
+      { test: /\.html$/, use: 'happypack/loader?id=raw' }
     ]
   }
 }
