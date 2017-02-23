@@ -204,7 +204,6 @@ export class Selector <T> {
 
   concat(... selectMetas: Selector<T>[]): Selector<T> {
     const equal = selectMetas.every(m =>
-      m.limit === this.limit &&
       m.select === this.select &&
       m.predicateProvider.toString() === this.predicateProvider.toString()
     )
