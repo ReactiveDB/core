@@ -27,7 +27,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/chai": "^3.4.34",
-    "@types/node": "^6.0.58",
+    "@types/node": "^7.0.5",
     "@types/sinon": "^1.16.34",
     "@types/sinon-chai": "^2.7.27",
     "awesome-typescript-loader": "^3.0.2",
@@ -52,7 +52,7 @@
     "tslint": "^4.3.1",
     "tslint-eslint-rules": "^3.2.3",
     "tslint-loader": "^3.3.0",
-    "typescript": "^2.1.5",
+    "typescript": "^2.2.1",
     "webpack": "^2.2.1",
     "webpack-dev-server": "^2.3.0"
   },

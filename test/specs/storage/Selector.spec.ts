@@ -837,19 +837,18 @@ export default describe('Selector test', () => {
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gte: 50 } }),
-        20, 0
+        10, 0
       )
       const selector6 = new Selector(db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gte: 50 } }),
-        21, 20
+        20, 11
       )
 
       const fn = () => selector5.concat(selector6)
-      const error = TOKEN_CONCAT_ERR()
 
-      expect(fn).to.throw(error.message)
+      expect(fn).to.throw()
     })
 
     it('concat two selector predicate not match should throw', () => {
