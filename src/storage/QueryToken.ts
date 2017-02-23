@@ -10,7 +10,7 @@ export class QueryToken<T> {
   }
 
   map<K>(fn: (val: T, index?: number) => K) {
-    return new QueryToken<K>(this.selectMeta$.do((selector: Selector<any>) => {
+    return new QueryToken<K>((this.selectMeta$ as Observable<Selector<any>>).do((selector) => {
       const previousValues = selector.values
       const previousChange$ = selector.change$
 
