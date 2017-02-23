@@ -1,8 +1,6 @@
 import { Observable } from 'rxjs/Observable'
 import { Selector } from './Selector'
 
-export type Mapper = <K, V>(v: K) => V
-
 export class QueryToken<T> {
   selectMeta$: Observable<Selector<T>>
 
@@ -11,15 +9,15 @@ export class QueryToken<T> {
       .refCount()
   }
 
-  map(fn: Mapper) {
-    return new QueryToken(this.selectMeta$.do(selector => {
+  map<K>(fn: (val: T, index?: number) => K) {
+    return new QueryToken<K>(this.selectMeta$.do((selector: Selector<any>) => {
       const previousValues = selector.values
       const previousChange$ = selector.change$
 
       selector.change$ = previousChange$
-        .map((val: any[]) => val.map(fn))
+        .map((val: T[]) => val.map(fn))
       selector.values = () => previousValues.call(selector)
-        .map((val: any[]) => val.map(fn))
+        .map((val: T[]) => val.map(fn))
     }))
   }
 
