@@ -24,7 +24,7 @@ ReactiveDB 由下面几个部分组成:
     - CRUD Method
     - QueryToken (src/storage/QueryToken.ts)
       - SelectMeta (src/storage/SelectMeta.ts)
-- [WIP] Query Engine (~~src/storage/QueryEngine.ts~~)
+- Query Engine
   - PredicateProvider (src/storage/PredicateProvider.ts)
   - Type Definition (src/storage/DataType.ts)
 

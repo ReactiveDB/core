@@ -13,6 +13,7 @@
     "cover": "rm -rf ./.nyc_output ./coverage && NODE_ENV=test nyc --reporter=html --reporter=lcov --exclude=node_modules --exclude=spec-js/test --exclude=spec-js/src/storage/lovefield.js --exclude=spec-js/src/utils/logger.js tman --mocha spec-js/test/run.js",
     "lint": "tslint -c tslint.json src/*.ts src/**/*.ts src/**/**/*.ts ./test/*.ts ./test/**/*.ts ./test/**/**/*.ts !./test/e2e/*.ts",
     "start": "webpack-dev-server --inline --colors --progress --port 3000",
+    "start-demo": "webpack-dev-server --config ./example/webpack.config.js --inline --colors --progress --port 3001 --open",
     "test": "npm run lint && NODE_ENV=test tman --mocha spec-js/test/run.js",
     "version": "ts-node tools/version.ts && git add .",
     "watch": "NODE_ENV=test ts-node ./tools/watch.ts & npm run watch_test",

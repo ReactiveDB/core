@@ -11,21 +11,23 @@
     "noUnusedLocals": true,
     "noImplicitReturns": true,
     "noUnusedParameters": true,
+    "baseUrl": "../",
+    "paths": {
+      "*": [
+        "*"
+      ],
+      "reactivedb": [ "./dist/cjs" ]
+    },
     "allowJs": true,
     "typeRoots": [
-      "node_modules/@types"
+      "../node_modules/@types"
     ]
   },
   "exclude": [
-    "node_modules",
-    "tools/build",
-    "dist",
-    "coverage",
-    "example"
+    "node_modules"
   ],
   "compileOnSave": false,
   "awesomeTypescriptLoaderOptions": {
-    "useTranspileModule": true,
     "useCache": true
   }
 }

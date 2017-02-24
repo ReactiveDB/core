@@ -1,0 +1,32 @@
+{
+  "name": "reactivedb-expmple",
+  "version": "0.7.0",
+  "description": "Example for ReactiveDB",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/teambition/ReactiveDB.git"
+  },
+  "keywords": [
+    "ReactiveDB",
+    "RxJS",
+    "Lovefield"
+  ],
+  "author": "lynweklm@gmail.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/teambition/ReactiveDB/issues"
+  },
+  "homepage": "https://github.com/teambition/ReactiveDB#readme",
+  "dependencies": {
+    "antd": "^2.7.3",
+    "react": "^15.4.2",
+    "react-dom": "^15.4.2"
+  },
+  "devDependencies": {
+    "typescript": "^2.2.1"
+  }
+}
