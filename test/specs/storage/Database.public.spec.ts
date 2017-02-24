@@ -1,3 +1,4 @@
+import * as lf from 'lovefield'
 import { Observable } from 'rxjs/Observable'
 import * as moment from 'moment'
 import { describe, it, beforeEach, afterEach } from 'tman'
@@ -32,12 +33,11 @@ import { TestFixture, TestFixture2 } from '../../schemas/Test'
 export default describe('Database public Method', () => {
 
   let database: Database
-
-  const originMetaData = Database['schemaMetaData']
+  let version = 0
 
   beforeEach(() => {
-    Database['schemaMetaData'] = originMetaData
-    database = new Database()
+    version ++
+    database = new Database(lf.schema.DataStoreType.MEMORY, false, `test:${version}`, version)
     schemaFactory(database)
     database.connect()
   })
@@ -56,12 +56,8 @@ export default describe('Database public Method', () => {
       expect(database.database$).to.be.instanceof(Observable)
       yield database.database$
         .do(db => {
-          expect(db.getSchema().name()).to.equal('ReactiveDB')
+          expect(db.getSchema().name()).to.equal('test:2')
         })
-    })
-
-    it('should delete schemaMetaData property on Database', () => {
-      expect(Database['schemaMetaData']).to.be.undefined
     })
 
     it('should store primaryKeys in primaryKeysMap', () => {
@@ -69,7 +65,7 @@ export default describe('Database public Method', () => {
     })
 
     it('should store selectMetaData', () => {
-      const taskSelectMetaData = database['selectMetaData'].get('Task')
+      const taskSelectMetaData = (database as any).selectMetaData.get('Task')
 
       expect(taskSelectMetaData.fields).to.deep.equal(new Set(['_id', 'content', 'note', '_projectId']))
       expect(taskSelectMetaData.virtualMeta.get('project').name).to.equal('Project')
@@ -89,10 +85,6 @@ export default describe('Database public Method', () => {
     })
 
     it('should throw when association is unexpected, should be one of oneToOne, oneToMany, manyToMany', () => {
-      const meta = Database['schemaMetaData']
-      const hooks = Database['hooks']
-
-      Database['schemaMetaData'] = new Map()
       TestFixture()
 
       const standardErr = UNEXPECTED_ASSOCIATION_ERR()
@@ -101,9 +93,6 @@ export default describe('Database public Method', () => {
         new Database()
       } catch (err) {
         expect(err.message).to.equal(standardErr.message)
-      } finally {
-        Database['schemaMetaData'] = meta
-        Database['hooks'] = hooks
       }
     })
 
@@ -934,7 +923,7 @@ export default describe('Database public Method', () => {
       checkExecutorResult(execRet2, 1, 0, 2)
     })
 
-    it.skip('should throw when try to upsert an entry without PK property', function* () {
+    it('should throw when try to upsert an entry without PK property', function* () {
       const post = postGenerator(1, null).pop()
       const standardErr = PRIMARY_KEY_NOT_PROVIDED_ERR()
 
@@ -946,8 +935,6 @@ export default describe('Database public Method', () => {
       } catch (e) {
         expect(standardErr.message).to.equal(standardErr.message)
       }
-
-      yield database.dispose()
     })
 
   })

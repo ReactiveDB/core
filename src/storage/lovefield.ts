@@ -1,5 +1,6 @@
 import * as lf from 'lovefield'
 import { Observable } from 'rxjs/Observable'
+import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable'
 import { ReplaySubject } from 'rxjs/ReplaySubject'
 import { Observer } from 'rxjs/Observer'
 
@@ -16,7 +17,7 @@ function onUpgrade (rawDb: lf.raw.BackStore) {
   return Promise.resolve()
 }
 
-export const lfFactory = (schemaBuilder: lf.schema.Builder, config: LfFactoryInit): Observable<lf.Database> => {
+export const lfFactory = (schemaBuilder: lf.schema.Builder, config: LfFactoryInit): ConnectableObservable<lf.Database> => {
   return Observable.create((observer: Observer<lf.Database>) => {
     (config as any).onUpgrade = onUpgrade
     schemaBuilder.connect(config)
@@ -27,5 +28,4 @@ export const lfFactory = (schemaBuilder: lf.schema.Builder, config: LfFactoryIni
       .catch(e => observer.error(e))
   })
     .publishReplay(1)
-    .refCount()
 }

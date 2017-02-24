@@ -13,13 +13,14 @@ import {
 
 export default describe('Database Method before Connect', () => {
 
-  let tablename = 'TestTable0'
+  let dbname = 'TestDatabase0'
+  const tablename = 'TestTable'
   let i = 1
   let database: Database
 
   beforeEach(() => {
-    tablename = `TestTable${i++}`
-    database = new Database()
+    dbname = `TestDatabase${i++}`
+    database = new Database(lf.schema.DataStoreType.MEMORY, false, dbname, i)
   })
 
   describe('Database.prototype.defineSchema', () => {

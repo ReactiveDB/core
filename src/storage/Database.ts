@@ -1,5 +1,7 @@
 import './RxOperator'
 import { Observable } from 'rxjs/Observable'
+import { Subscription } from 'rxjs/Subscription'
+import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable'
 import * as lf from 'lovefield'
 import { lfFactory } from './lovefield'
 import { RDBType, Association } from './DataType'
@@ -214,7 +216,7 @@ export class Database {
     return ret
   }
 
-  database$: Observable<lf.Database>
+  database$: ConnectableObservable<lf.Database>
 
   private hooks = new Map<string, HooksDef>()
   private schemaMetaData = new Map<string, SchemaDef<any>>()
@@ -224,6 +226,7 @@ export class Database {
   private schemaBuilder: lf.schema.Builder
   private connected = false
   private storedIds = new Set<string>()
+  private subscription: Subscription
 
   /**
    * 定义数据表的 metadata
@@ -305,6 +308,7 @@ export class Database {
   connect() {
     this.buildTables(this.schemaBuilder)
     this.connected = true
+    this.subscription = this.database$.connect()
   }
 
   insert<T>(tableName: string, raw: T[]): Observable<T[]>
@@ -590,13 +594,9 @@ export class Database {
   }
 
   dispose() {
-    const queue: Observable<lf.query.Delete>[] = []
-
-    this.primaryKeysMap.forEach((_, tableName) => {
-      queue.push(this.database$.map(db => {
-        const [ table ] = Database.getTable(db, tableName)
-        return db.delete().from(table)
-      }))
+    const queue = this.database$.flatMap(db => {
+      const tables = db.getSchema().tables()
+      return tables.map(t => db.delete().from(t))
     })
 
     return Observable.forkJoin(queue)
@@ -608,6 +608,11 @@ export class Database {
         })
 
         this.storedIds.clear()
+      })
+      .concatMapTo(this.database$)
+      .do(db => {
+        db.close()
+        this.subscription.unsubscribe()
       })
   }
 
