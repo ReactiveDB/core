@@ -1,4 +1,4 @@
-export { Database } from '../src/storage/Database'
+export { Database, ExecutorResult } from '../src/storage/Database'
 export * from '../src/storage/DataType'
 export * from '../src/storage/PredicateProvider'
 export * from '../src/storage/QueryToken'

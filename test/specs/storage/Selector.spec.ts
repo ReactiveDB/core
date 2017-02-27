@@ -44,6 +44,8 @@ export default describe('Selector test', () => {
       .addColumn('priority', lf.Type.NUMBER)
       .addPrimaryKey(['_id'])
 
+    db$.connect()
+
     yield db$.do(r => {
       db = r
       table = db.getSchema().table('TestSelectMetadata')

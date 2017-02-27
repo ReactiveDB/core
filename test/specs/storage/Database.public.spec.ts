@@ -1,3 +1,4 @@
+import * as lf from 'lovefield'
 import { Observable } from 'rxjs/Observable'
 import * as moment from 'moment'
 import { describe, it, beforeEach, afterEach } from 'tman'
@@ -8,6 +9,10 @@ import {
   ProjectSchema,
   SubtaskSchema,
   TaskSchema,
+  PostSchema,
+  ProgramSchema,
+  ModuleSchema,
+  ExecutorResult,
   clone,
   INVALID_FIELD_DES_ERR,
   HOOK_EXECUTE_FAILED,
@@ -15,23 +20,24 @@ import {
   ALIAS_CONFLICT_ERR,
   UNEXPECTED_ASSOCIATION_ERR,
   INVALID_ROW_TYPE_ERR,
-  INVALID_PATCH_TYPE_ERR
+  INVALID_PATCH_TYPE_ERR,
+  PRIMARY_KEY_NOT_PROVIDED_ERR
 } from '../../index'
 import { uuid } from '../../utils/uuid'
 import taskGenerator from '../../utils/taskGenerator'
-import relationalDataGenerator from '../../utils/relationalDataGenerator'
+import postGenerator from '../../utils/postGenerator'
+import { default as relationalDataGenerator, ProgramGenerator } from '../../utils/relationalDataGenerator'
 import schemaFactory from '../../schemas'
 import { TestFixture, TestFixture2 } from '../../schemas/Test'
 
 export default describe('Database public Method', () => {
 
   let database: Database
-
-  const originMetaData = Database['schemaMetaData']
+  let version = 0
 
   beforeEach(() => {
-    Database['schemaMetaData'] = originMetaData
-    database = new Database()
+    version ++
+    database = new Database(lf.schema.DataStoreType.MEMORY, false, `test:${version}`, version)
     schemaFactory(database)
     database.connect()
   })
@@ -50,12 +56,8 @@ export default describe('Database public Method', () => {
       expect(database.database$).to.be.instanceof(Observable)
       yield database.database$
         .do(db => {
-          expect(db.getSchema().name()).to.equal('ReactiveDB')
+          expect(db.getSchema().name()).to.equal('test:2')
         })
-    })
-
-    it('should delete schemaMetaData property on Database', () => {
-      expect(Database['schemaMetaData']).to.be.undefined
     })
 
     it('should store primaryKeys in primaryKeysMap', () => {
@@ -63,7 +65,7 @@ export default describe('Database public Method', () => {
     })
 
     it('should store selectMetaData', () => {
-      const taskSelectMetaData = database['selectMetaData'].get('Task')
+      const taskSelectMetaData = (database as any).selectMetaData.get('Task')
 
       expect(taskSelectMetaData.fields).to.deep.equal(new Set(['_id', 'content', 'note', '_projectId']))
       expect(taskSelectMetaData.virtualMeta.get('project').name).to.equal('Project')
@@ -83,10 +85,6 @@ export default describe('Database public Method', () => {
     })
 
     it('should throw when association is unexpected, should be one of oneToOne, oneToMany, manyToMany', () => {
-      const meta = Database['schemaMetaData']
-      const hooks = Database['hooks']
-
-      Database['schemaMetaData'] = new Map()
       TestFixture()
 
       const standardErr = UNEXPECTED_ASSOCIATION_ERR()
@@ -95,9 +93,6 @@ export default describe('Database public Method', () => {
         new Database()
       } catch (err) {
         expect(err.message).to.equal(standardErr.message)
-      } finally {
-        Database['schemaMetaData'] = meta
-        Database['hooks'] = hooks
       }
     })
 
@@ -261,6 +256,18 @@ export default describe('Database public Method', () => {
           const standardErr = NON_EXISTENT_TABLE_ERR(tableName)
           expect(e.message).equals(standardErr.message)
         }
+      })
+
+      it('should be able to get result correctly with a not exactly right query', function* () {
+        const [ result ] = yield database.get<TaskSchema>('Task', {
+          fields: ['_id', {
+            ['__NON_EXISTENT_FIELD__'] : ['_id']
+          }], where: {
+            _id: taskData._id
+          }
+        }).values()
+
+        expect(result).have.property('_id', taskData._id)
       })
 
       it('should get current fields when get with query', function* () {
@@ -697,6 +704,239 @@ export default describe('Database public Method', () => {
         expect(error.message).to.equal(err.message)
       }
     })
+  })
+
+  describe('Database.protototype.upsert', () => {
+
+    afterEach(() => {
+      database.dispose()
+    })
+
+    const checkExecutorResult =
+      function (result: ExecutorResult, insertCount: number = 0, deleteCount: number = 0, updateCount: number = 0, selectCount: number = 0) {
+        expect(result.result).to.equal(true)
+        expect(result).have.property('insert', insertCount)
+        expect(result).have.property('delete', deleteCount)
+        expect(result).have.property('select', selectCount)
+        expect(result).have.property('update', updateCount)
+      }
+
+    it('should be able to upsert single record', function* () {
+      const post = postGenerator(1, null).pop()
+      const execRet = yield database.upsert('Post', post)
+
+      const [ ret ] = yield database.get<PostSchema>('Post', {
+        where: {
+          _id: post._id
+        }
+      }).values()
+
+      expect(ret).to.deep.equal(post)
+      checkExecutorResult(execRet, 1)
+    })
+
+    it('should be able to upsert multi records', function* () {
+      const posts: PostSchema[] = postGenerator(10, null)
+      const execRet = yield database.upsert<PostSchema>('Post', posts)
+
+      const rets = yield database.get<PostSchema>('Post', {
+        where: {
+          _id: {
+            $in: posts.map(p => p._id)
+          }
+        }
+      }).values()
+
+      expect(posts).to.deep.equal(rets)
+      checkExecutorResult(execRet, 10)
+    })
+
+    it('should be able to upsert single record with its association property', function* () {
+      const programCount = 1
+      const moduleCount = 1
+
+      const program = ProgramGenerator(programCount, moduleCount).pop()
+      const execRet = yield database.upsert<ProgramSchema>('Program', program)
+
+      const [ ret ] = yield database.get<ProgramSchema>('Program', {
+        where: {
+          _id: program._id
+        }
+      }).values()
+
+      expect(ret).to.deep.equal(program)
+      checkExecutorResult(execRet, programCount + (moduleCount * 2))
+    })
+
+    it('should be able to upsert multi records with their association property', function* () {
+      const programCount = 2
+      const moduleCount = 8
+
+      const programs = ProgramGenerator(programCount, moduleCount)
+      const execRet = yield database.upsert<ProgramSchema>('Program', programs)
+
+      const rets = yield database.get<ProgramSchema>('Program', {
+        where: {
+          _id: {
+            $in: programs.map(p => p._id)
+          }
+        }
+      }).values()
+
+      expect(programs).to.deep.equal(rets)
+      checkExecutorResult(execRet, programCount + moduleCount * 2)
+    })
+
+    it('should be merge duplicated record which have same id [1]', function* () {
+      const programCount = 1
+      const moduleCount = 1
+
+      const program = ProgramGenerator(programCount, moduleCount).pop()
+      const programs = [program, program]
+      const execRet = yield database.upsert<ProgramSchema>('Program', programs)
+
+      const [ ret ] = yield database.get<ProgramSchema>('Program', {
+        where: {
+          _id: program._id
+        }
+      }).values()
+
+      const rows = programs.length * (programCount + (moduleCount * 2))
+
+      expect(ret).to.deep.equal(program)
+      checkExecutorResult(execRet, rows / 2)
+    })
+
+    it('should be merge duplicated record which have same id [2]', function* () {
+      const programCount = 1
+      const moduleCount = 1
+
+      const program = ProgramGenerator(programCount, moduleCount).pop()
+      const programs = [program, { ...program, ownerId: 'foo' }]
+      const execRet = yield database.upsert<ProgramSchema>('Program', programs)
+
+      const [ ret ] = yield database.get<ProgramSchema>('Program', {
+        where: {
+          _id: program._id
+        }
+      }).values()
+
+      const rows = programs.length * (programCount + (moduleCount * 2))
+
+      expect(ret).to.deep.equal({ ...program, ownerId: 'foo', owner: null })
+      checkExecutorResult(execRet, rows / 2)
+    })
+
+    it('should be able to handle the record which is already be stored correctly', function* () {
+      const programCount = 1
+      const moduleCount = 1
+
+      const program = ProgramGenerator(programCount, moduleCount).pop()
+      yield database.upsert<ProgramSchema>('Program', program)
+
+      const execRet = yield database.upsert<ProgramSchema>('Program', program)
+
+      const [ ret ] = yield database.get<ProgramSchema>('Program', {
+        where: {
+          _id: program._id
+        }
+      }).values()
+
+      expect(ret).to.deep.equal(program)
+      checkExecutorResult(execRet, 0, 0, programCount + moduleCount * 2)
+    })
+
+    it('should be able to handle the records which contained duplicated association property correctly', function* () {
+      const programCount = 1
+      const moduleCount = 1
+
+      const program1 = ProgramGenerator(programCount, moduleCount).pop()
+      const program2 = ProgramGenerator(programCount, moduleCount).pop()
+
+      program2.modules = program1.modules
+
+      const execRet = yield database.upsert<ProgramSchema>('Program', [program1, program2])
+
+      const rets = yield database.get<ProgramSchema>('Program', {
+        where: {
+          _id: {
+            $in: [program1._id, program2._id]
+          }
+        }
+      }).values()
+
+      expect(rets).to.deep.equal([program1, { ...program2, modules: [] }])
+      checkExecutorResult(execRet, programCount * 2 + 1 + moduleCount * 2)
+    })
+
+    it('should use `update` to handle the record which is already stored', function* () {
+      const programCount = 2
+      const moduleCount = 4
+
+      const program1 = ProgramGenerator(programCount, moduleCount).pop()
+      const program2 = ProgramGenerator(programCount, moduleCount).pop()
+
+      yield database.upsert<ProgramSchema>('Program', program1)
+
+      const [ mod ] = program1.modules
+      program2.modules = [
+        {
+          _id: (mod as any)._id,
+          name: 'foo'
+        }
+      ]
+
+      const execRet = yield database.upsert<ProgramSchema>('Program', program2)
+
+      const [ ret ] = yield database.get<ModuleSchema>('Module', {
+        where: {
+          _id: (mod as any)._id
+        },
+        fields: ['_id', 'name', 'ownerId', 'parentId', {
+          programmer: ['_id', 'name']
+        }]
+      }).values()
+
+      expect(ret).to.deep.equal({ ...mod, name: 'foo' })
+      checkExecutorResult(execRet, 1 + 1, 0, 1)
+    })
+
+    // should handle the storedId correctly when Insert/Upsert/Delete records
+    it('should be able to operate thin cache layer correctly after operation: [Inser/Upsert/Delete]', function* () {
+      const programCount = 1
+      const moduleCount = 1
+
+      const program1 = ProgramGenerator(programCount, moduleCount).pop()
+      yield database.insert<ProgramSchema>('Program', program1)
+
+      const execRet1 = yield database.upsert<ProgramSchema>('Program', program1)
+
+      yield database.delete<ProgramSchema>('Program', {
+        where: {
+          _id: program1._id
+        }
+      })
+
+      const execRet2 = yield database.upsert<ProgramSchema>('Program', program1)
+
+      checkExecutorResult(execRet1, 0, 0, 1 + 1 * 2)
+      checkExecutorResult(execRet2, 1, 0, 2)
+    })
+
+    it('should throw when try to upsert an entry without PK property', function* () {
+      const post = postGenerator(1, null).pop()
+      const standardErr = PRIMARY_KEY_NOT_PROVIDED_ERR()
+
+      delete post._id
+
+      try {
+        yield database.upsert<PostSchema>('Post', {} as any)
+        throw 1
+      } catch (e) {
+        expect(standardErr.message).to.equal(standardErr.message)
+      }
+    })
+
   })
 
   describe('Query relational data', () => {

@@ -10,6 +10,6 @@ export function randomNumber(from: number, to: number) {
   return parseInt(from as any) + Math.ceil( Math.random() * (to - from) )
 }
 
-export function randomString(length: number = 5) {
+export function randomString(length: number = 10) {
   return Math.random().toString(36).substr(2, length)
 }

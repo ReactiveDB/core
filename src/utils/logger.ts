@@ -2,7 +2,8 @@ export enum Level {
   debug = 10,
   info = 20,
   warning = 30,
-  error = 40
+  error = 40,
+  test = 1000
 }
 
 export type Formatter = (name: string, level: Level, message: string) => string
@@ -96,8 +97,16 @@ export class Logger {
 }
 
 const envifyLevel = () => {
-  const isProduction = (process && process.env && process.env.NODE_ENV) === 'production'
-  return isProduction ? Level.error : Level.debug
+  const env = (process && process.env && process.env.NODE_ENV) || 'production'
+
+  switch (env) {
+    case 'production':
+      return Level.error
+    case 'test':
+      return Level.test
+    default:
+      return Level.debug
+  }
 }
 
 Logger.setLevel(envifyLevel())

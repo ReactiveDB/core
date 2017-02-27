@@ -54,8 +54,7 @@ export default (db: Database) => {
       type: RDBType.STRING
     },
     content: {
-      type: RDBType.STRING,
-      unique: true
+      type: RDBType.STRING
     },
     note: {
       type: RDBType.STRING

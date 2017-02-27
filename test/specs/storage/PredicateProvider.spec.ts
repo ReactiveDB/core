@@ -24,6 +24,8 @@ export default describe('PredicateProvider test', () => {
       .addColumn('nullable', lf.Type.BOOLEAN)
       .addPrimaryKey(['_id'])
       .addNullable(['nullable'])
+
+    db$.connect()
     db = yield db$.do(r => {
       table = r.getSchema().table('TestPredicateProvider')
     })
