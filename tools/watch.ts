@@ -1,17 +1,18 @@
 import * as path from 'path'
-import * as fs from 'fs'
 import { Observable, Observer } from 'rxjs'
 import { runTman } from './tman'
+
+const fileWacher = require('node-watch')
 
 function watch (paths: string[]) {
   return Observable.from(paths)
     .map(p => path.join(process.cwd(), p))
     .mergeMap(path => {
       return Observable.create((observer: Observer<string>) => {
-        fs.watch(path, { recursive: true }, evt => {
+        fileWacher(path, (evt: any) => {
           observer.next(evt)
         })
-        return () => fs.unwatchFile(path)
+        return () => fileWacher.close()
       })
     })
     .debounceTime(300)
