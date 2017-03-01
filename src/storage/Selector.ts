@@ -28,21 +28,23 @@ export interface OrderInfo {
 export class Selector <T> {
   static concatFactory<U>(... metaDatas: Selector<U>[]) {
     const [ meta ] = metaDatas
-    const skips = metaDatas
-      .map(m => m.skip)
-      .sort((x, y) => x - y)
-    const { db, lselect, shape, predicateProvider, limit } = meta
-    const [ minSkip ] = skips
-    if (!skips.every((s, i) => s === limit * i) ) {
-      throw TOKEN_CONCAT_ERR(`
-        skip should be serial,
-        expect:
-        ${ JSON.stringify(skips.map((_, i) => i * limit), null, 2) }, limit = ${ limit }
-        actual:
-        ${ JSON.stringify(skips, null, 2) }
-      `)
-    }
-    return new Selector(db, lselect, shape, predicateProvider, limit * skips.length, minSkip)
+    const skipsAndLimits = metaDatas
+      .map(m => ({ skip: m.skip, limit: m.limit }))
+      .sort((x, y) => x.skip - y.skip)
+    const { db, lselect, shape, predicateProvider } = meta
+    const [ minSkip ] = skipsAndLimits
+    const maxLimit = skipsAndLimits.reduce((acc, current) => {
+      const nextSkip = acc.skip + acc.limit
+      if (current.skip !== nextSkip) {
+        throw TOKEN_CONCAT_ERR(`
+          skip should be serial,
+          expect: ${JSON.stringify(acc, null, 2)}
+          actual: ${nextSkip}
+        `)
+      }
+      return current
+    })
+    return new Selector(db, lselect, shape, predicateProvider, maxLimit.limit + maxLimit.skip, minSkip.skip)
   }
 
   static combineFactory<U>(... metaDatas: Selector<U>[]) {
