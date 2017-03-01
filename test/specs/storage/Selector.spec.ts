@@ -6,6 +6,7 @@ import * as SinonChai from 'sinon-chai'
 import { beforeEach, it, describe, afterEach } from 'tman'
 import {
   Selector,
+  DataStoreType,
   lfFactory,
   TableShape,
   PredicateProvider,
@@ -33,7 +34,7 @@ export default describe('Selector test', () => {
   beforeEach(function * () {
     const schemaBuilder = lf.schema.create('SelectorTest', version ++)
     const db$ = lfFactory(schemaBuilder, {
-      storeType: lf.schema.DataStoreType.MEMORY,
+      storeType: DataStoreType.MEMORY,
       enableInspector: false
     })
 

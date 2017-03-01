@@ -14,3 +14,11 @@ export enum Association {
   oneToOne,
   manyToMany
 }
+
+export enum DataStoreType {
+  INDEXED_DB = 0,
+  MEMORY = 1,
+  LOCAL_STORAGE = 2,
+  WEB_SQL = 3,
+  OBSERVABLE_STORE = 4
+}

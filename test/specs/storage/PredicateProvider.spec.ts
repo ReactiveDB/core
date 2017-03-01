@@ -1,7 +1,7 @@
 import * as lf from 'lovefield'
 import { describe, it, beforeEach } from 'tman'
 import { expect } from 'chai'
-import { PredicateProvider, lfFactory } from '../../index'
+import { PredicateProvider, lfFactory, DataStoreType } from '../../index'
 
 export default describe('PredicateProvider test', () => {
   const dataLength = 1000
@@ -12,7 +12,7 @@ export default describe('PredicateProvider test', () => {
   beforeEach(function* () {
     const schemaBuilder = lf.schema.create('PredicateProviderDatabase', version ++)
     const db$ = lfFactory(schemaBuilder, {
-      storeType: lf.schema.DataStoreType.MEMORY,
+      storeType: DataStoreType.MEMORY,
       enableInspector: false
     })
     const tableBuilder = schemaBuilder.createTable('TestPredicateProvider')

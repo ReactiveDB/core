@@ -4,6 +4,7 @@ import { expect } from 'chai'
 import {
   Database,
   RDBType,
+  DataStoreType,
   Association,
   NON_EXISTENT_PRIMARY_KEY_ERR,
   UNMODIFIABLE_TABLE_SCHEMA_ERR,
@@ -20,7 +21,7 @@ export default describe('Database Method before Connect', () => {
 
   beforeEach(() => {
     dbname = `TestDatabase${i++}`
-    database = new Database(lf.schema.DataStoreType.MEMORY, false, dbname, i)
+    database = new Database(DataStoreType.MEMORY, false, dbname, i)
   })
 
   describe('Database.prototype.defineSchema', () => {
@@ -76,7 +77,7 @@ export default describe('Database Method before Connect', () => {
     })
 
     it('should throw after Database connect', () => {
-      const db = new Database(lf.schema.DataStoreType.MEMORY, false)
+      const db = new Database(DataStoreType.MEMORY, false)
 
       const metaData = {
         _id: {
@@ -100,7 +101,7 @@ export default describe('Database Method before Connect', () => {
 
   describe('Database.prototype.defineHook', () => {
     it('should throw after connect', () => {
-      const db = new Database(lf.schema.DataStoreType.MEMORY, false)
+      const db = new Database(DataStoreType.MEMORY, false)
 
       db.connect()
 

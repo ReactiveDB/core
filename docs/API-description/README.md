@@ -35,6 +35,10 @@ constructor(
     <td>WEB_SQL</td>
     <td>3</td>
   </tr>
+  <tr>
+    <td>OBSERVABLE_STORE</td>
+    <td>4</td>
+  </tr>
 </table>
 
 *example:*
