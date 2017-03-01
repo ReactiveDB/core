@@ -4,7 +4,7 @@ import { Subscription } from 'rxjs/Subscription'
 import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable'
 import * as lf from 'lovefield'
 import { lfFactory } from './lovefield'
-import { RDBType, Association } from './DataType'
+import { RDBType, Association, DataStoreType } from './DataType'
 import * as Graphify from './Graphify'
 import { Selector } from './Selector'
 import { QueryToken } from './QueryToken'
@@ -294,7 +294,7 @@ export class Database {
   }
 
   constructor(
-    storeType: lf.schema.DataStoreType = lf.schema.DataStoreType.MEMORY,
+    storeType: DataStoreType = DataStoreType.MEMORY,
     enableInspector: boolean = false,
     // database name
     name = 'ReactiveDB',

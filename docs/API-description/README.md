@@ -1,7 +1,56 @@
-# Database
-## Static Method
-静态方法
-### Database.defineSchema
+## Database
+
+### Constructor
+
+```ts
+constructor(
+  storeType: DataStoreType = DataStoreType.MEMORY,
+  enableInspector: boolean = false,
+  name = 'ReactiveDB',
+  version = 1
+)
+```
+构造函数
+
+- ```Enum: DataStoreType```
+
+<table>
+  <tr>
+    <td>Value</td>
+    <td>Index</td>
+  </tr>
+  <tr>
+    <td>INDEXED_DB</td>
+    <td>0</td>
+  </tr>
+  <tr>
+    <td>MEMORY</td>
+    <td>1</td>
+  </tr>
+  <tr>
+    <td>LOCAL_STORAGE</td>
+    <td>2</td>
+  </tr>
+  <tr>
+    <td>WEB_SQL</td>
+    <td>3</td>
+  </tr>
+  <tr>
+    <td>OBSERVABLE_STORE</td>
+    <td>4</td>
+  </tr>
+</table>
+
+*example:*
+
+```ts
+// Database.ts
+improt { Database, DataStoreType } from 'reactivedb'
+
+export default new Database(DataStoreType)
+```
+
+### Database.prototype.defineSchema
 
 ```ts
 Database.defineSchema(tableName: string, schemaDef: SchemaDef): Database
@@ -153,6 +202,8 @@ Database.defineSchema(tableName: string, schemaDef: SchemaDef): Database
   </tr>
 </table>
 
+[example](https://github.com/teambition/ReactiveDB/blob/master/example/rdb/defineSchema.ts)
+
 ### Database.defineHook
 ```ts
 Database.defineHook(tableName: string, hookDef: HookDef): HookDef
@@ -205,48 +256,27 @@ Database.defineHook(tableName: string, hookDef: HookDef): HookDef
   </tr>
 </table>
 
-
-## Instance Method
-实例方法
-```ts
-  const database = new Database(...args)
-```
-### Constructor
+*example:*
 
 ```ts
-constructor(
-  storeType: DataStoreType = DataStoreType.MEMORY,
-  enableInspector: boolean = false,
-  name = 'ReactiveDB',
-  version = 1
-)
+Database.defineHook('Demo', {
+  destroy: (db, entity) => {
+    // db docs: https://github.com/google/lovefield/blob/master/docs/spec/04_query.md
+    const basicTable = db.getSchema().table('Demo')
+    return db.delete()
+      .from(basicTable)
+      .where(basicTable['_id'].in(entity.basicIds))
+  }
+})
 ```
-构造函数
 
-- ```Enum: DataStoreType```
+### Database.prototype.connect
 
-<table>
-  <tr>
-    <td>Value</td>
-    <td>Index</td>
-  </tr>
-  <tr>
-    <td>INDEXED_DB</td>
-    <td>0</td>
-  </tr>
-  <tr>
-    <td>MEMORY</td>
-    <td>1</td>
-  </tr>
-  <tr>
-    <td>LOCAL_STORAGE</td>
-    <td>2</td>
-  </tr>
-  <tr>
-    <td>WEB_SQL</td>
-    <td>3</td>
-  </tr>
-</table>
+```ts
+  database.connect(): void
+```
+连接数据库，在 `defineSchema` 与 `defineHook` 完成之后调用，如果上述两个接口在 `connect` 之后依然被调用，则会抛出一个异常。
+只有在 `connect` 之后才能调用下面的 API。
 
 ### Database.prototype.get
 ```ts
@@ -271,7 +301,7 @@ constructor(
   </tr>
   <tr>
     <td>clause</td>
-    <td>QueryDescription</td>
+    <td><a href="./QueryDescription.md">QueryDescription</a></td>
     <td>required</td>
     <td>指定用于<code>查询</code>操作的描述信息</td>
   </tr>
@@ -307,6 +337,25 @@ constructor(
   type FieldsValue = string | { [index: string]: string[] }
 ```
 
+- return [QueryToken](./QueryToken.md)
+
+*example:*
+
+```ts
+database.get('Task', {
+  where: {
+    dueDate: {
+      $and: {
+        $gt: moment().add(1, 'day').startOf('day').valueOf(),
+        $lt: moment().add(6, 'day').endOf('day').valueOf()
+      }
+    },
+    involveMembers: {
+      $has: 'xxxxuserId'
+    }
+  }
+})
+```
 
 ### Database.prototype.insert
 ```ts
@@ -438,19 +487,18 @@ constructor(
   </tr>
 </table>
 
-# QueryToken
-## Instance Method
-实例方法
+## Database.prototype.upsert
 ```ts
-  const queryToken = database.get(...args)
-```
-## QueryToken.prototype.values()
-```ts
-  queryToken<T>.values(): Observable<T[]>
-```
-对已定义的query条件做单次求值操作. (complete immediately stream)
+upsert<T>(tableName: string, raw: T | T[]): Observable<ExecutorResult>
 
-- ```Method: queryToken.values()```
+interface ExecutorResult {
+  result: boolean
+  insert: number
+  delete: number
+  update: number
+  select: number
+}
+```
 
 <table>
   <tr>
@@ -460,52 +508,50 @@ constructor(
     <td>Description</td>
   </tr>
   <tr>
-    <td colspan='4'>No parameters</td>
-  </tr>
-</table>
-
-## QueryToken.prototype.changes()
-```ts
-  queryToken<T>.changes(): Observable<T[]>
-```
-对已定义的query条件做持续求值操作, 每当监听的query匹配的集合数据发生变化, 数据都将从该接口被推送出来. (live stream)
-
-- ```Method: queryToken.changes()```
-
-<table>
-  <tr>
-    <td>Parameter</td>
-    <td>Type</td>
-    <td>Required</td>
-    <td>Description</td>
-  </tr>
-  <tr>
-    <td colspan='4'>No parameters</td>
-  </tr>
-</table>
-
-## QueryToken.prototype.combine(...tokens)
-```ts
-  queryToken<T>.combine(...tokens: QueryToken[]): QueryToken
-```
-对已有的单个或多个QueryToken进行合并操作.
-
-- ```Method: queryToken.combine(...tokens: QueryToken[]) ```
-
-<table>
-  <tr>
-    <td>Parameter</td>
-    <td>Type</td>
-    <td>Required</td>
-    <td>Description</td>
-  </tr>
-  <tr>
-    <td>token</td>
-    <td>QueryToken</td>
+    <td>tableName</td>
+    <td>String</td>
     <td>required</td>
-    <td>QueryToken实例</td>
+    <td>指定将要执行<code>upsert</code>操作的数据表的名字</td>
   </tr>
   <tr>
-    <td colspan='4'>...</td>
+    <td>raw</td>
+    <td>T | T[]</td>
+    <td>required</td>
+    <td>执行<code>upsert</code>操作的数据</td>
+  </tr>
+</table>
+
+- return `ExecutorResult`
+
+<table>
+  <tr>
+    <td>fields</td>
+    <td>Type</td>
+    <td>Description</td>
+  </tr>
+  <tr>
+    <td>result</td>
+    <td>Boolean</td>
+    <td>执行是否成功</td>
+  </tr>
+  <tr>
+    <td>insert</td>
+    <td>number</td>
+    <td>执行<code>insert</code>的数据条数</td>
+  </tr>
+  <tr>
+    <td>delete</td>
+    <td>number</td>
+    <td>执行<code>delete</code>的数据条数</td>
+  </tr>
+  <tr>
+    <td>update</td>
+    <td>number</td>
+    <td>执行<code>update</code>的数据条数</td>
+  </tr>
+  <tr>
+    <td>select</td>
+    <td>number</td>
+    <td>执行<code>select</code>的数据条数</td>
   </tr>
 </table>

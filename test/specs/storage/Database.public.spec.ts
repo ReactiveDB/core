@@ -1,4 +1,3 @@
-import * as lf from 'lovefield'
 import { Observable } from 'rxjs/Observable'
 import * as moment from 'moment'
 import { describe, it, beforeEach, afterEach } from 'tman'
@@ -6,6 +5,7 @@ import { expect, assert } from 'chai'
 import {
   RDBType,
   Database,
+  DataStoreType,
   ProjectSchema,
   SubtaskSchema,
   TaskSchema,
@@ -37,7 +37,7 @@ export default describe('Database public Method', () => {
 
   beforeEach(() => {
     version ++
-    database = new Database(lf.schema.DataStoreType.MEMORY, false, `test:${version}`, version)
+    database = new Database(DataStoreType.MEMORY, false, `test:${version}`, version)
     schemaFactory(database)
     database.connect()
   })
