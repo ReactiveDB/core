@@ -61,7 +61,7 @@
   "dependencies": {
     "@types/lovefield": "^2.0.32",
     "lovefield": "2.1.12",
-    "nesthydrationjs": "^1.0.0"
+    "nesthydrationjs": "^1.0.1"
   },
   "peerDependencies": {
     "rxjs": "^5.2.0"
