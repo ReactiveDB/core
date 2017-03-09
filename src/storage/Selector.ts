@@ -56,6 +56,8 @@ export class Selector <T> {
       .map(metas => metas.change$)
       .combineAll()
       .map((r: U[][]) => r.reduce((acc, val) => acc.concat(val)))
+      .publishReplay(1)
+      .refCount()
     dist.values = () => {
       if (dist.consumed) {
         throw TOKEN_CONSUMED_ERR()
@@ -157,6 +159,8 @@ export class Selector <T> {
             return () => this.db.unobserve(query, listener)
           })
         })
+        .publishReplay(1)
+        .refCount()
     } else {
       this.change$ = Observable.create((observer: Observer<T[]>) => {
         const listener = () => {
@@ -171,6 +175,8 @@ export class Selector <T> {
 
         return () => this.db.unobserve(query, listener)
       })
+        .publishReplay(1)
+        .refCount()
     }
     this.select = lselect.toSql()
   }
@@ -259,12 +265,16 @@ export class Selector <T> {
       const { rangeQuery } = this
       const listener = () => {
         rangeQuery.exec()
-          .then((r) => observer.next(r.map(v => v[this.shape.pk.name])))
+          .then((r) => {
+            observer.next(r.map(v => v[this.shape.pk.name]))
+          })
           .catch(e => observer.error(e))
       }
       listener()
       this.db.observe(rangeQuery, listener)
       return () => this.db.unobserve(rangeQuery, listener)
     })
+      // 多 emit 了一个值？？？
+      .skip(1)
   }
 }
