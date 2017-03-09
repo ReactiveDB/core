@@ -1,7 +1,9 @@
 import { Observable } from 'rxjs/Observable'
 import * as moment from 'moment'
 import { describe, it, beforeEach, afterEach } from 'tman'
-import { expect, assert } from 'chai'
+import { expect, assert, use } from 'chai'
+import * as sinon from 'sinon'
+import * as SinonChai from 'sinon-chai'
 import {
   RDBType,
   Database,
@@ -29,6 +31,8 @@ import postGenerator from '../../utils/postGenerator'
 import { default as relationalDataGenerator, ProgramGenerator } from '../../utils/relationalDataGenerator'
 import schemaFactory from '../../schemas'
 import { TestFixture, TestFixture2 } from '../../schemas/Test'
+
+use(SinonChai)
 
 export default describe('Database public Method', () => {
 
@@ -619,6 +623,34 @@ export default describe('Database public Method', () => {
           const standardErr = INVALID_PATCH_TYPE_ERR('Array')
           expect(e.message).to.equal(standardErr.message)
         }
+      })
+
+      it('should be able to update a empty table which contain a hidden column', (done) => {
+        const db2 = new Database(DataStoreType.MEMORY, false, `test:${++version}`, version)
+        const T = 'FooTable'
+
+        db2.defineSchema(T, {
+          id: {
+            type: RDBType.NUMBER,
+            primaryKey: true
+          },
+          members: {
+            type: RDBType.LITERAL_ARRAY
+          }
+        })
+
+        const errSpy = sinon.spy((): void => void 0)
+
+        db2.connect()
+        db2.update(T, { where: { id: 1 } }, {
+          members: ['1', '2']
+        })
+        .catch(errSpy)
+        .finally(() => {
+          expect(errSpy).not.be.called
+          done()
+        })
+        .subscribe()
       })
 
     })
