@@ -452,7 +452,6 @@ export class Database {
       .concatMap<any, any>(db => {
         const [ table ] = Database.getTable(db, tableName)
         let updateQuery: lf.query.Update
-
         let predicate: lf.Predicate
 
         if (clause.where) {
@@ -689,16 +688,16 @@ export class Database {
         return
       }
 
+      mapper.set(key, def['hiddenMapper'])
       // create a hidden column in table and make compare datetime easier
       // not elegant but it worked
       this.defineHook(tableName, {
         insert: (_db: lf.Database, entity: any) => {
           return new Promise(resolve => {
             const hiddenVal = entity[key]
-            const mapFn = def['hiddenMapper']
+            const mapFn = mapper.get(key)
             entity[`${Database.__HIDDEN__}${key}`] = hiddenVal
             entity[key] = mapFn(hiddenVal)
-            mapper.set(key, mapFn)
             resolve()
           })
         }
