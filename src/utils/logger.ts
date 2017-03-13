@@ -49,29 +49,33 @@ export class ContextLogger {
     }
   }
 
+  setLevel(level: Level) {
+    this.level = level
+  }
+
 }
 
 export class Logger {
 
   private static contextMap = new Map<string, ContextLogger>()
-  private static level = Level.debug
+  private static defaultLevel = Level.debug
   private static outputLogger: ContextLogger = null
 
-  static get(name: string, formatter?: Formatter) {
+  static get(name: string, formatter?: Formatter, level?: Level) {
     const logger = Logger.contextMap.get(name)
 
     if (!logger) {
-      const instance = new ContextLogger(name, Logger.level, formatter)
-      Logger.contextMap.set(name, instance)
-      return instance
+      const ctxLogger = new ContextLogger(name, level || Logger.defaultLevel, formatter)
+      Logger.contextMap.set(name, ctxLogger)
+      return ctxLogger
     }
 
     return logger
   }
 
   static setLevel(level: Level) {
-    this.level = level
-    this.outputLogger = new ContextLogger(null, level, (name, _, message) => {
+    Logger.defaultLevel = level
+    Logger.outputLogger = new ContextLogger(null, level, (name, _, message) => {
       const current = new Date()
       const prefix = name ? `[${name}] ` : ''
       return `${prefix}at ${current.toLocaleString()} \r\n    ` + message
@@ -79,19 +83,19 @@ export class Logger {
   }
 
   static warn(...message: string[]) {
-    this.outputLogger.warn(...message)
+    Logger.outputLogger.warn(...message)
   }
 
   static info(...message: string[]) {
-    this.outputLogger.info(...message)
+    Logger.outputLogger.info(...message)
   }
 
   static debug(...message: string[]) {
-    this.outputLogger.debug(...message)
+    Logger.outputLogger.debug(...message)
   }
 
   static error(...message: string[]) {
-    this.outputLogger.error(...message)
+    Logger.outputLogger.error(...message)
   }
 
 }
