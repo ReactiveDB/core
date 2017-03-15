@@ -26,7 +26,7 @@ export interface OrderInfo {
 }
 
 export class Selector <T> {
-  static concatFactory<U>(... metaDatas: Selector<U>[]) {
+  private static concatFactory<U>(... metaDatas: Selector<U>[]) {
     const [ meta ] = metaDatas
     const skipsAndLimits = metaDatas
       .map(m => ({ skip: m.skip, limit: m.limit }))
@@ -44,10 +44,13 @@ export class Selector <T> {
       }
       return current
     })
-    return new Selector(db, lselect, shape, predicateProvider, maxLimit.limit + maxLimit.skip, minSkip.skip)
+    return new Selector(
+      db, lselect, shape, predicateProvider,
+      maxLimit.limit + maxLimit.skip, minSkip.skip, meta.orderDescriptions
+    )
   }
 
-  static combineFactory<U>(... metaDatas: Selector<U>[]) {
+  private static combineFactory<U>(... metaDatas: Selector<U>[]) {
     const [ originalToken ] = metaDatas
     const fakeQuery = { toSql: identity }
     // 初始化一个空的 QuerySelector，然后在初始化以后替换它上面的属性和方法
@@ -73,6 +76,19 @@ export class Selector <T> {
     }
     dist.select = originalToken.select
     return dist
+  }
+
+  private static stringifyOrder(orderInfo: OrderInfo[], ) {
+    if (!orderInfo) {
+      return 0
+    }
+    let orderStr = ''
+    forEach(orderInfo, order => {
+      const name = order.column.getName()
+      const o = order.orderBy
+      orderStr += `${name}:${o}`
+    })
+    return orderStr
   }
 
   public select: string
@@ -211,9 +227,11 @@ export class Selector <T> {
   }
 
   concat(... selectMetas: Selector<T>[]): Selector<T> {
+    const orderStr = Selector.stringifyOrder(this.orderDescriptions)
     const equal = selectMetas.every(m =>
       m.select === this.select &&
-      m.predicateProvider.toString() === this.predicateProvider.toString()
+      m.predicateProvider.toString() === this.predicateProvider.toString() &&
+      Selector.stringifyOrder(m.orderDescriptions) === orderStr
     )
     if (!equal) {
       throw TOKEN_CONCAT_ERR()
