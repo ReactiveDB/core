@@ -1,4 +1,4 @@
-import { Observable, Scheduler } from 'rxjs'
+import { Observable, Scheduler, Subscription } from 'rxjs'
 import * as lf from 'lovefield'
 import { expect, use } from 'chai'
 import * as sinon from 'sinon'
@@ -30,6 +30,7 @@ export default describe('Selector test', () => {
 
   let tableShape: TableShape
   let storeData: any[]
+  let subscription: Subscription
 
   beforeEach(function * () {
     const schemaBuilder = lf.schema.create('SelectorTest', version ++)
@@ -96,6 +97,9 @@ export default describe('Selector test', () => {
   })
 
   afterEach(() => {
+    if (subscription) {
+      subscription.unsubscribe()
+    }
     db.close()
   })
 
@@ -205,7 +209,7 @@ export default describe('Selector test', () => {
 
       const newName = 'test name change'
 
-      selector.changes()
+      subscription = selector.changes()
         .skip(1)
         .subscribe((r: any[]) => {
           expect(r[0].name).to.equal(newName)
@@ -228,7 +232,7 @@ export default describe('Selector test', () => {
 
       const newName = 'test name change'
 
-      const subscription = selector.changes()
+      const _subscription = selector.changes()
         .subscribe(spy)
 
       yield db.update(table)
@@ -236,7 +240,7 @@ export default describe('Selector test', () => {
         .where(table['_id'].eq('_id:50'))
         .exec()
 
-      subscription.unsubscribe()
+      _subscription.unsubscribe()
 
       yield db.update(table)
         .set(table['name'], newName)
@@ -257,7 +261,7 @@ export default describe('Selector test', () => {
 
       const signal = selector.changes()
 
-      signal.subscribe()
+      subscription = signal.subscribe()
 
       yield signal.take(1)
 
@@ -347,7 +351,7 @@ export default describe('Selector test', () => {
 
       const signal = selector.changes()
 
-      signal.subscribe()
+      subscription = signal.subscribe()
 
       yield signal.take(1)
 
@@ -380,7 +384,7 @@ export default describe('Selector test', () => {
 
       const signal = selector.changes()
 
-      signal.subscribe()
+      subscription = signal.subscribe()
 
       yield signal.take(1)
 
@@ -436,7 +440,7 @@ export default describe('Selector test', () => {
 
       yield signal.take(1)
 
-      signal.subscribe()
+      subscription = signal.subscribe()
 
       yield db.update(table)
         .set(table['name'], newName)
@@ -473,7 +477,7 @@ export default describe('Selector test', () => {
 
       const signal = selector.changes()
 
-      signal.subscribe()
+      subscription = signal.subscribe()
 
       yield signal.take(1)
 
@@ -503,7 +507,7 @@ export default describe('Selector test', () => {
 
       const signal = selector.changes()
 
-      signal.subscribe()
+      subscription = signal.subscribe()
 
       yield signal.take(1)
 
@@ -642,7 +646,7 @@ export default describe('Selector test', () => {
       const signal = selector5.combine(selector6)
         .changes()
 
-      signal.subscribe()
+      subscription = signal.subscribe()
 
       yield signal.take(1)
 
@@ -883,7 +887,7 @@ export default describe('Selector test', () => {
 
       const signal = dest.changes()
 
-      signal.subscribe()
+      subscription = signal.subscribe()
 
       yield signal.take(1)
 
