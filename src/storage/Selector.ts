@@ -1,6 +1,7 @@
 import './RxOperator'
 import { Observer } from 'rxjs/Observer'
 import { Observable } from 'rxjs/Observable'
+import { async } from 'rxjs/scheduler/async'
 import * as lf from 'lovefield'
 import { PredicateProvider } from './PredicateProvider'
 import {
@@ -59,6 +60,7 @@ export class Selector <T> {
       .map(metas => metas.change$)
       .combineAll()
       .map((r: U[][]) => r.reduce((acc, val) => acc.concat(val)))
+      .debounceTime(0, async)
       .publishReplay(1)
       .refCount()
     dist.values = () => {

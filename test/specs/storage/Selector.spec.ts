@@ -594,6 +594,9 @@ export default describe('Selector test', () => {
 
     it('changes should observe all values from original SelectMeta', function* () {
       const changes$ = dist.changes()
+        .subscribeOn(Scheduler.async, 1)
+        .publish()
+        .refCount()
 
       changes$.subscribe()
 
@@ -601,13 +604,14 @@ export default describe('Selector test', () => {
       const update2 = 'test update name 2'
       const update3 = 'test update name 3'
 
+      yield changes$.take(1)
+
       yield db.update(table)
         .set(table['name'], update1)
         .where(table['_id'].eq('_id:15'))
         .exec()
 
       yield changes$.take(1)
-        .subscribeOn(Scheduler.async)
         .do(r => expect(r[15].name).equal(update1))
 
       yield db.update(table)
@@ -616,7 +620,6 @@ export default describe('Selector test', () => {
         .exec()
 
       yield changes$.take(1)
-        .subscribeOn(Scheduler.async)
         .do(r => expect(r[55].name).equal(update2))
 
       yield db.update(table)
@@ -625,7 +628,6 @@ export default describe('Selector test', () => {
         .exec()
 
       yield changes$.take(1)
-        .subscribeOn(Scheduler.async)
         .do(r => expect(r[125].name).equal(update3))
     })
 
@@ -645,6 +647,9 @@ export default describe('Selector test', () => {
 
       const signal = selector5.combine(selector6)
         .changes()
+        .subscribeOn(Scheduler.async, 1)
+        .publish()
+        .refCount()
 
       subscription = signal.subscribe()
 
@@ -656,7 +661,6 @@ export default describe('Selector test', () => {
         .exec()
 
       yield signal.take(1)
-        .subscribeOn(Scheduler.async)
         .do(r => {
           expect(r).to.have.lengthOf(40)
           r.forEach(v => expect(v['time']).not.equal(81))
@@ -672,7 +676,6 @@ export default describe('Selector test', () => {
         .exec()
 
       yield signal.take(1)
-        .subscribeOn(Scheduler.async)
         .do(r => {
           expect(r).to.have.lengthOf(40)
           r.forEach(v => expect(v['time']).not.equal(135))
@@ -689,7 +692,6 @@ export default describe('Selector test', () => {
         .exec()
 
       yield signal.take(1)
-        .subscribeOn(Scheduler.async)
         .do(r => {
           r.filter(v => v['time'] === 82)
             .forEach(v => expect(v['name']).to.equal(newName))
@@ -701,7 +703,6 @@ export default describe('Selector test', () => {
         .exec()
 
       yield signal.take(1)
-        .subscribeOn(Scheduler.async)
         .do(r => {
           r.filter(v => v['time'] === 136)
             .forEach(v => expect(v['name']).to.equal(newName))
