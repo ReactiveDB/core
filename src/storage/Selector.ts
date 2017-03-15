@@ -26,7 +26,7 @@ export interface OrderInfo {
 }
 
 export class Selector <T> {
-  static concatFactory<U>(... metaDatas: Selector<U>[]) {
+  private static concatFactory<U>(... metaDatas: Selector<U>[]) {
     const [ meta ] = metaDatas
     const skipsAndLimits = metaDatas
       .map(m => ({ skip: m.skip, limit: m.limit }))
@@ -47,7 +47,7 @@ export class Selector <T> {
     return new Selector(db, lselect, shape, predicateProvider, maxLimit.limit + maxLimit.skip, minSkip.skip)
   }
 
-  static combineFactory<U>(... metaDatas: Selector<U>[]) {
+  private static combineFactory<U>(... metaDatas: Selector<U>[]) {
     const [ originalToken ] = metaDatas
     const fakeQuery = { toSql: identity }
     // 初始化一个空的 QuerySelector，然后在初始化以后替换它上面的属性和方法
