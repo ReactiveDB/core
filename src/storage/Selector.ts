@@ -44,7 +44,10 @@ export class Selector <T> {
       }
       return current
     })
-    return new Selector(db, lselect, shape, predicateProvider, maxLimit.limit + maxLimit.skip, minSkip.skip)
+    return new Selector(
+      db, lselect, shape, predicateProvider,
+      maxLimit.limit + maxLimit.skip, minSkip.skip, meta.orderDescriptions
+    )
   }
 
   private static combineFactory<U>(... metaDatas: Selector<U>[]) {
@@ -73,6 +76,19 @@ export class Selector <T> {
     }
     dist.select = originalToken.select
     return dist
+  }
+
+  private static stringifyOrder(orderInfo: OrderInfo[], ) {
+    if (!orderInfo) {
+      return 0
+    }
+    let orderStr = ''
+    forEach(orderInfo, order => {
+      const name = order.column.getName()
+      const o = order.orderBy
+      orderStr += `${name}:${o}`
+    })
+    return orderStr
   }
 
   public select: string
@@ -211,9 +227,11 @@ export class Selector <T> {
   }
 
   concat(... selectMetas: Selector<T>[]): Selector<T> {
+    const orderStr = Selector.stringifyOrder(this.orderDescriptions)
     const equal = selectMetas.every(m =>
       m.select === this.select &&
-      m.predicateProvider.toString() === this.predicateProvider.toString()
+      m.predicateProvider.toString() === this.predicateProvider.toString() &&
+      Selector.stringifyOrder(m.orderDescriptions) === orderStr
     )
     if (!equal) {
       throw TOKEN_CONCAT_ERR()
