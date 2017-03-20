@@ -1,6 +1,5 @@
-import * as lf from 'lovefield'
-import { RDBType, Association } from '../index'
-import { TeambitionTypes, Database, SubtaskSchema } from '../index'
+import { RDBType, Relationship } from '../index'
+import { TeambitionTypes, Database, SubtaskSchema, ProjectSchema } from '../index'
 
 export interface TaskSchema {
   _id: TeambitionTypes.TaskId
@@ -60,27 +59,23 @@ export default (db: Database) => {
       type: RDBType.STRING
     },
     project: {
-      type: Association.oneToOne,
+      type: Relationship.oneToOne,
       virtual: {
         name: 'Project',
-        where: (
-          projectTable: lf.schema.Table & TaskSchema
-        ) => {
+        where: (ref: ProjectSchema) => {
           return {
-            _projectId: projectTable._id
+            _projectId: ref._id
           }
         }
       }
     },
     subtasks: {
-      type: Association.oneToMany,
+      type: Relationship.oneToMany,
       virtual: {
         name: 'Subtask',
-        where: (
-          subtaskTable: lf.schema.Table & SubtaskSchema
-        ) => {
+        where: (ref: SubtaskSchema) => {
           return {
-            _id: subtaskTable._taskId
+            _id: ref._taskId
           }
         }
       }
@@ -93,15 +88,10 @@ export default (db: Database) => {
     },
     created: {
       type: RDBType.DATE_TIME
-    }
-  })
-
-  return db.defineHook('Task', {
-    destroy(database, entity) {
-      const subtaskTable = database.getSchema().table('Subtask')
-      return database.delete()
-        .from(subtaskTable)
-        .where(subtaskTable['_taskId'].eq(entity._id))
+    },
+    dispose: (rootEntities, scope) => {
+      const [ matcher, disposer ] = scope('Subtask')
+      return matcher({ _taskId: { $in: rootEntities.map((entity: any) => entity._id) } }).do(disposer)
     }
   })
 }

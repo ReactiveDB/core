@@ -1,8 +1,7 @@
+import './operators'
 import './global'
 import 'tslib'
-export * from './storage/Database'
-export * from './storage/DataType'
-export { PredicateDescription } from './storage/PredicateProvider'
-export { QueryToken } from './storage/QueryToken'
-export { Selector } from './storage/Selector'
-export { Logger, Level } from './utils/logger'
+
+export * from './interface'
+export * from './shared'
+export * from './storage'

@@ -1,5 +1,4 @@
-import { TeambitionTypes, Database, RDBType, Association } from '../index'
-import { ProjectSchema } from './Project'
+import { TeambitionTypes, Database, RDBType, Relationship } from '../index'
 
 export interface TestSchema {
   _id: string
@@ -7,12 +6,11 @@ export interface TestSchema {
   taskId: TeambitionTypes.TaskId
 }
 
-export const TestFixture = (enableAliasConfict = false) => {
+export const TestFixture = (db: Database) => {
   const schema = {
     _id: {
       type: RDBType.STRING,
-      primaryKey: true,
-      as: 'id'
+      primaryKey: true
     },
     data1: {
       type: RDBType.ARRAY_BUFFER,
@@ -24,10 +22,8 @@ export const TestFixture = (enableAliasConfict = false) => {
       type: RDBType.STRING,
       virtual: {
         name: 'Project',
-        where: (
-          projectTable: lf.schema.Table & ProjectSchema
-        ) => ({
-          _projectId: projectTable._id
+        where: (ref: any) => ({
+          _projectId: ref._id
         })
       }
     },
@@ -39,11 +35,7 @@ export const TestFixture = (enableAliasConfict = false) => {
     }
   }
 
-  if (enableAliasConfict) {
-    schema.data2['as'] = 'id'
-  }
-
-  return (db: Database) => db.defineSchema('Fixture1', schema)
+  db.defineSchema('Fixture1', schema)
 }
 
 export const TestFixture2 = (db: Database) => {
@@ -76,7 +68,7 @@ export const TestFixture2 = (db: Database) => {
   return db.defineSchema('Fixture2', schema)
 }
 
-export default (db: Database) => {
+export const TestFixture3 = (db: Database) => {
   const schema = {
     id: {
       type: RDBType.STRING,
@@ -86,13 +78,11 @@ export default (db: Database) => {
       type: RDBType.NUMBER
     },
     data2: {
-      type: Association.oneToMany,
+      type: Relationship.oneToMany,
       virtual: {
         name: 'Project',
-        where: (
-          projectTable: lf.schema.Table,
-        ) => ({
-          id: projectTable['_id']
+        where: (ref: any) => ({
+          id: ref['_id']
         })
       }
     }

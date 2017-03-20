@@ -1,4 +1,4 @@
-import { Database, RDBType, Association } from '../index'
+import { Database, RDBType, Relationship, EngineerSchema } from '../index'
 
 export interface ModuleSchema {
   _id: string
@@ -8,7 +8,7 @@ export interface ModuleSchema {
   parentId: string
 }
 
-export default (db: Database) => db.defineSchema('Module', {
+export default (db: Database) => db.defineSchema<ModuleSchema>('Module', {
   _id: {
     type: RDBType.STRING,
     primaryKey: true
@@ -24,12 +24,16 @@ export default (db: Database) => db.defineSchema('Module', {
     type: RDBType.STRING
   },
   programmer: {
-    type: Association.oneToOne,
+    type: Relationship.oneToOne,
     virtual: {
       name: 'Engineer',
-      where: (engineerTable: lf.schema.Table) => ({
-        ownerId: engineerTable['_id']
+      where: (ref: EngineerSchema) => ({
+        ownerId: ref._id
       })
     }
+  },
+  dispose(rootEntities, scope) {
+    const [ matcher, disposer ] = scope('Engineer')
+    return matcher({ _id: { $in: rootEntities.map(entity => entity.ownerId) } }).do(disposer)
   }
 })

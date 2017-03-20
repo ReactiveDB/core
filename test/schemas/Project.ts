@@ -1,4 +1,4 @@
-import { TeambitionTypes, Database, RDBType, Association } from '../index'
+import { TeambitionTypes, Database, RDBType, Relationship, PostSchema } from '../index'
 
 export interface ProjectSchema {
   _id: TeambitionTypes.ProjectId
@@ -16,30 +16,12 @@ export default (db: Database) => db.defineSchema('Project', {
     type: RDBType.BOOLEAN
   },
   posts: {
-    type: Association.oneToMany,
+    type: Relationship.oneToMany,
     virtual: {
       name: 'Post',
-      where: (
-        postTable: lf.schema.Table
-      ) => ({
-        _id: postTable['belongTo']
+      where: (ref: PostSchema) => ({
+        _id: ref.belongTo
       })
     }
   }
 })
-
-// waiting for next lovefield release
-/**
-  posts: {
-    type: Association.oneToMany,
-    virtual: {
-      name: 'Post',
-      where: (
-        postTable: lf.schema.Table,
-        projectTable: lf.schema.Table
-      ) => {
-        return postTable['belongTo'].eq(projectTable['_id'])
-      }
-    }
-  }
- */

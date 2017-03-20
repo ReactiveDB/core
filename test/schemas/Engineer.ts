@@ -1,4 +1,4 @@
-import { Database, RDBType, Association } from '../index'
+import { Database, RDBType, Relationship, ProgramSchema } from '../index'
 
 export interface EngineerSchema {
   _id: string
@@ -6,7 +6,7 @@ export interface EngineerSchema {
   leadProgram?: Object[]
 }
 
-export default (db: Database) => db.defineSchema('Engineer', {
+export default (db: Database) => db.defineSchema<EngineerSchema>('Engineer', {
   _id: {
     type: RDBType.STRING,
     primaryKey: true
@@ -15,12 +15,14 @@ export default (db: Database) => db.defineSchema('Engineer', {
     type: RDBType.STRING
   },
   leadProgram: {
-    type: Association.oneToMany,
+    type: Relationship.oneToMany,
     virtual: {
       name: 'Program',
-      where: (programTable: lf.schema.Table) => ({
-        _id: programTable['ownerId']
-      })
+      where(table: ProgramSchema) {
+        return {
+          _id: table.ownerId
+        }
+      }
     }
   }
 })

@@ -1,4 +1,4 @@
-export function random (percent: number) {
+export function rnd (percent: number) {
   if (percent > 100 || percent < 0) {
     throw new TypeError(`Invaild percent`)
   }
@@ -6,10 +6,10 @@ export function random (percent: number) {
   return judge < percent
 }
 
-export function randomNumber(from: number, to: number) {
+export function number(from: number, to: number) {
   return parseInt(from as any) + Math.ceil( Math.random() * (to - from) )
 }
 
-export function randomString(length: number = 10) {
+export function string(length: number = 10) {
   return Math.random().toString(36).substr(2, length)
 }

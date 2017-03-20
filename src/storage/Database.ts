@@ -1,304 +1,74 @@
-import './RxOperator'
 import { Observable } from 'rxjs/Observable'
 import { Subscription } from 'rxjs/Subscription'
 import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable'
 import * as lf from 'lovefield'
-import { lfFactory } from './lovefield'
-import { RDBType, Association, DataStoreType } from './DataType'
-import * as Graphify from './Graphify'
-import { Selector } from './Selector'
-import { QueryToken } from './QueryToken'
-import { PredicateDescription, PredicateProvider } from './PredicateProvider'
-import { forEach, identity, clone, Logger } from '../utils'
-import { Modifier } from './Modifier'
+import * as Exception from '../exception'
+import * as definition from './helper/definition'
 import version from '../version'
-
-import {
-  ReactiveDBError,
-  DEFINE_HOOK_ERR,
-  NON_EXISTENT_TABLE_ERR,
-  UNMODIFIABLE_TABLE_SCHEMA_ERR,
-  UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR,
-  NON_EXISTENT_PRIMARY_KEY_ERR,
-  UNMODIFIABLE_PRIMARYKEY_WARN,
-  NON_EXISTENT_COLUMN_WARN,
-  INVALID_NAVIGATINO_TYPE_ERR,
-  INVALID_ROW_TYPE_ERR,
-  INVALID_FIELD_DES_ERR,
-  NON_DEFINED_PROPERTY_WARN,
-  NON_EXISTENT_FIELD_WARN,
-  BUILD_PREDICATE_FAILED_WARN,
-  ALIAS_CONFLICT_ERR,
-  NOT_IMPLEMENT_ERR,
-  UNEXPECTED_ASSOCIATION_ERR,
-  TRANSACTION_EXECUTE_FAILED,
-  HOOK_EXECUTE_FAILED,
-  INVALID_PATCH_TYPE_ERR,
-  PRIMARY_KEY_NOT_PROVIDED_ERR
-} from './RuntimeError'
-
-export interface SchemaMetadata<T> {
-  type: RDBType | Association
-  primaryKey?: boolean
-  index?: boolean
-  unique?: boolean
-  /**
-   * alias to other table
-   * 这里需要定义表名，字段和查询条件
-   */
-  virtual?: {
-    name: string
-    where(virtualTable: TableShape<T>): PredicateDescription<T>
-  }
-  // 被 Database.prototype.createRow 动态挂上去的
-  // readonly isHidden?: boolean
-  // readonly hiddenMapper?: (val: any) => any
-}
-
-export type TableShape<T> = lf.schema.Table & {
-  [P in keyof T]: lf.schema.Column
-}
-
-export type SchemaDef<T> = {
-  [P in keyof T]: SchemaMetadata<T[P]>
-}
-
-export interface HookDef {
-  insert?: (db: lf.Database, entity: any) => Promise<any>
-  destroy?: (db: lf.Database, entity: any) => lf.query.Builder
-}
-
-export interface HooksDef {
-  insert: ((db: lf.Database, entity: any) => Promise<any>)[]
-  destroy: ((db: lf.Database, entity: any) => lf.query.Builder)[]
-}
-
-/**
- * 在查询和更新数据的时候需要使用的元数据
- * 每次查询会遍历 VirtualMetadata，然后将需要使用的字段从对应的 VirtualTable 中查到，拼接到对应的字段上
- * 更新的时候也会查询是否更新的是 Virtual 字段，如果更新的是 Virtual 字段，则忽略这次更新
- */
-export interface VirtualMetadata {
-  name: string
-  association?: Association
-  where(table: lf.schema.Table, targetTable: lf.schema.Table): lf.Predicate
-}
-
-export interface SelectMetadata {
-  fields: Set<string>
-  virtualMeta: Map<string, VirtualMetadata>
-  mapper: Map<string, Function>
-}
-
-export type FieldsValue = string | { [index: string]: FieldsValue[] }
-
-export interface ClauseDescription<T> {
-  where?: PredicateDescription<T>
-}
-
-export interface OrderDescription {
-  fieldName: string
-  orderBy?: 'DESC' | 'ASC'
-}
-
-export interface QueryDescription<T> extends ClauseDescription<T> {
-  fields?: FieldsValue[]
-  limit?: number
-  skip?: number
-  orderBy?: OrderDescription[]
-}
-
-export interface JoinInfo {
-  table: lf.schema.Table,
-  predicate: lf.Predicate
-}
-
-export type ShapeMatcher = {
-  id: boolean
-  column: string
-  type?: string
-}
-
-export interface TraverseContext {
-  [property: string]: number
-}
-
-export type DeepPartial<T> = {
-  [K in keyof T]?: Partial<T[K]>
-}
-
-export interface TraverseBuilder {
-  insert: lf.query.Insert[],
-  update: lf.query.Update[],
-  keys?: Set<string>
-}
-
-export enum UpsertOps {
-  insert,
-  update
-}
-
-export interface ExecutorResult {
-  result: boolean
-  insert: number
-  delete: number
-  update: number
-  select: number
-}
+import { Traversable } from '../shared'
+import { Mutation, Selector, QueryToken, PredicateProvider } from './modules'
+import { dispose, contextTableName, fieldIdentifier, hiddenColName } from './symbols'
+import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, identity, warn } from '../utils'
+import { createPredicate, createPkClause, mergeTransactionResult, predicatableQuery, lfFactory } from './helper'
+import { Relationship, RDBType, DataStoreType, LeafType, StatementType } from '../interface/enum'
+import { Record, Fields, JoinInfo, Query, Clause, Predicate } from '../interface'
+import { SchemaDef, ColumnDef, ParsedSchema, Association, ScopedHandler } from '../interface'
+import { ColumnLeaf, NavigatorLeaf, ExecutorResult, UpsertContext, SelectContext } from '../interface'
 
 export class Database {
+
   public static version = version
-  /**
-   * hidden row namespace
-   * 比如 api 获取的 task.created 是 string 类型
-   * 我们希望它存储为 number 类型（方便我们 Select 的时候对它进行一系列的条件运算
-   * 那么可以在 Schema 上将它定义为:
-   * RDBType.DATE_TIME
-   * 然后 Database 类会将原始值存储到 __hidden__created 字段上
-   * 存储的时候将原始值存储为 new Date(task.created).valueOf()
-   */
-  private static readonly __HIDDEN__ = '__hidden__'
 
-  private static unwrapPredicate(table: lf.schema.Table, targetTable: lf.schema.Table, joinClause: Function) {
-    try {
-      return new PredicateProvider(targetTable, joinClause(table)).getPredicate()
-    } catch (e) {
-      BUILD_PREDICATE_FAILED_WARN(e, table.getName())
-      return null
-    }
-  }
-
-  private static getTable(db: lf.Database, ...tableNames: string[]) {
+  public static getTables(db: lf.Database, ...tableNames: string[]) {
     return tableNames.map((name) => db.getSchema().table(name))
   }
 
-  private static reviseAssocDefinition(assoc: Association, def: Object) {
-    switch (assoc) {
-      case Association.oneToOne:
-        forEach(def, (value) => {
-          if (value.id) {
-            value.id = false
-          }
-        })
-        break
-      case Association.oneToMany:
-        def = [def]
-        break
-      case Association.manyToMany:
-        throw NOT_IMPLEMENT_ERR()
-      default:
-        throw UNEXPECTED_ASSOCIATION_ERR()
-    }
+  public database$: ConnectableObservable<lf.Database>
 
-    return def
-  }
-
-  private static mergeQueriesType(queries: lf.query.Builder[], transactionResult: any[]) {
-    const ret = {
-      insert: 0,
-      update: 0,
-      delete: 0,
-      select: 0
-    }
-
-    queries.forEach((q, index) => {
-      if (q instanceof lf.query.SelectBuilder) {
-        ret.select++
-      } else if (q instanceof lf.query.InsertBuilder) {
-        ret.insert += Array.isArray(transactionResult[index]) ? transactionResult[index].length : 1
-      } else if (q instanceof lf.query.UpdateBuilder) {
-        ret.update++
-      } else if (q instanceof lf.query.DeleteBuilder) {
-        ret.delete++
-      }
-    })
-
-    return ret
-  }
-
-  database$: ConnectableObservable<lf.Database>
-
-  private hooks = new Map<string, HooksDef>()
-  private schemaMetaData = new Map<string, SchemaDef<any>>()
-
-  private primaryKeysMap = new Map<string, string>()
-  private selectMetaData = new Map<string, SelectMetadata>()
+  private schemaDefs = new Map<string, SchemaDef<any>>()
+  private schemas = new Map<string, ParsedSchema>()
   private schemaBuilder: lf.schema.Builder
   private connected = false
   private storedIds = new Set<string>()
   private subscription: Subscription
 
+  private findPrimaryKey = (name: string) => {
+    return this.findSchema(name).pk
+  }
+
+  private findSchema = (name: string) => {
+    const schema = this.schemas.get(name)
+    assert(schema, Exception.NonExistentTable(name))
+    return schema
+  }
+
   /**
-   * 定义数据表的 metadata
-   * 会根据这些 metadata 决定增删改查的时候如何处理关联数据
+   * @method defineSchema
+   * @description 定义数据表的 metadata, 通过ReactiveDB查询时会根据这些 metadata 决定如何处理关联数据
    */
-  defineSchema<T>(tableName: string, schemaMetaData: SchemaDef<T>) {
-    if (this.connected) {
-      throw UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR()
-    }
+  defineSchema<T>(tableName: string, schema: SchemaDef<T>) {
+    const advanced = !this.schemaDefs.has(tableName) && !this.connected
+    assert(advanced, Exception.UnmodifiableTable())
 
-    if (this.schemaMetaData.has(tableName)) {
-      throw UNMODIFIABLE_TABLE_SCHEMA_ERR(tableName)
-    }
+    const hasPK = Object.keys(schema)
+      .some((key: string) => schema[key].primaryKey === true)
+    assert(hasPK, Exception.PrimaryKeyNotProvided())
 
-    let hasPK = false
-    // src: schemaMetaData; dest: hasPK;
-    // short-curcuiting at the first meta that has primaryKey
-    forEach(schemaMetaData, meta => {
-      if (meta.primaryKey) {
-        hasPK = true
-        return false
-      }
-      return true
-    })
-
-    if (!hasPK) {
-      throw NON_EXISTENT_PRIMARY_KEY_ERR(schemaMetaData as any)
-    }
-
-    Object.freeze(schemaMetaData)
-    this.schemaMetaData.set(tableName, schemaMetaData)
-
-    this.hooks.set(tableName, {
-      insert: [],
-      destroy: []
-    })
-
+    this.schemaDefs.set(tableName, schema)
     return this
   }
 
   /**
-   * 在数据表上定义一些 hook
-   * 这些 hook 的过程都会被放置在一个transaction中执行
+   * @constructor ReactiveDB
+   * @param storeType 定义使用的BackStore类型
+   * @param enableInspector 是否允许外联Inspector
+   * @param name 定义当前数据仓储的名字
+   * @param version 定义当前数据仓储的版本
    */
-  defineHook(tableName: string, hookDef: HookDef) {
-    if (this.connected) {
-      throw UNMODIFIABLE_TABLE_SCHEMA_AFTER_INIT_ERR()
-    }
-
-    const hooks = this.hooks.get(tableName)
-
-    if (!hooks) {
-      throw DEFINE_HOOK_ERR(tableName)
-    }
-
-    if (hookDef.insert) {
-      hooks.insert.push(hookDef.insert)
-    }
-
-    if (hookDef.destroy) {
-      hooks.destroy.push(hookDef.destroy)
-    }
-
-    return hookDef
-  }
-
   constructor(
     storeType: DataStoreType = DataStoreType.MEMORY,
     enableInspector: boolean = false,
-    // database name
     name = 'ReactiveDB',
-    // database version
     version = 1
   ) {
     this.schemaBuilder = lf.schema.create(name, version)
@@ -306,265 +76,146 @@ export class Database {
   }
 
   connect() {
-    this.buildTables(this.schemaBuilder)
+    this.buildTables()
     this.connected = true
+    // definition should be clear once database is connected
+    this.schemaDefs.clear()
     this.subscription = this.database$.connect()
   }
 
-  insert<T>(tableName: string, raw: T[]): Observable<T[]>
+  dump() {
+    return this.database$.concatMap(db => db.export())
+  }
 
-  insert<T>(tableName: string, raw: T): Observable<T>
-
-  insert<T>(tableName: string, raw: T | T[]): Observable<T> | Observable<T[]>
-
-  /**
-   * 存储数据到数据表
-   * 先执行 insert hook 列表中的 hook 再存储
-   * insertHooks 是一些 lovefield query
-   * 它们将在一个 transaction 中被串行执行，任意一个失败回滚所有操作并抛出异常
-   */
-  insert<T>(tableName: string, raw: T | T[]): Observable<T> | Observable<T[]> | Observable<void> {
-    return this.database$
-      .concatMap(db => {
-        const [ table ] = Database.getTable(db, tableName)
-        let hook: Observable<any> = Observable.of(null)
-        const rows: lf.Row[] = []
-
-        const data = clone(raw)
-        if (data instanceof Array) {
-          const hookObservables: Observable<lf.Transaction>[] = []
-          const hooks = this.hooks.get(tableName)
-
-          data.forEach(r => {
-            rows.push(table.createRow(r))
-            if (!hooks || !hooks.insert || !hooks.insert.length) {
-              return null
-            }
-
-            const hookStream = Observable.from(hooks.insert)
-              .concatMap(fn => fn(db, r))
-              .skip(hooks.insert.length - 1)
-
-            hookObservables.push(hookStream)
-          })
-
-          if (hooks && hookObservables.length) {
-            hook = Observable.from(hookObservables)
-              .concatAll()
-              .skip(hookObservables.length - 1)
-          }
-
-        } else {
-          rows.push(table.createRow(data))
-          const hooks = this.hooks.get(tableName)
-
-          if (hooks && hooks.insert && hooks.insert.length) {
-            hook = Observable.from(hooks.insert)
-              .concatMap(fn => fn(db, data))
-              .skip(hooks.insert.length - 1)
-          }
-        }
-
-        const tx = db.createTransaction()
-        return hook.concatMap(() => {
-          return tx.exec([db.insertOrReplace()
-            .into(table)
-            .values(rows)])
-            .then(ret => {
-              const pk = this.primaryKeysMap.get(tableName)
-
-              if (Array.isArray(data)) {
-                data.forEach(item => this.storedIds.add(item[pk]))
-              } else {
-                this.storedIds.add(data[pk])
-              }
-              return ret
-            })
+  load(data: any) {
+    assert(!this.connected, Exception.DatabaseIsNotEmpty())
+    return this.database$.concatMap(db => db.import(data))
+      .do(() => {
+        forEach(data.tables, (entities: any[], name: string) => {
+          const schema = this.findSchema(name)
+          entities.forEach(entity => this.storedIds.add(entity[schema.pk]))
         })
-          .catch(e => Promise.reject(HOOK_EXECUTE_FAILED('insert', e)))
-          .flatMap(identity)
-          .catch((e) => {
-            if (e instanceof ReactiveDBError) {
-              return Promise.reject(e)
-            }
-            return tx.rollback()
-              .then(() => Promise.reject(TRANSACTION_EXECUTE_FAILED(e)))
-          })
       })
   }
 
-  /**
-   * 根据 SchemaMetadata 中的元信息 join 出正确的数据结构
-   * 设有一表有如下结构：
-   * {
-   *   _id: PrimaryKey,
-   *   note: string,
-   *   content: string,
-   *   subtasks: {
-   *     type: Association.oneToMany
-   *     virtual: {
-   *       name: 'SubTask',
-   *       where: (table) => ({
-   *         _id: table.taskId
-   *       })
-   *     }
-   *   }
-   *
-   * }
-   *
-   * 根据 Schema 定义的 metadata, 在`SELECT`时将会返回如下结果:
-   * {
-   *   _id: string,
-   *   note: string,
-   *   content: string,
-   *   subtasks: [{
-   *    ...subtask attribute
-   *   }]
-   * }
-   */
-  get<T>(tableName: string, query: QueryDescription<T> = {}): QueryToken<T> {
-    const pk = this.primaryKeysMap.get(tableName)
-    if (!pk) {
-      throw NON_EXISTENT_TABLE_ERR(tableName)
-    }
+  insert<T>(tableName: string, raw: T[]): Observable<ExecutorResult>
 
-    const selectMeta$ = this.database$
-      .map(db => this.buildSelector<T>(db, tableName, query))
+  insert<T>(tableName: string, raw: T): Observable<ExecutorResult>
 
-    return new QueryToken<T>(selectMeta$)
+  insert<T>(tableName: string, raw: T | T[]): Observable<ExecutorResult>
+
+  insert<T>(tableName: string, raw: T | T[]): Observable<ExecutorResult> {
+    return this.database$
+      .concatMap(db => {
+        const schema = this.findSchema(tableName)
+        const pk = schema.pk
+        const columnMapper = schema.mapper
+        const [ table ] = Database.getTables(db, tableName)
+        const muts: Mutation[] = []
+        const entities = clone(raw)
+
+        const iterator = Array.isArray(entities) ? entities : [entities]
+
+        iterator.forEach((entity: any) => {
+          const mut = new Mutation(db, table)
+          const hiddenPayload = Object.create(null)
+
+          columnMapper.forEach((mapper, key) => {
+            // cannot create a hidden column for primary key
+            if (!hasOwn(entity, key) || key === pk) {
+              return
+            }
+
+            const val = entity[key]
+            hiddenPayload[key] = mapper(val)
+            hiddenPayload[hiddenColName(key)] = val
+          })
+
+          mut.patch({ ...entity, ...hiddenPayload })
+          mut.withId(pk, entity[pk])
+          muts.push(mut)
+        })
+
+        const { contextIds, queries } = Mutation.aggregate(db, muts, [])
+        return this.executor(queries)
+          .do(() => contextIds.forEach(id => this.storedIds.add(id)))
+      })
   }
 
-  update<T>(tableName: string, clause: ClauseDescription<T>, patch: Partial<T> | DeepPartial<T>) {
-    const selectMetadata = this.selectMetaData.get(tableName)
-    const pk = this.primaryKeysMap.get(tableName)
+  get<T>(tableName: string, query: Query<T> = {}): QueryToken<T> {
+    const selector$ = this.buildSelector<T>(tableName, query)
+    return new QueryToken<T>(selector$)
+  }
 
-    if (!selectMetadata) {
-      return Observable.throw(NON_EXISTENT_TABLE_ERR(tableName))
+  update<T>(tableName: string, clause: Clause<T>, raw: Partial<T>): Observable<ExecutorResult> {
+    const type = getType(raw)
+    if (type !== 'Object') {
+      return Observable.throw(Exception.InvalidType(['Object', type]))
     }
 
-    const patchType = typeof patch
-    const isArray = Array.isArray(patch)
-    if (patchType !== 'object' || isArray) {
-      throw INVALID_PATCH_TYPE_ERR(isArray ? 'Array' : patchType)
+    const [ schema, err ] = tryCatch<ParsedSchema>(this.findSchema)(tableName)
+    if (err) {
+      return Observable.throw(err)
     }
 
     return this.database$
       .concatMap<any, any>(db => {
-        const [ table ] = Database.getTable(db, tableName)
-        let updateQuery: lf.query.Update
-        let predicate: lf.Predicate
+        const entity = clone(raw)
+        const [ table ] = Database.getTables(db, tableName)
+        const columnMapper = schema.mapper
+        const hiddenPayload = Object.create(null)
 
-        if (clause.where) {
-          try {
-            predicate = new PredicateProvider(table, clause.where).getPredicate()
-          } catch (e) {
-            return Observable.throw(e)
+        columnMapper.forEach((mapper, key) => {
+          // cannot create a hidden column for primary key
+          if (!hasOwn(entity, key) || key === schema.pk) {
+            return
           }
-        }
 
-        // source: patch; dest: updateQuery;
-        // no short-curcuiting
-        forEach(patch, (val, key) => {
+          const val = (entity as any)[key]
+          hiddenPayload[key] = mapper(val)
+          hiddenPayload[hiddenColName(key)] = val
+        })
+
+        const mut = { ...(entity as any), ...hiddenPayload }
+        const predicate = createPredicate(table, clause.where)
+        const query = predicatableQuery(db, table, predicate, StatementType.Update)
+
+        forEach(mut, (val, key) => {
           const column = table[key]
-          const virtualMeta = selectMetadata.virtualMeta.get(key)
-
-          if (typeof column === 'undefined') {
-            NON_EXISTENT_COLUMN_WARN(key, tableName)
-          } else if (key === pk) {
-            UNMODIFIABLE_PRIMARYKEY_WARN()
-          } else if (!virtualMeta) {
-            const hiddenColumn = table[`${Database.__HIDDEN__}${key}`]
-            updateQuery = (updateQuery || db.update(table))
-
-            if (hiddenColumn) {
-              const mapFn = selectMetadata.mapper.get(key)
-              updateQuery
-                .set(hiddenColumn, val)
-                .set(column, mapFn(val))
-            } else {
-              updateQuery
-                .set(column, val)
-            }
+          if (key === schema.pk) {
+            warn(`Primary key is not modifiable.`)
+          } else if (!column) {
+            warn(`Column: ${key} is not existent on table:${tableName}`)
+          } else {
+            query.set(column, val)
           }
         })
 
-        if (updateQuery) {
-          if (predicate) {
-            return updateQuery.where(predicate).exec()
-          } else {
-            return updateQuery.exec()
-          }
-        } else {
-          return Promise.resolve()
-        }
+        return this.executor([query])
       })
   }
 
-  /**
-   * 如果有 deleteHook 先查询出数据，然后用 transaction 执行 deleteHook
-   * 如果没有则直接删除
-   * hook 中任意一个执行失败即会回滚，并抛出异常
-   */
-  delete<T>(tableName: string, clause: ClauseDescription<T> = {}): Observable<T[]> {
-    const pk = this.primaryKeysMap.get(tableName)
-    if (!pk) {
-      return Observable.throw(NON_EXISTENT_TABLE_ERR(tableName))
+  delete<T>(tableName: string, clause: Clause<T> = {}): Observable<ExecutorResult> {
+    const [pk, err] = tryCatch<string>(this.findPrimaryKey)(tableName)
+    if (err) {
+      return Observable.throw(err)
     }
 
     return this.database$
       .concatMap(db => {
-        const [ table ] = Database.getTable(db, tableName)
-        let predicate: lf.Predicate
-        if (clause.where) {
-          try {
-            predicate = new PredicateProvider(table, clause.where).getPredicate()
-          } catch (e) {
-            return Observable.throw(e)
-          }
-        }
+        const [ table ] = Database.getTables(db, tableName)
+        const column = table[pk]
+        const provider = new PredicateProvider(table, clause.where)
+        const prefetch =
+          predicatableQuery(db, table, provider.getPredicate(), StatementType.Select, column)
 
-        // let hookStream = Observable.of(db)
-        let preparedData: any[] = []
-        const hooks = this.hooks.get(tableName)
-        const query = {
-          where: clause.where
-        }
-
-        return this.get(tableName, query).values().do((res) => {
-          preparedData = res.map(r => r[pk])
-        })
-        .flatMap(identity)
-        .concatMap((r) => {
-          if (hooks.destroy && hooks.destroy.length) {
-            const tx = db.createTransaction()
-            return Observable
-              .from(hooks.destroy)
-              .map(fn => fn(db, r))
-              .catch(e => Promise.reject(HOOK_EXECUTE_FAILED('delete', e)))
-              .toArray()
-              .concatMap(r2 => tx.exec(r2))
-              .catch(e => {
-                if (e instanceof ReactiveDBError) {
-                  return Promise.reject(e)
-                }
-                return tx.rollback()
-                  .then(() => Promise.reject(TRANSACTION_EXECUTE_FAILED(e)))
-              })
-              .mapTo(db)
-          }
-          return Observable.of(db)
-        })
-        .concatMap(() => {
-          const deleteQuery = db.delete().from(table)
-          if (predicate) {
-            deleteQuery.where(predicate)
-          }
-
-          return deleteQuery.exec().then(ret => {
-            preparedData.forEach(id => this.storedIds.delete(id))
-            return ret
+        return Observable.fromPromise(prefetch.exec())
+          .concatMap((scopedIds) => {
+            const query = predicatableQuery(db, table, provider.getPredicate(), StatementType.Delete)
+            return this.executor([query])
+              .do(() => scopedIds.forEach((entity: any) =>
+                this.storedIds.delete(fieldIdentifier(tableName, entity[pk]))))
           })
-        })
       })
   }
 
@@ -576,137 +227,144 @@ export class Database {
 
   upsert<T>(tableName: string, raw: T | T[]): Observable<ExecutorResult> {
     return this.database$.concatMap(db => {
-      const sharing = new Map<any, Modifier>()
-      const insertMods: Modifier[] = []
-      const updateMods: Modifier[] = []
+      const sharing = new Map<any, Mutation>()
+      const insert: Mutation[] = []
+      const update: Mutation[] = []
 
-      this.traverseData(db, tableName, clone(raw), insertMods, updateMods, sharing)
-
-      const { preparedKeys, insertQueries } = Modifier.concatToInserter(db, insertMods)
-      const updateQueries = updateMods.map((m) => m.toUpdater())
-
-      return this.executor([...insertQueries, ...updateQueries])
+      this.traverseCompound(db, tableName, clone(raw), insert, update, sharing)
+      const { contextIds, queries } = Mutation.aggregate(db, insert, update)
+      return this.executor(queries)
         .do(() => {
-          preparedKeys.forEach(key => this.storedIds.add(key))
+          contextIds.forEach(id => this.storedIds.add(id))
+        })
+    })
+  }
+
+  remove<T>(tableName: string, clause: Clause<T> = {}): Observable<ExecutorResult> {
+    const [schema, err] = tryCatch<ParsedSchema>(this.findSchema)(tableName)
+    if (err) {
+      return Observable.throw(err)
+    }
+    const disposeHandler = schema.dispose
+
+    return this.database$.concatMap((db) => {
+      const [ table ] = Database.getTables(db, tableName)
+      const predicate = createPredicate(table, clause.where)
+
+      const queries: lf.query.Builder[] = []
+      const removedIds: any = []
+      queries.push(predicatableQuery(db, table, predicate, StatementType.Delete))
+
+      const prefetch = predicatableQuery(db, table, predicate, StatementType.Select)
+      return Observable.fromPromise(prefetch.exec())
+        .concatMap((rootEntities) => {
+          rootEntities.forEach(entity => {
+            removedIds.push(fieldIdentifier(tableName, entity[schema.pk]))
+          })
+
+          if (disposeHandler) {
+            const scope = this.createScopedHandler<T>(db, queries, removedIds)
+            return disposeHandler(rootEntities, scope)
+              .concatMap(() => this.executor(queries))
+          } else {
+            return this.executor(queries)
+          }
+        })
+        .do(() => {
+          removedIds.forEach((id: string) => this.storedIds.delete(id))
         })
     })
   }
 
   dispose() {
-    const queue = this.database$.flatMap(db => {
-      const tables = db.getSchema().tables()
-      return tables.map(t => db.delete().from(t))
-    })
+    if (!this.connected) {
+      return Observable.throw(Exception.NotConnected())
+    }
 
-    return Observable.forkJoin(queue)
-      .concatMap(queries => this.executor(queries))
-      .do(() => {
-        this.hooks.forEach(tableHookDef => {
-          tableHookDef.insert = []
-          tableHookDef.destroy = []
-        })
+    const cleanup = this.database$.map(db =>
+      db.getSchema().tables().map(t => db.delete().from(t)))
 
-        this.storedIds.clear()
-      })
+    return cleanup.concatMap(queries => this.executor(queries))
       .concatMapTo(this.database$)
       .do(db => {
         db.close()
+        this.schemas.clear()
+        this.storedIds.clear()
+        this.schemaBuilder = null
         this.subscription.unsubscribe()
       })
   }
 
-  private buildTables(builder: lf.schema.Builder) {
-    this.schemaMetaData.forEach((schemaDef, tableName) => {
-      const tableBuilder = builder.createTable(tableName)
-      this.buildTableRows(tableName, schemaDef, tableBuilder)
+  private buildTables() {
+    this.schemaDefs.forEach((schemaDef, tableName) => {
+      const tableBuilder = this.schemaBuilder.createTable(tableName)
+      this.parseSchemaDef(tableName, schemaDef, tableBuilder)
     })
   }
 
   /**
-   * 解析 schemaMetaData
-   * 根据解析后的 metadata 建表
-   * 根据 metadata 中定义的关联关系新建 store hook
+   * 解析 schemaDefs, 根据解析后的 metadata 建表
    */
-  private buildTableRows(
+  private parseSchemaDef(
     tableName: string,
-    schemaMetaData: SchemaDef<any>,
+    schemaDef: SchemaDef<any>,
     tableBuilder: lf.schema.TableBuilder
   ) {
     const uniques: string[] = []
     const indexes: string[] = []
     const primaryKey: string[] = []
     const nullable: string[] = []
-    const fields = new Set<string>()
-    const virtualMeta = new Map<string, VirtualMetadata>()
+    const columns = new Map<string, RDBType>()
+    const associations = new Map<string, Association>()
     const mapper = new Map<string, Function>()
+    const disposeHandler =
+      (typeof schemaDef.dispose === 'function' && schemaDef.dispose) ||
+      (typeof schemaDef[dispose] === 'function' && schemaDef[dispose]) || null
 
-    // src: schemaMetaData; dest: uniques, indexes, primaryKey, nullable, fields, vitualMeta, mapper
+    // src: schemaDef; dest: uniques, indexes, primaryKey, nullable, associations, mapper
     // no short-curcuiting
-    forEach(schemaMetaData, (def, key) => {
-      if (!def.virtual) {
-        tableBuilder = this.addRow(tableBuilder, key, def.type as RDBType, nullable, def)
-        fields.add(key)
+    forEach(schemaDef, (def, key) => {
+      if (typeof def === 'function') {
+        return
+      }
 
-        let flag = false
+      if (!def.virtual) {
+        this.createColumn(tableBuilder, key, def.type as RDBType, nullable, mapper)
+        columns.set(key, def.type)
 
         if (def.primaryKey) {
+          assert(!primaryKey[0], Exception.PrimaryKeyConflict())
           primaryKey.push(key)
-          this.primaryKeysMap.set(tableName, key)
-          flag = flag || true
         }
 
         if (def.unique) {
           uniques.push(key)
-          flag = flag || true
         }
 
         if (def.index) {
           indexes.push(key)
-          flag = flag || true
         }
 
-        if (!flag) {
+        const isNullable = ![def.primaryKey, def.index, def.unique].some(identity)
+        if (isNullable) {
           nullable.push(key)
         }
-
       } else {
-        fields.delete(key)
-        virtualMeta.set(key, {
+        associations.set(key, {
           where: def.virtual.where,
-          association: def.type as Association,
+          type: def.type as Relationship,
           name: def.virtual.name
         })
-
-        this.defineHook(tableName, {
-          insert: (db: lf.Database, entity: any) => {
-            return this.createInsertHook(db, tableName, key, def, entity)
-          }
-        })
       }
-
-      if (!def['isHidden']) {
-        return
-      }
-
-      mapper.set(key, def['hiddenMapper'])
-      // create a hidden column in table and make compare datetime easier
-      // not elegant but it worked
-      this.defineHook(tableName, {
-        insert: (_db: lf.Database, entity: any) => {
-          return new Promise(resolve => {
-            const hiddenVal = entity[key]
-            const mapFn = mapper.get(key)
-            entity[`${Database.__HIDDEN__}${key}`] = hiddenVal
-            entity[key] = mapFn(hiddenVal)
-            resolve()
-          })
-        }
-      })
     })
 
-    const selectResult = { fields, virtualMeta, mapper }
-    this.selectMetaData.set(tableName, selectResult)
-    tableBuilder = tableBuilder.addPrimaryKey(primaryKey)
+    this.schemas.set(tableName, {
+      pk: primaryKey[0],
+      mapper,
+      columns,
+      dispose: disposeHandler,
+      associations
+    })
 
     if (indexes.length) {
       tableBuilder.addIndex('index', indexes)
@@ -720,401 +378,332 @@ export class Database {
       tableBuilder.addNullable(nullable)
     }
 
-    return selectResult
-  }
-
-  /**
-   * 在 normalize 的时候定义 insertHook
-   * 在 insert 数据到这个 table 的时候调用
-   * 这里新建的 hook 是把 schemaMetaData 中的关联的数据剥离，单独存储
-   * 存储的时候会验证 virtual props 的类型与定义时候明确的关联关系是否一致
-   */
-  private createInsertHook(
-    db: lf.Database,
-    tableName: string,
-    key: string,
-    def: SchemaMetadata<any>,
-    entity: any
-  ) {
-    const prop: any = entity[key]
-    if (!prop) {
-      return Promise.resolve()
-    }
-
-    const propType = typeof prop
-    if (propType !== 'object') {
-      return Promise.reject(INVALID_NAVIGATINO_TYPE_ERR(prop, ['Object / Array', propType]))
-    }
-
-    const virtualTableName = def.virtual.name
-    const pk = this.primaryKeysMap.get(virtualTableName)
-    const [ virtualTable ] = Database.getTable(db, virtualTableName)
-    const virtualMetadata = this.selectMetaData.get(tableName).virtualMeta
-    const recordType = virtualMetadata.get(key).association
-
-    const virtualTableDef = virtualMetadata.get(key)
-    virtualTableDef.name = virtualTableName
-
-    switch (recordType) {
-      case Association.oneToMany:
-        if (!Array.isArray(prop)) {
-          return Promise.reject(INVALID_NAVIGATINO_TYPE_ERR(key))
-        }
-
-        const insertQueue = Promise.all(prop.map(data => {
-          return this.upsertVirtualProp(db, pk, virtualTable, data)
-        }))
-
-        return Observable.fromPromise(insertQueue)
-          .do(() => delete entity[key])
-          .reduce((acc, curr) => acc.concat(curr))
-          .toPromise()
-
-      case Association.oneToOne:
-        if (propType !== 'object' || Array.isArray(prop)) {
-          return Promise.reject(INVALID_NAVIGATINO_TYPE_ERR(key, ['Object', propType === 'object' ? 'Array' : propType]))
-        }
-
-        return this.upsertVirtualProp(db, pk, virtualTable, prop)
-          .then(() => delete entity[key])
-
-      case Association.manyToMany:
-        return Promise.reject(NOT_IMPLEMENT_ERR())
-      default:
-        return Promise.reject(UNEXPECTED_ASSOCIATION_ERR())
-    }
-  }
-
-  /**
-   * 将 virtual prop 分离存储
-   * 比如 TaskSchema:
-   * {
-   *   _id: TaskId,
-   *   project: {
-   *     _id: ProjectId,
-   *     name: string
-   *   }
-   *   ...
-   * }
-   * 这个方法会将 project 字段从 TaskSchema 上剥离，存储到对应的 Project 表中
-   * 表的名字定义在 schemaMetaData 中
-   */
-  private upsertVirtualProp<T> (
-    db: lf.Database,
-    pk: string,
-    table: lf.schema.Table,
-    data: T
-  ) {
-    const clause = {
-      [pk]: data[pk]
-    }
-    const predicate = new PredicateProvider(table, clause).getPredicate()
-    return db.select().from(table)
-      .where(predicate)
-      .exec()
-      .then((rows) => {
-        if (rows.length) {
-          return this
-            .update(table.getName(), { where: clause }, data)
-            .toPromise()
-        } else {
-          return this.insert<T>(table.getName(), data).toPromise()
-        }
-      })
+    tableBuilder.addPrimaryKey(primaryKey)
   }
 
   private buildSelector<T>(
-    db: lf.Database,
     tableName: string,
-    queryClause: QueryDescription<T>
+    clause: Query<T>
   ) {
-    const pk = this.primaryKeysMap.get(tableName)
-    const selectMetadata = this.selectMetaData.get(tableName)
-    const hasQueryFields = !!queryClause.fields
+    return this.database$.map((db) => {
+      const schema = this.findSchema(tableName)
+      const pk = schema.pk
+      const containFields = !!clause.fields
 
-    const fields = queryClause.fields
-    const isKeyQueried = queryClause.fields ? queryClause.fields.indexOf(pk) > -1 : true
-    const queriedFields: Set<FieldsValue> = hasQueryFields ? new Set(fields) : selectMetadata.fields
-    const {
-      table,
-      columns,
-      joinInfo,
-      definition
-    } = this.traverseFields(db, tableName, queriedFields, isKeyQueried, !hasQueryFields)
+      const containKey = containFields ? contains(pk, clause.fields) : true
+      const fields: Set<Fields> = containFields ? new Set(clause.fields) : new Set(schema.columns.keys())
+      const { table, columns, joinInfo, definition } =
+        this.traverseQueryFields(db, tableName, fields, containKey, !containFields)
+      const query =
+        predicatableQuery(db, table, null, StatementType.Select, ...columns)
 
-    const query = db.select(...columns).from(table)
-    joinInfo.forEach((info: JoinInfo) => {
-      query.leftOuterJoin(info.table, info.predicate)
-    })
+      joinInfo.forEach((info: JoinInfo) =>
+        query.leftOuterJoin(info.table, info.predicate))
 
-    const orderDesc = queryClause.orderBy ? queryClause.orderBy
-      .map(desc => ({
-        column: table[desc.fieldName],
-        orderBy: !desc.orderBy ? null : lf.Order[desc.orderBy]
-      })) : []
+      const orderDesc = (clause.orderBy || []).map(desc => {
+        return {
+          column: table[desc.fieldName],
+          orderBy: !desc.orderBy ? null : lf.Order[desc.orderBy]
+        }
+      })
 
-    return new Selector<T>(db, query, {
-        mainTable: table,
+      const matcher = {
         pk: {
-          queried: isKeyQueried,
-          name: pk
+          name: pk,
+          queried: containKey
         },
-        definition: definition
-      },
-      new PredicateProvider(table, queryClause.where),
-      queryClause.limit,
-      queryClause.skip,
-      orderDesc
-    )
+        definition,
+        mainTable: table
+      }
+      const { limit, skip } = clause
+      const provider = new PredicateProvider(table, clause.where)
+
+      return new Selector<T>(db, query, matcher, provider, limit, skip, orderDesc)
+    })
   }
 
-  private addRow(
+  private createColumn(
     tableBuilder: lf.schema.TableBuilder,
-    rowName: string,
+    columnName: string,
     rdbType: RDBType,
     nullable: string[],
-    def: SchemaMetadata<any>
+    mapper: Map<string, Function>
   ): lf.schema.TableBuilder {
-    const hiddenName = `${Database.__HIDDEN__}${rowName}`
+    const hiddenName = hiddenColName(columnName)
 
     switch (rdbType) {
       case RDBType.ARRAY_BUFFER:
-        return tableBuilder.addColumn(rowName, lf.Type.ARRAY_BUFFER)
+        return tableBuilder.addColumn(columnName, lf.Type.ARRAY_BUFFER)
       case RDBType.BOOLEAN:
-        return tableBuilder.addColumn(rowName, lf.Type.BOOLEAN)
+        return tableBuilder.addColumn(columnName, lf.Type.BOOLEAN)
       case RDBType.DATE_TIME:
-        nullable.push(hiddenName);
-        (def as any).isHidden = true;
-        (def as any).hiddenMapper = (val: string) => val ? new Date(val).valueOf() : new Date(0).valueOf()
+        nullable.push(hiddenName)
+        mapper.set(columnName, (val: string) => val ? new Date(val).valueOf() : new Date(0).valueOf())
         return tableBuilder
-          .addColumn(rowName, lf.Type.INTEGER)
+          .addColumn(columnName, lf.Type.INTEGER)
           .addColumn(hiddenName, lf.Type.STRING)
       case RDBType.INTEGER:
-        return tableBuilder.addColumn(rowName, lf.Type.INTEGER)
+        return tableBuilder.addColumn(columnName, lf.Type.INTEGER)
       case RDBType.LITERAL_ARRAY:
-        nullable.push(hiddenName);
-        (def as any).isHidden = true;
-        (def as any).hiddenMapper = (val: any[]) => val ? val.join('|') : ''
+        nullable.push(hiddenName)
+        mapper.set(columnName, (val: any[]) => val ? val.join('|') : '')
         return tableBuilder
-          .addColumn(rowName, lf.Type.STRING)
+          .addColumn(columnName, lf.Type.STRING)
           .addColumn(hiddenName, lf.Type.OBJECT)
       case RDBType.NUMBER:
-        return tableBuilder.addColumn(rowName, lf.Type.NUMBER)
+        return tableBuilder.addColumn(columnName, lf.Type.NUMBER)
       case RDBType.OBJECT:
-        return tableBuilder.addColumn(rowName, lf.Type.OBJECT)
+        return tableBuilder.addColumn(columnName, lf.Type.OBJECT)
       case RDBType.STRING:
-        return tableBuilder.addColumn(rowName, lf.Type.STRING)
+        return tableBuilder.addColumn(columnName, lf.Type.STRING)
       default:
-        throw INVALID_ROW_TYPE_ERR()
+        throw Exception.InvalidType()
     }
   }
 
   // context 用来标记DFS路径中的所有出现过的表，用于解决self-join时的二义性
   // path 用来标记每个查询路径上出现的表，用于解决circular reference
-  private traverseFields(
+  private traverseQueryFields(
     db: lf.Database,
     tableName: string,
-    fieldTree: Set<FieldsValue>,
-    hasKey: boolean = true,
-    glob: boolean = false,
+    fieldsValue: Set<Fields>,
+    hasKey: boolean,
+    glob: boolean,
     path: string[] = [],
-    context: TraverseContext = {}
+    context: Record = {}
   ) {
-    const tableInfo = this.selectMetaData.get(tableName)
-    const allFields = Object.create(null)
-    const definition = Object.create(null)
-    const associationItem: string[] = []
-    const associationMeta: string[] = []
+    const schema = this.findSchema(tableName)
+    const rootDefinition = Object.create(null)
+    const navigators: string[] = []
 
-    let columns: lf.schema.Column[] = []
-    let joinInfo: JoinInfo[] = []
-    let advanced: boolean = true
+    const columns: lf.schema.Column[] = []
+    const joinInfo: JoinInfo[] = []
 
-    if (path.indexOf(tableName) !== -1) {
-      advanced = false
-      return { columns, allFields, joinInfo, advanced, table: null, definition: null }
+    if (contains(tableName, path)) { // thinking mode: implicit & explicit
+      return { columns, joinInfo, advanced: false, table: null, definition: null }
     } else {
       path.push(tableName)
     }
 
-    tableInfo.virtualMeta.forEach((_, assoc) => {
-      if (glob && path.indexOf(assoc) === -1) {
-        fieldTree.add(assoc)
-        associationItem.push(assoc)
+    schema.associations.forEach((_, nav) => {
+      if (glob && !contains(nav, path)) {
+        fieldsValue.add(nav)
       }
-      associationMeta.push(assoc)
+      navigators.push(nav)
     })
 
-    if (fieldTree.size === associationMeta.length
-        && associationMeta.every((assoc) => fieldTree.has(assoc))) {
-      throw INVALID_FIELD_DES_ERR()
-    }
+    const onlyNavigator = fieldsValue.size === navigators.length &&
+      navigators.every((nav) => fieldsValue.has(nav))
+    assert(!onlyNavigator, Exception.InvalidQuery())
 
     if (!hasKey) {
-      const pk = this.primaryKeysMap.get(tableName)
-      fieldTree.add(pk)
+      fieldsValue.add(schema.pk)
     }
 
     const suffix = (context[tableName] || 0) + 1
     context[tableName] = suffix
-    const contextName = `${tableName}@${suffix}`
-    const currentTable = Database.getTable(db, tableName)[0].as(contextName)
+    const contextName = contextTableName(tableName, suffix)
+    const currentTable = Database.getTables(db, tableName)[0].as(contextName)
 
-    const handleAdvanced = (ret: any, key: string, assocDesc: VirtualMetadata) => {
-      columns = columns.concat(ret.columns)
-      allFields[key] = ret.allFields
-
-      if (definition[key]) {
-        throw ALIAS_CONFLICT_ERR(key, tableName)
-      }
-      definition[key] = Database.reviseAssocDefinition(assocDesc.association, ret.definition)
-
-      const predicate = Database.unwrapPredicate(ret.table, currentTable, assocDesc.where)
-      const joinLink = predicate ?
-        [{ table: ret.table, predicate }, ...ret.joinInfo] : ret.joinInfo
-      joinInfo = joinInfo.concat(joinLink)
-    }
-
-    fieldTree.forEach(field => {
-      if (typeof field === 'string'
-          && associationItem.indexOf(field) === -1
-          && associationMeta.indexOf(field) === -1) {
-        const column = currentTable[field]
-        if (column) {
-          const schema = this.schemaMetaData.get(tableName)
-          const hiddenName = `${Database.__HIDDEN__}${field}`
-          const hiddenCol = currentTable[hiddenName]
-          const fieldName = `${contextName}__${field}`
-          const col = hiddenCol ? hiddenCol.as(fieldName) : column.as(fieldName)
-
-          columns.push(col)
-          allFields[field] = true
-
-          if (!definition[field]) {
-            definition[field] = Graphify.definition(
-              fieldName,
-              !!schema[field].primaryKey,
-              schema[field].type
-            )
-          } else {
-            throw ALIAS_CONFLICT_ERR(field, tableName)
-          }
-
-        } else {
-          NON_EXISTENT_FIELD_WARN(field, tableName)
-        }
-      } else if (typeof field === 'object') {
-        forEach(field, (value, key) => {
-          const assocDesc = tableInfo.virtualMeta.get(key)
-          if (!assocDesc) {
-            NON_DEFINED_PROPERTY_WARN(key)
-            return
-          }
-
-          const pk = this.primaryKeysMap.get(key)
-          const keyInFields = value.indexOf(pk) > -1
-          const associationName = assocDesc.name
-          const ret = this.traverseFields(
-            db,
-            associationName,
-            new Set(value as FieldsValue[]),
-            keyInFields,
-            glob,
-            path.slice(0),
-            context
-          )
-
-          if (ret.advanced) {
-            handleAdvanced(ret, key, assocDesc)
-          }
-        })
-      } else if (typeof field === 'string' && associationMeta.indexOf(field) > -1) {
-        const assocDesc = tableInfo.virtualMeta.get(field)
-        if (!assocDesc) {
-          NON_DEFINED_PROPERTY_WARN(field)
-          return
-        }
-
-        const associationName = assocDesc.name
-        const ret = this.traverseFields(
-          db,
-          associationName,
-          this.selectMetaData.get(associationName).fields,
-          true,
-          true,
-          path.slice(0),
-          context
-        )
-
-        if (ret.advanced) {
-          handleAdvanced(ret, field, assocDesc)
-        }
-      }
-    })
-
-    return { columns, allFields, joinInfo, advanced, table: currentTable, definition }
-  }
-
-  private traverseData(
-    db: lf.Database,
-    tableName: string,
-    data: any,
-    insertMods: Modifier[],
-    updateMods: Modifier[],
-    sharing: Map<string, Modifier> = new Map<string, Modifier>()
-  ) {
-    if (Array.isArray(data)) {
-      data.map((item) =>
-        this.traverseData(db, tableName, item, insertMods, updateMods, sharing))
-    } else {
-      const schema = this.schemaMetaData.get(tableName)
-      const pk = this.primaryKeysMap.get(tableName)
-      const pkVal = data[pk]
-
-      if (pkVal === undefined) {
-        throw PRIMARY_KEY_NOT_PROVIDED_ERR()
-      }
-
-      const [ table ] = Database.getTable(db, tableName)
-      const identifier = `${tableName}@${pkVal}`
-
-      const isTraversed = sharing.has(identifier)
-      const op = (this.storedIds.has(pkVal) || isTraversed) ? UpsertOps.update : UpsertOps.insert
-      const modifier = isTraversed ? sharing.get(identifier) : new Modifier(db, table)
-
-      if (!isTraversed) {
-        sharing.set(identifier, modifier)
-      }
-
-      forEach(data, (val, key) => {
-        if (schema[key] === undefined) {
-          return
-        }
-
-        if (typeof schema[key].virtual === 'object') {
-          this.traverseData(db, schema[key].virtual.name, val, insertMods, updateMods, sharing)
-          return
-        }
-
-        if (key !== pk && table[key]) {
-          if (schema[key].isHidden) {
-            modifier.patch({
-              [key]: schema[key].hiddenMapper(val),
-              [`${Database.__HIDDEN__}${key}`]: val
-            })
-          } else {
-            modifier.patch({ [key]: val })
-          }
-        } else if (key === pk && !isTraversed) {
-          modifier.assignPk(key, val)
-        }
-      })
-
-      if (isTraversed) {
+    const handleAdvanced = (ret: any, key: string, defs: Association | ColumnDef) => {
+      if (!ret.advanced) {
         return
       }
 
-      (op === UpsertOps.update ? updateMods : insertMods).push(modifier)
+      columns.push(...ret.columns)
+      assert(!rootDefinition[key], Exception.AliasConflict(key, tableName))
+
+      if ((defs as ColumnDef).column) {
+        rootDefinition[key] = defs
+      } else {
+        const { where, type } = defs as Association
+        rootDefinition[key] = definition.revise(type, ret.definition)
+        const [ predicate, err ] = tryCatch(createPredicate)(currentTable, where(ret.table))
+        if (err) {
+          warn(
+            `Failed to build predicate, since ${err.message}` +
+            `, on table: ${ret.table.getName()}`
+          )
+        }
+        const joinLink = predicate
+          ? [{ table: ret.table, predicate }, ...ret.joinInfo]
+          : ret.joinInfo
+
+        joinInfo.push(...joinLink)
+      }
+    }
+
+    const traversable = new Traversable<SelectContext>(fieldsValue)
+
+    traversable.context((field, val, ctx) => {
+      if (ctx.isRoot || typeof field !== 'string') {
+        return false
+      }
+
+      const isNavigatorLeaf = contains(field, navigators)
+      const type = isNavigatorLeaf ? LeafType.navigator : LeafType.column
+      const key = ctx.key ? ctx.key : val
+
+      if (isNavigatorLeaf) {
+        const description = schema.associations.get(ctx.key)
+        if (!description) {
+          warn(`Build a relationship failed, field: ${ctx.key}.`)
+          return false
+        }
+
+        return { type, key, leaf: this.navigatorLeaf(description, ctx.key, val) }
+      }
+
+      if (!currentTable[field]) {
+        warn(`Column: ${field} is not exist on ${tableName}`)
+        return false
+      }
+
+      return { type, key, leaf: this.columnLeaf(currentTable, contextName, field) }
+    })
+
+    traversable.forEach((ctx) => {
+      switch (ctx.type) {
+        case LeafType.column:
+          const { column, identifier } = ctx.leaf as ColumnLeaf
+          const type = schema.columns.get(ctx.key)
+          const columnDef = definition.create(identifier, schema.pk === ctx.key, type)
+          handleAdvanced({ columns: [column], advanced: true }, ctx.key, columnDef)
+          break
+        case LeafType.navigator:
+          const { containKey, fields, assocaiation } = ctx.leaf as NavigatorLeaf
+          const ret =
+            this.traverseQueryFields(db, assocaiation.name, new Set(fields), containKey, glob, path.slice(0), context)
+          handleAdvanced(ret, ctx.key, assocaiation)
+          break
+      }
+    })
+
+    return { columns, joinInfo, advanced: true, table: currentTable, definition: rootDefinition }
+  }
+
+  private traverseCompound(
+    db: lf.Database,
+    tableName: string,
+    compoundEntites: any,
+    insertMutList: Mutation[],
+    updateMutList: Mutation[],
+    sharing: Map<string, Mutation>
+  ) {
+    if (Array.isArray(compoundEntites)) {
+      compoundEntites.forEach((item) =>
+        this.traverseCompound(db, tableName, item, insertMutList, updateMutList, sharing))
+      return
+    }
+
+    const schema = this.findSchema(tableName)
+    const pk = schema.pk
+    const pkVal = compoundEntites[pk]
+    assert(pkVal !== undefined, Exception.PrimaryKeyNotProvided())
+
+    const [ table ] = Database.getTables(db, tableName)
+    const identifier = fieldIdentifier(tableName, pkVal)
+    const visited = contains(identifier, sharing)
+    const stored =  contains(identifier, this.storedIds)
+    const mut = visited ? sharing.get(identifier) : new Mutation(db, table)
+
+    if (!visited) {
+      const list = stored ? updateMutList : insertMutList
+      list.push(mut)
+      sharing.set(identifier, mut)
+    }
+
+    const traversable = new Traversable<UpsertContext>(compoundEntites)
+
+    traversable.context((key, _, ctx) => {
+      const isNavigator = schema.associations.has(key)
+      const isColumn = schema.columns.has(key)
+      const mapper = (isColumn && schema.mapper.get(key)) || null
+
+      return (ctx.isRoot || (!isColumn && !isNavigator)) ? false : {
+        mapper,
+        visited,
+        isNavigatorLeaf: isNavigator
+      }
+    })
+
+    traversable.forEach((ctx, node) => {
+      if (ctx.isNavigatorLeaf) {
+        ctx.skip()
+        const ref = schema.associations.get(ctx.key).name
+        return this.traverseCompound(db, ref, node, insertMutList, updateMutList, sharing)
+      }
+
+      if (ctx.key !== pk) {
+        // 如果字段不为主键
+        const res = ctx.mapper ? {
+          [ctx.key]: ctx.mapper(node),
+          [hiddenColName(ctx.key)]: node
+        } : { [ctx.key]: node }
+        mut.patch(res)
+      } else if (ctx.key === pk && !ctx.visited) {
+        // 如果该字段为该表主键, 且该节点是第一次在过程中访问
+        // i.e. sharing.has(identifier) is equl to false
+        mut.withId(ctx.key, node)
+      }
+    })
+  }
+
+  private columnLeaf(table: lf.schema.Table, tableName: string, key: string) {
+    const column = table[key]
+    const hiddenName = hiddenColName(key)
+    const identifier = fieldIdentifier(tableName, key)
+    const hiddenCol = table[hiddenName]
+    const ret = hiddenCol ? hiddenCol.as(identifier) : column.as(identifier)
+
+    return {
+      identifier,
+      column: ret
+    }
+  }
+
+  private navigatorLeaf(assocaiation: Association, _: string, val: any) {
+    const schema = this.findSchema(assocaiation.name)
+    const fields = typeof val === 'string'
+      ? new Set(schema.columns.keys())
+      : val
+
+    return {
+      fields,
+      assocaiation,
+      containKey: contains(schema.pk, val)
+    }
+  }
+
+  private createScopedHandler<T>(db: lf.Database, queryCollection: any[], keys: any[]) {
+    return (tableName: string): ScopedHandler => {
+      const pk = this.findPrimaryKey(tableName)
+
+      const remove = (entities: T[]) => {
+        const [ table ] = Database.getTables(db, tableName)
+        entities.forEach(entity => {
+          const pkVal = entity[pk]
+          const clause = createPkClause(pk, pkVal)
+          const predicate = createPredicate(table, clause)
+          const query = predicatableQuery(db, table, predicate, StatementType.Delete)
+
+          queryCollection.push(query)
+          keys.push(fieldIdentifier(tableName, pkVal))
+        })
+      }
+
+      const get = (where: Predicate<any> = null) => {
+        const [ table ] = Database.getTables(db, tableName)
+        const [ predicate, err ] = tryCatch(createPredicate)(table, where)
+        if (err) {
+          return Observable.throw(err)
+        }
+        const query = predicatableQuery(db, table, predicate, StatementType.Select)
+
+        return Observable.fromPromise<T[]>(query.exec())
+      }
+
+      return [get, remove]
     }
   }
 
@@ -1122,19 +711,17 @@ export class Database {
     return this.database$.concatMap(db => {
       const tx = db.createTransaction()
       const handler = {
-        error: () => {
-          Logger.warn('Execute failed, transaction is already marked for rollback.')
-        }
+        error: () => warn(`Execute failed, transaction is already marked for rollback.`)
       }
 
-      return Observable.from(tx.exec(queries))
+      return Observable.fromPromise(tx.exec(queries))
+        .do(handler)
         .map((ret) => {
           return {
             result: true,
-            ...Database.mergeQueriesType(queries, ret)
+            ...mergeTransactionResult(queries, ret)
           }
         })
-        .do(handler)
     })
   }
 
