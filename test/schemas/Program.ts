@@ -1,4 +1,4 @@
-import { Database, RDBType, Association } from '../index'
+import { Database, RDBType, Relationship, EngineerSchema } from '../index'
 
 export interface ProgramSchema {
   _id: string
@@ -7,27 +7,26 @@ export interface ProgramSchema {
   modules?: Object[]
 }
 
-export default (db: Database) => db.defineSchema('Program', {
+export default (db: Database) => db.defineSchema<ProgramSchema>('Program', {
   _id: {
     type: RDBType.STRING,
     primaryKey: true
   },
   ownerId: {
-    type: RDBType.STRING
+    type: RDBType.STRING,
+    index: true
   },
   owner: {
-    type: Association.oneToOne,
+    type: Relationship.oneToOne,
     virtual: {
       name: 'Engineer',
-      where: (
-        engineerTable: lf.schema.Table
-      ) => ({
-        ownerId: engineerTable['_id']
+      where: (ref: EngineerSchema) => ({
+        ownerId: ref._id
       })
     }
   },
   modules: {
-    type: Association.oneToMany,
+    type: Relationship.oneToMany,
     virtual: {
       name: 'Module',
       where: (
@@ -36,5 +35,19 @@ export default (db: Database) => db.defineSchema('Program', {
         _id: moduleTable['parentId']
       })
     }
+  },
+  ['@@dispose']: (rootEntities, scope) => {
+    const [ matcher1, disposer1 ] = scope('Module')
+    const [ matcher2, disposer2 ] = scope('Engineer')
+
+    return matcher1({ parentId: { $in: rootEntities.map((e) => e._id) } })
+      .do(disposer1)
+      .concatMap(modules => {
+        const engineers = rootEntities
+          .map(entity => entity.ownerId)
+          .concat(modules.map((m: any) => m.ownerId))
+        return matcher2({ _id: { $in: engineers } })
+      })
+      .do(disposer2)
   }
 })

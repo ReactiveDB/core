@@ -3,7 +3,7 @@ import { Database } from '../index'
 import ProjectSelectMetadata from './Project'
 import SubtaskSelectMetadata from './Subtask'
 import TaskSelectMetadata from './Task'
-import PostSelectMetadata from './Posts'
+import PostSelectMetadata from './Post'
 import EngineerSelectMetadata from './Engineer'
 import ModuleSelectMetadata from './Module'
 import ProgramSelectMetadata from './Program'
@@ -19,7 +19,7 @@ export default (db: Database) => {
 }
 
 export { ProjectSchema } from './Project'
-export { PostSchema } from './Posts'
+export { PostSchema } from './Post'
 export { SubtaskSchema } from './Subtask'
 export { TaskSchema } from './Task'
 export { ProgramSchema } from './Program'
