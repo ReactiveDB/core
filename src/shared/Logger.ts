@@ -76,7 +76,7 @@ export class Logger {
     if (!logger) {
       const ctxLogger = new ContextLogger(name, level || Logger.defaultLevel, formatter)
       Logger.contextMap.set(name, ctxLogger)
-      logger.destroy = () => Logger.contextMap.delete(name)
+      ctxLogger.destroy = () => Logger.contextMap.delete(name)
       return ctxLogger
     }
 

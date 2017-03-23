@@ -7,7 +7,11 @@ import * as Exception from '../../exception'
 export function revise(relation: Relationship, def: Object) {
   switch (relation) {
     case Relationship.oneToOne:
-      forEach(def, (value) => value.id = value.id ? false : value.id)
+      forEach(def, (value) => {
+        if (value.id) {
+          value.id = false
+        }
+      })
       break
     case Relationship.oneToMany:
       def = [def]
