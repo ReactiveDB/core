@@ -1,4 +1,4 @@
-import { forEach, clone, getType, assert } from '../../index'
+import { forEach, clone, getType, assert, hash } from '../../index'
 import { describe, it } from 'tman'
 import { expect } from 'chai'
 
@@ -393,6 +393,16 @@ export default describe('Utils Testcase: ', () => {
     it('should not throw when assert successed', () => {
       const check = () => assert(true, Error('error code path'))
       expect(check).to.not.throw()
+    })
+
+  })
+
+  describe('Func: hash', () => {
+
+    it('should be able to convert string to hash', () => {
+      expect(hash('')).to.equal(0)
+      expect(hash(' ')).to.equal(32)
+      expect(hash('  ')).to.equal(1024)
     })
 
   })

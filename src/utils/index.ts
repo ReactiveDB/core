@@ -1,3 +1,4 @@
+export * from './hash'
 export * from './clone'
 export * from './valid'
 export * from './option'
