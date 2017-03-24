@@ -29,6 +29,7 @@ export class Database {
   private schemas = new Map<string, ParsedSchema>()
   private schemaBuilder: lf.schema.Builder
   private connected = false
+  // note thin cache will be unreliable in some eage case
   private storedIds = new Set<string>()
   private subscription: Subscription
 
@@ -89,11 +90,20 @@ export class Database {
 
   load(data: any) {
     assert(!this.connected, Exception.DatabaseIsNotEmpty())
-    return this.database$.concatMap(db => db.import(data))
-      .do(() => {
+
+    return this.database$
+      .concatMap(db => {
         forEach(data.tables, (entities: any[], name: string) => {
           const schema = this.findSchema(name)
-          entities.forEach(entity => this.storedIds.add(entity[schema.pk]))
+          entities.forEach((entity: any) =>
+            this.storedIds.add(fieldIdentifier(name, entity[schema.pk])))
+        })
+        return db.import(data).catch(() => {
+          forEach(data.tables, (entities: any[], name: string) => {
+            const schema = this.findSchema(name)
+            entities.forEach((entity: any) =>
+              this.storedIds.delete(fieldIdentifier(name, entity[schema.pk])))
+          })
         })
       })
   }
@@ -137,8 +147,9 @@ export class Database {
         })
 
         const { contextIds, queries } = Mutation.aggregate(db, muts, [])
+        contextIds.forEach(id => this.storedIds.add(id))
         return this.executor(db, queries)
-          .do(() => contextIds.forEach(id => this.storedIds.add(id)))
+          .do({ error: () => contextIds.forEach(id => this.storedIds.delete(id)) })
       })
   }
 
@@ -212,9 +223,14 @@ export class Database {
         return Observable.fromPromise(prefetch.exec())
           .concatMap((scopedIds) => {
             const query = predicatableQuery(db, table, provider.getPredicate(), StatementType.Delete)
-            return this.executor(db, [query])
-              .do(() => scopedIds.forEach((entity: any) =>
-                this.storedIds.delete(fieldIdentifier(tableName, entity[pk]))))
+
+            scopedIds.forEach((entity: any) =>
+              this.storedIds.delete(fieldIdentifier(tableName, entity[pk])))
+
+            return this.executor(db, [query]).do({ error: () => {
+              scopedIds.forEach((entity: any) =>
+                this.storedIds.add(fieldIdentifier(tableName, entity[pk])))
+            }})
           })
       })
   }
@@ -233,10 +249,9 @@ export class Database {
 
       this.traverseCompound(db, tableName, clone(raw), insert, update, sharing)
       const { contextIds, queries } = Mutation.aggregate(db, insert, update)
+      contextIds.forEach(id => this.storedIds.add(id))
       return this.executor(db, queries)
-        .do(() => {
-          contextIds.forEach(id => this.storedIds.add(id))
-        })
+        .do({ error: () => contextIds.forEach(id => this.storedIds.delete(id)) })
     })
   }
 
@@ -265,13 +280,15 @@ export class Database {
           if (disposeHandler) {
             const scope = this.createScopedHandler<T>(db, queries, removedIds)
             return disposeHandler(rootEntities, scope)
+              .do(() => removedIds.forEach((id: string) => this.storedIds.delete(id)))
               .concatMap(() => this.executor(db, queries))
           } else {
+            removedIds.forEach((id: string) => this.storedIds.delete(id))
             return this.executor(db, queries)
           }
         })
-        .do(() => {
-          removedIds.forEach((id: string) => this.storedIds.delete(id))
+        .do({ error: () =>
+          removedIds.forEach((id: string) => this.storedIds.add(id))
         })
     })
   }
