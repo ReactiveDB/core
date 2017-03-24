@@ -29,6 +29,7 @@ export class Database {
   private schemas = new Map<string, ParsedSchema>()
   private schemaBuilder: lf.schema.Builder
   private connected = false
+  // note thin cache will be unreliable in some eage case
   private storedIds = new Set<string>()
   private subscription: Subscription
 
@@ -89,11 +90,20 @@ export class Database {
 
   load(data: any) {
     assert(!this.connected, Exception.DatabaseIsNotEmpty())
-    return this.database$.concatMap(db => db.import(data))
-      .do(() => {
+
+    return this.database$
+      .concatMap(db => {
         forEach(data.tables, (entities: any[], name: string) => {
           const schema = this.findSchema(name)
-          entities.forEach(entity => this.storedIds.add(entity[schema.pk]))
+          entities.forEach((entity: any) =>
+            this.storedIds.add(fieldIdentifier(name, entity[schema.pk])))
+        })
+        return db.import(data).catch(() => {
+          forEach(data.tables, (entities: any[], name: string) => {
+            const schema = this.findSchema(name)
+            entities.forEach((entity: any) =>
+              this.storedIds.delete(fieldIdentifier(name, entity[schema.pk])))
+          })
         })
       })
   }
@@ -137,8 +147,9 @@ export class Database {
         })
 
         const { contextIds, queries } = Mutation.aggregate(db, muts, [])
-        return this.executor(queries)
-          .do(() => contextIds.forEach(id => this.storedIds.add(id)))
+        contextIds.forEach(id => this.storedIds.add(id))
+        return this.executor(db, queries)
+          .do({ error: () => contextIds.forEach(id => this.storedIds.delete(id)) })
       })
   }
 
@@ -191,7 +202,7 @@ export class Database {
           }
         })
 
-        return this.executor([query])
+        return this.executor(db, [query])
       })
   }
 
@@ -212,9 +223,14 @@ export class Database {
         return Observable.fromPromise(prefetch.exec())
           .concatMap((scopedIds) => {
             const query = predicatableQuery(db, table, provider.getPredicate(), StatementType.Delete)
-            return this.executor([query])
-              .do(() => scopedIds.forEach((entity: any) =>
-                this.storedIds.delete(fieldIdentifier(tableName, entity[pk]))))
+
+            scopedIds.forEach((entity: any) =>
+              this.storedIds.delete(fieldIdentifier(tableName, entity[pk])))
+
+            return this.executor(db, [query]).do({ error: () => {
+              scopedIds.forEach((entity: any) =>
+                this.storedIds.add(fieldIdentifier(tableName, entity[pk])))
+            }})
           })
       })
   }
@@ -233,10 +249,9 @@ export class Database {
 
       this.traverseCompound(db, tableName, clone(raw), insert, update, sharing)
       const { contextIds, queries } = Mutation.aggregate(db, insert, update)
-      return this.executor(queries)
-        .do(() => {
-          contextIds.forEach(id => this.storedIds.add(id))
-        })
+      contextIds.forEach(id => this.storedIds.add(id))
+      return this.executor(db, queries)
+        .do({ error: () => contextIds.forEach(id => this.storedIds.delete(id)) })
     })
   }
 
@@ -265,13 +280,15 @@ export class Database {
           if (disposeHandler) {
             const scope = this.createScopedHandler<T>(db, queries, removedIds)
             return disposeHandler(rootEntities, scope)
-              .concatMap(() => this.executor(queries))
+              .do(() => removedIds.forEach((id: string) => this.storedIds.delete(id)))
+              .concatMap(() => this.executor(db, queries))
           } else {
-            return this.executor(queries)
+            removedIds.forEach((id: string) => this.storedIds.delete(id))
+            return this.executor(db, queries)
           }
         })
-        .do(() => {
-          removedIds.forEach((id: string) => this.storedIds.delete(id))
+        .do({ error: () =>
+          removedIds.forEach((id: string) => this.storedIds.add(id))
         })
     })
   }
@@ -284,15 +301,16 @@ export class Database {
     const cleanup = this.database$.map(db =>
       db.getSchema().tables().map(t => db.delete().from(t)))
 
-    return cleanup.concatMap(queries => this.executor(queries))
-      .concatMapTo(this.database$)
-      .do(db => {
-        db.close()
-        this.schemas.clear()
-        this.storedIds.clear()
-        this.schemaBuilder = null
-        this.subscription.unsubscribe()
-      })
+    return this.database$.concatMap(db => {
+      return cleanup.concatMap(queries => this.executor(db, queries))
+        .do(() => {
+          db.close()
+          this.schemas.clear()
+          this.storedIds.clear()
+          this.schemaBuilder = null
+          this.subscription.unsubscribe()
+        })
+    })
   }
 
   private buildTables() {
@@ -492,8 +510,8 @@ export class Database {
       navigators.push(nav)
     })
 
-    const onlyNavigator = fieldsValue.size === navigators.length &&
-      navigators.every((nav) => fieldsValue.has(nav))
+    const onlyNavigator = Array.from(fieldsValue.keys())
+      .every(key => contains(key, navigators))
     assert(!onlyNavigator, Exception.InvalidQuery())
 
     if (!hasKey) {
@@ -575,6 +593,7 @@ export class Database {
           const ret =
             this.traverseQueryFields(db, assocaiation.name, new Set(fields), containKey, glob, path.slice(0), context)
           handleAdvanced(ret, ctx.key, assocaiation)
+          ctx.skip()
           break
       }
     })
@@ -620,6 +639,11 @@ export class Database {
       const isColumn = schema.columns.has(key)
       const mapper = (isColumn && schema.mapper.get(key)) || null
 
+      if (!(isColumn || isNavigator || ctx.isRoot)) {
+        // 若当前节点非 有效节点、叶子节点或者根节点中任意一种时，直接停止子节点的迭代
+        ctx.skip()
+      }
+
       return (ctx.isRoot || (!isColumn && !isNavigator)) ? false : {
         mapper,
         visited,
@@ -628,8 +652,9 @@ export class Database {
     })
 
     traversable.forEach((ctx, node) => {
+      // 考虑到叶节点可能存在`Object` type， 所以无论分支节点还是叶节点，其后的结构都不迭代
+      ctx.skip()
       if (ctx.isNavigatorLeaf) {
-        ctx.skip()
         const ref = schema.associations.get(ctx.key).name
         return this.traverseCompound(db, ref, node, insertMutList, updateMutList, sharing)
       }
@@ -707,22 +732,20 @@ export class Database {
     }
   }
 
-  private executor(queries: lf.query.Builder[]) {
-    return this.database$.concatMap(db => {
-      const tx = db.createTransaction()
-      const handler = {
-        error: () => warn(`Execute failed, transaction is already marked for rollback.`)
-      }
+  private executor(db: lf.Database, queries: lf.query.Builder[]) {
+    const tx = db.createTransaction()
+    const handler = {
+      error: () => warn(`Execute failed, transaction is already marked for rollback.`)
+    }
 
-      return Observable.fromPromise(tx.exec(queries))
-        .do(handler)
-        .map((ret) => {
-          return {
-            result: true,
-            ...mergeTransactionResult(queries, ret)
-          }
-        })
-    })
+    return Observable.fromPromise(tx.exec(queries))
+      .do(handler)
+      .map((ret) => {
+        return {
+          result: true,
+          ...mergeTransactionResult(queries, ret)
+        }
+      })
   }
 
 }
