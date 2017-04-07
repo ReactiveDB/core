@@ -1,62 +1,61 @@
 import { Observable } from 'rxjs/Observable'
 import { Selector } from './Selector'
+import { ProxySelector } from './ProxySelector'
+
+export type SelectorMeta<T> = Selector<T> | ProxySelector<T>
 
 export class QueryToken<T> {
-  selector$: Observable<Selector<T>>
 
-  constructor(meta$: Observable<Selector<T>>) {
-    this.selector$ = meta$.publishReplay(1)
+  mapFn: <J, K>(v: J, index?: number, array?: J[]) => K
+  selector$: Observable<SelectorMeta<T>>
+
+  constructor(meta$: Observable<SelectorMeta<T>>) {
+    this.selector$ = meta$
+      .do((selector: SelectorMeta<T>) => {
+        if (!(selector instanceof ProxySelector)) {
+          (selector as Selector<T>).setMapFn(this.mapFn)
+        }
+      })
+      .publishReplay(1)
       .refCount()
   }
 
-  map<K>(fn: (val: T, index?: number) => K) {
-    return new QueryToken<K>((this.selector$ as Observable<Selector<any>>).do((selector) => {
-      const previousValues = selector.values
-      const previousChange$ = selector.change$
-
-      selector.change$ = previousChange$
-        .map((val: T[]) => val.map(fn))
-
-      selector.values = () => previousValues.call(selector)
-        .map((val: T[]) => val.map(fn))
-    }))
+  map<K>(fn: (v: T, index?: number, array?: T[]) => K) {
+    this.mapFn = fn
+    return this
   }
 
   values() {
-    return this.selector$
-      .flatMap(selector => selector.values())
+    return (this.selector$ as Observable<Selector<T>>)
+      .switchMap(selector => selector.values())
   }
 
   changes() {
-    return this.selector$
-      .flatMap(selector => selector.changes())
+    return (this.selector$ as Observable<Selector<T>>)
+      .switchMap(selector => selector.changes())
   }
 
   concat(...tokens: QueryToken<T>[]) {
-    tokens.unshift(this)
-    const newSelector$ = Observable.from(tokens)
-      .map(token => token.selector$)
-      .combineAll()
-      .map((r: Selector<T>[]) => {
-        const first = r.shift()
-        return first.concat(...r)
-      })
-    return new QueryToken(newSelector$)
+    return this.composeFactory(tokens, 'combine')
   }
 
   combine(...tokens: QueryToken<T>[]) {
-    tokens.unshift(this)
-    const newSelector$ = Observable.from(tokens)
-      .map(token => token.selector$)
-      .combineAll()
-      .map((r: Selector<T>[]) => {
-        const first = r.shift()
-        return first.combine(...r)
-      })
-    return new QueryToken(newSelector$)
+    return this.composeFactory(tokens, 'combine')
   }
 
   toString() {
     return this.selector$.map(r => r.toString())
+  }
+
+  private composeFactory(tokens: QueryToken<T>[], method: string) {
+    tokens.unshift(this)
+    const newSelector$ = Observable.from(tokens)
+      .map(token => token.selector$.skipWhile(v => v instanceof ProxySelector))
+      .combineAll()
+      .map((r: Selector<T>[]) => {
+        const first = r.shift()
+        return first[method](...r)
+      })
+    return new QueryToken(newSelector$)
   }
 }

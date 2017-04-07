@@ -74,6 +74,9 @@ export class Selector <T> {
   public select: string
 
   public change$: Observable<T[]>
+
+  private mapFn: <J, K>(v: J, index?: number, array?: J[]) => K = (v: T) => v
+
   private consumed = false
   private predicateBuildErr = false
 
@@ -224,6 +227,10 @@ export class Selector <T> {
     return this.change$
   }
 
+  setMapFn<J, K>(fn: (v: J, index?: number, array?: J[]) => K) {
+    this.mapFn = fn
+  }
+
   private getValue(pks?: (string | number)[]) {
     let q: lf.query.Select
     if (pks) {
@@ -244,6 +251,12 @@ export class Selector <T> {
         const result = graph<T>(rows, this.shape.definition)
         const col = this.shape.pk.name
         return !this.shape.pk.queried ? this.removeKey(result, col) : result
+      })
+      .then(v => {
+        if (typeof this.mapFn === 'function') {
+          v = v.map(this.mapFn)
+        }
+        return v
       })
   }
 
