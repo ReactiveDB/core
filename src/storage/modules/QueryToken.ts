@@ -27,7 +27,7 @@ export class QueryToken<T> {
 
   values() {
     return (this.selector$ as Observable<Selector<T>>)
-      .switchMap(selector => selector.values())
+      .switchMap(selector => selector.values()).take(1)
   }
 
   changes() {
@@ -56,6 +56,6 @@ export class QueryToken<T> {
         const first = r.shift()
         return first[method](...r)
       })
-    return new QueryToken(newSelector$)
+    return new QueryToken<T>(newSelector$)
   }
 }
