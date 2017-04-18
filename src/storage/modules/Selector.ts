@@ -266,7 +266,10 @@ export class Selector <T> {
       this.db.observe(rangeQuery, listener)
       return () => this.db.unobserve(rangeQuery, listener)
     })
-      // 多 emit 了一个值？？？
-      .skip(1)
+    /**
+     * TODO 这里返回的 observable 第一个值和第二个值在它们的值不为空
+     * 的时候是重复的，也许有必要省去做优化；但不能简单 skip(1)，因为
+     * 那样会导致不能推出空结果集。
+     */
   }
 }
