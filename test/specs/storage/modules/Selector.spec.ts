@@ -339,6 +339,48 @@ export default describe('Selector test', () => {
       }
     })
 
+    it('should work correctly with empty result set', function* () {
+      const impossibleTime = -1
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $eq: impossibleTime } }),
+        1, 0 // 添加 limit, skip 以模仿实际使用场景
+      )
+
+      const signal = selector.changes()
+
+      subscription = signal.subscribe()
+
+      yield signal
+        .subscribeOn(Scheduler.async)
+        .take(1)
+        .do((r: any) => {
+          // 确定能推出空结果集
+          expect(r).to.deep.equal([])
+        })
+
+      const impossibleRow = {
+        _id: '_id:939.5',
+        name: 'name:939.5',
+        time: impossibleTime,
+        priority: 10
+      }
+
+      yield db.insert()
+        .into(table)
+        .values([table.createRow(impossibleRow)])
+        .exec()
+
+      yield signal
+        .subscribeOn(Scheduler.async)
+        .take(1)
+        .do((r: any) => {
+          // 确定在空结果集上也能推出更新
+          expect(r[0]).to.deep.equal(impossibleRow)
+        })
+    })
+
     it('should observe changes when skip and limit', function* () {
       const selector = new Selector(db,
         db.select().from(table),
