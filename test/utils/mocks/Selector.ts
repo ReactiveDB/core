@@ -14,8 +14,10 @@ export class MockSelector<T> {
     MockSelector.selectMeta.get(_id).notify()
   }
 
+  private mapFn: <J, K>(v: J, index?: number, array?: J[]) => K = (v: T) => v
   private subject = new ReplaySubject<T[]>(1)
   private change$ = this.subject
+    .map(v => v.map(this.mapFn))
   private datas: T[]
 
   constructor(datas: Map<string, T>) {
@@ -58,11 +60,16 @@ export class MockSelector<T> {
         .map((r: T[][]) => r.reduce((acc, val) => acc.concat(val)))
     }
     return dist
-
   }
 
   toString() {
     return `MockSelector SQL`
+  }
+
+  setMapFn<J, K>(fn: (v: J, index?: number, array?: J[]) => K) {
+    if (typeof fn === 'function') {
+      this.mapFn = fn
+    }
   }
 
   private notify() {

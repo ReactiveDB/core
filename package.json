@@ -6,8 +6,8 @@
   "module": "dist/es6/index.js",
   "scripts": {
     "build_all": "npm run build_cjs && npm run build_module_es6 && npm run build_test",
-    "build_cjs": "rm -rf dist/cjs && tsc src/index.ts -m commonjs --outDir dist/cjs --sourcemap --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --noImplicitThis --noUnusedLocals --noUnusedParameters --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
-    "build_module_es6": "rm -rf dist/es6 && tsc src/index.ts -m ES2015 --outDir dist/es6 --sourcemap --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --noImplicitThis --noUnusedLocals --noUnusedParameters --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
+    "build_cjs": "rm -rf dist/cjs && tsc src/index.ts src/proxy/index.ts -m commonjs --outDir dist/cjs --sourcemap --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --noImplicitThis --noUnusedLocals --noUnusedParameters --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
+    "build_module_es6": "rm -rf dist/es6 && tsc src/index.ts src/proxy/index.ts -m ES2015 --outDir dist/es6 --sourcemap --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --noImplicitThis --noUnusedLocals --noUnusedParameters --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
     "build_test": "rm -rf spec-js && tsc test/run.ts -m commonjs --outDir spec-js --sourcemap  --target ES2015 --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node",
     "check_circular_dependencies": "madge ./dist/cjs --circular",
     "cover": "rm -rf ./.nyc_output ./coverage && NODE_ENV=test nyc --reporter=html --reporter=lcov --exclude=node_modules --exclude=spec-js/test --exclude=spec-js/src/storage/lovefield.js --exclude=spec-js/src/shared/Logger.js --exclude=spec-js/src/utils/option.js --exclude=spec-js/src/utils/valid.js tman --mocha spec-js/test/run.js",
@@ -66,10 +66,5 @@
   "peerDependencies": {
     "rxjs": "^5.2.0"
   },
-  "files": [
-    "src/**",
-    "dist/**",
-    "docs"
-  ],
-  "typings": "./dist/cjs/index.d.ts"
+  "typings": "./index.d.ts"
 }
