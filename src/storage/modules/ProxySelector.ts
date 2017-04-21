@@ -3,7 +3,7 @@ import { Query } from '../../interface'
 
 export class ProxySelector<T> {
 
-  private mapFn: <J, K>(v: J, index?: number, array?: J[]) => K = (v: T) => v
+  private mapFn: <U, K>(v: U, index?: number, array?: U[]) => K = (v: T) => v
 
   constructor (
     public request$: Observable<T> | Observable<T[]>,
