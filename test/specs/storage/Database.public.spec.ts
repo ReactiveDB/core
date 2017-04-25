@@ -1027,6 +1027,11 @@ export default describe('Database Testcase: ', () => {
       checkExecutorResult(execRet2, 1, 0, 0)
     })
 
+    it('should be able to handle `null` as entities', function* () {
+      const ret = yield database.upsert<PostSchema>('Post', null)
+      expect(ret.result).to.equal(false)
+    })
+
     it('should throw since entry does not contain PK property', function* () {
       const post = postGen(1, null).pop()
       const standardErr = PrimaryKeyNotProvided()

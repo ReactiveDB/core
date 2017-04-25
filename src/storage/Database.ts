@@ -249,9 +249,13 @@ export class Database {
 
       this.traverseCompound(db, tableName, clone(raw), insert, update, sharing)
       const { contextIds, queries } = Mutation.aggregate(db, insert, update)
-      contextIds.forEach(id => this.storedIds.add(id))
-      return this.executor(db, queries)
-        .do({ error: () => contextIds.forEach(id => this.storedIds.delete(id)) })
+      if (queries.length > 0) {
+        contextIds.forEach(id => this.storedIds.add(id))
+        return this.executor(db, queries)
+          .do({ error: () => contextIds.forEach(id => this.storedIds.delete(id)) })
+      } else {
+        return Observable.of({ result: false, insert: 0, update: 0, delete: 0, select: 0 })
+      }
     })
   }
 
@@ -609,6 +613,9 @@ export class Database {
     updateMutList: Mutation[],
     sharing: Map<string, Mutation>
   ) {
+    if (compoundEntites == null) {
+      return
+    }
     if (Array.isArray(compoundEntites)) {
       compoundEntites.forEach((item) =>
         this.traverseCompound(db, tableName, item, insertMutList, updateMutList, sharing))
