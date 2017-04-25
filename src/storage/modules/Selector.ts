@@ -123,15 +123,16 @@ export class Selector <T> {
     private skip?: number,
     private orderDescriptions?: OrderInfo[]
   ) {
-    let predicate: lf.Predicate
     if (predicateProvider) {
       try {
-        predicate = predicateProvider.getPredicate()
+        const predicate = predicateProvider.getPredicate()
         if (!predicate) {
+          predicateProvider = null
           this.predicateProvider = null
           this.predicateBuildErr = true
         }
       } catch (err) {
+        predicateProvider = null
         this.predicateProvider = null
         this.predicateBuildErr = true
         warn(
@@ -153,9 +154,11 @@ export class Selector <T> {
             }
             listener()
             const $in = mainTable[pk.name].in(pks)
-            predicate = predicate ? lf.op.and($in, predicate) : $in
+            const $predicate = predicateProvider
+              ? lf.op.and($in, predicateProvider.getPredicate())
+              : $in
             const query = this.query
-              .where(predicate)
+              .where($predicate)
             db.observe(query, listener)
             return () => this.db.unobserve(query, listener)
           })
@@ -169,8 +172,8 @@ export class Selector <T> {
             .then(r => observer.next(r as T[]))
             .catch(e => observer.error(e))
         }
-        const query = predicate ? this.query
-          .where(predicate) : this.query
+        const query = predicateProvider ? this.query
+          .where(predicateProvider.getPredicate()) : this.query
         listener()
         db.observe(query, listener)
 
