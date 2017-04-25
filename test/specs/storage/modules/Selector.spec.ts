@@ -568,6 +568,48 @@ export default describe('Selector test', () => {
           })
         })
     })
+
+    it('should observe updates to an inserted row', function* () {
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $lt: 0 } }),
+        20
+      )
+
+      const signal = selector.changes()
+
+      subscription = signal.subscribe()
+
+      yield signal.take(1)
+
+      const newRow = { _id: '_id:929.5', name: 'name:929.5', time: -1, priority: 10 }
+      const row = table.createRow(newRow)
+
+      yield db.insert()
+        .into(table)
+        .values([row])
+        .exec()
+
+      const newName = newRow.name + 'updated'
+      yield db.update(table)
+        .set(table['name'], newName)
+        .where(table['_id'].eq(newRow._id))
+        .exec()
+
+      yield signal.take(1)
+        .subscribeOn(Scheduler.async)
+        .do(r => {
+          expect(r).to.have.lengthOf(1)
+          const diff = r.filter((d: Fixture) => d._id === newRow._id)
+          expect(diff).to.have.lengthOf(1)
+          if (diff.length === 1) {
+            const diffRow: any = diff[0]
+            expect(diffRow._id).to.equal(newRow._id)
+            expect(diffRow.name).to.equal(newName)
+          }
+        })
+    })
   })
 
   describe('Selector.prototype.combine', () => {
