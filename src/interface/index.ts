@@ -83,7 +83,6 @@ export interface ExecutorResult {
   insert: number
   delete: number
   update: number
-  select: number
 }
 
 export interface TraverseContext {
