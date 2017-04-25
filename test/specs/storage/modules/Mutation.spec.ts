@@ -155,6 +155,13 @@ export default describe('Mutation Testcase: ', () => {
         expect(check2).throw(standardErr.message)
       })
 
+      it('should skip the `toUpdater` once params is empty', () => {
+        const mut = new Mutation(database, table)
+        const { queries } = Mutation.aggregate(database, [], [mut])
+
+        expect(queries).have.lengthOf(0)
+      })
+
     })
 
   })

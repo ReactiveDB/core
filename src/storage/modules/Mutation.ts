@@ -48,9 +48,16 @@ export class Mutation {
       })
     }
 
+    const updateQueries: lf.query.Update[] = []
+    for (let i = 0; i < update.length; i++) {
+      if (Object.keys(update[i].params).length > 0) {
+        updateQueries.push(update[i].toUpdater())
+      }
+    }
+
     return {
       contextIds: keys,
-      queries: [].concat(insertQueries).concat(update.map(m => m.toUpdater()))
+      queries: [].concat(insertQueries).concat(updateQueries)
     }
   }
 
