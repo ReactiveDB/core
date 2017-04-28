@@ -5,5 +5,4 @@ dist
 coverage
 .nyc_output
 .awcache
-yarn.lock
 .happypack
