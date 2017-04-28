@@ -25,7 +25,7 @@ export interface TaskSchema {
 }
 
 export default (db: Database) => {
-  db.defineSchema('Task', {
+  db.defineSchema<TaskSchema>('Task', {
     _creatorId: {
       type: RDBType.STRING
     },

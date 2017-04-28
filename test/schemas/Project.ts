@@ -3,8 +3,10 @@ import { TeambitionTypes, Database, RDBType, Relationship, PostSchema } from '..
 export interface ProjectSchema {
   _id: TeambitionTypes.ProjectId
   name: string
+  isArchived: boolean
+  posts: any[]
 }
-export default (db: Database) => db.defineSchema('Project', {
+export default (db: Database) => db.defineSchema<ProjectSchema>('Project', {
   _id: {
     type: RDBType.STRING,
     primaryKey: true

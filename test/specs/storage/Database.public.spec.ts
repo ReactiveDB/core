@@ -712,7 +712,7 @@ export default describe('Database Testcase: ', () => {
       const tmpDB = new Database(DataStoreType.MEMORY, false, `test:${++version}`, version)
       const T = 'FooTable'
 
-      tmpDB.defineSchema(T, {
+      tmpDB.defineSchema<any>(T, {
         id: {
           type: RDBType.NUMBER,
           primaryKey: true
