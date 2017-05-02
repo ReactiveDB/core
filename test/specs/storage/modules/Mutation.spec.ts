@@ -87,8 +87,8 @@ export default describe('Mutation Testcase: ', () => {
         const { queries } = Mutation.aggregate(database, [], muts)
 
         queries.forEach((q, i) => {
-          expect(q.params.content).is.ok
-          expect(q.params.content).is.equal(`${fixture[i][key]}${i}`)
+          expect((q as any).params.content).is.ok
+          expect((q as any).params.content).is.equal(`${fixture[i][key]}${i}`)
         })
       })
 

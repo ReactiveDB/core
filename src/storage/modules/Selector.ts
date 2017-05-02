@@ -13,11 +13,11 @@ export class Selector <T> {
     const [ meta ] = metaDatas
     const skipsAndLimits = metaDatas
       .map(m => ({ skip: m.skip, limit: m.limit }))
-      .sort((x, y) => x.skip - y.skip)
+      .sort((x, y) => x.skip! - y.skip!)
     const { db, lselect, shape, predicateProvider } = meta
     const [ minSkip ] = skipsAndLimits
     const maxLimit = skipsAndLimits.reduce((acc, current) => {
-      const nextSkip = acc.skip + acc.limit
+      const nextSkip = acc.skip! + acc.limit!
       assert(current.skip === nextSkip, Exception.TokenConcatFailed(`
         skip should be serial,
         expect: ${JSON.stringify(acc, null, 2)}
@@ -27,7 +27,7 @@ export class Selector <T> {
     })
     return new Selector(
       db, lselect, shape, predicateProvider,
-      maxLimit.limit + maxLimit.skip, minSkip.skip, meta.orderDescriptions
+      maxLimit.limit! + maxLimit.skip!, minSkip.skip, meta.orderDescriptions
     )
   }
 
@@ -81,7 +81,7 @@ export class Selector <T> {
   private predicateBuildErr = false
 
   private get rangeQuery(): lf.query.Select {
-    let predicate: lf.Predicate = null
+    let predicate: lf.Predicate | null = null
     const { predicateProvider } = this
     if (predicateProvider && !this.predicateBuildErr) {
       predicate = predicateProvider.getPredicate()
@@ -93,11 +93,11 @@ export class Selector <T> {
 
     if (this.orderDescriptions && this.orderDescriptions.length) {
       forEach(this.orderDescriptions, orderInfo =>
-        rangeQuery.orderBy(orderInfo.column, orderInfo.orderBy)
+        rangeQuery.orderBy(orderInfo.column, orderInfo.orderBy!)
       )
     }
 
-    rangeQuery.limit(this.limit).skip(this.skip)
+    rangeQuery.limit(this.limit!).skip(this.skip!)
 
     return rangeQuery
   }
@@ -107,7 +107,7 @@ export class Selector <T> {
 
     if (this.orderDescriptions && this.orderDescriptions.length) {
       forEach(this.orderDescriptions, orderInfo =>
-        q.orderBy(orderInfo.column, orderInfo.orderBy)
+        q.orderBy(orderInfo.column, orderInfo.orderBy!)
       )
     }
 
@@ -118,7 +118,7 @@ export class Selector <T> {
     public db: lf.Database,
     private lselect: lf.query.Select,
     private shape: ShapeMatcher,
-    public predicateProvider?: PredicateProvider<T>,
+    public predicateProvider?: PredicateProvider<T> | null,
     private limit?: number,
     private skip?: number,
     private orderDescriptions?: OrderInfo[]
@@ -155,7 +155,7 @@ export class Selector <T> {
             listener()
             const $in = mainTable[pk.name].in(pks)
             const $predicate = predicateProvider
-              ? lf.op.and($in, predicateProvider.getPredicate())
+              ? lf.op.and($in, predicateProvider.getPredicate()!)
               : $in
             const query = this.query
               .where($predicate)
@@ -173,7 +173,7 @@ export class Selector <T> {
             .catch(e => observer.error(e))
         }
         const query = predicateProvider ? this.query
-          .where(predicateProvider.getPredicate()) : this.query
+          .where(predicateProvider.getPredicate()!) : this.query
         listener()
         db.observe(query, listener)
 
@@ -186,10 +186,10 @@ export class Selector <T> {
   }
 
   toString(): string {
-    let predicate: lf.Predicate
+    let predicate: lf.Predicate | undefined
     const { predicateProvider } = this
     if (predicateProvider && !this.predicateBuildErr) {
-      predicate = predicateProvider.getPredicate()
+      predicate = predicateProvider.getPredicate()!
     }
     return predicate ? this.query.where(predicate).toSql() : this.query.toSql()
   }
@@ -213,11 +213,11 @@ export class Selector <T> {
   }
 
   concat(... selectMetas: Selector<T>[]): Selector<T> {
-    const orderStr = Selector.stringifyOrder(this.orderDescriptions)
+    const orderStr = Selector.stringifyOrder(this.orderDescriptions!)
     const equal = selectMetas.every(m =>
       m.select === this.select &&
-      m.predicateProvider.toString() === this.predicateProvider.toString() &&
-      Selector.stringifyOrder(m.orderDescriptions) === orderStr
+      m.predicateProvider!.toString() === this.predicateProvider!.toString() &&
+      Selector.stringifyOrder(m.orderDescriptions!) === orderStr
     )
     assert(equal, Exception.TokenConcatFailed())
 
@@ -240,13 +240,13 @@ export class Selector <T> {
       const predIn = this.shape.mainTable[this.shape.pk.name].in(pks)
       const predicate = (!this.predicateProvider || this.predicateBuildErr)
         ? predIn
-        : lf.op.and(predIn, this.predicateProvider.getPredicate())
+        : lf.op.and(predIn, this.predicateProvider.getPredicate()!)
 
       q = this.query.where(predicate)
     } else {
       q = this.query
       if (!this.predicateBuildErr) {
-        q = q.where(this.predicateProvider.getPredicate())
+        q = q.where(this.predicateProvider!.getPredicate()!)
       }
     }
     return q.exec()

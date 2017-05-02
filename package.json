@@ -8,12 +8,12 @@
     "build_all": "npm-run-all build_cjs build_module_es6 build_test",
     "build_cjs": "npm-run-all clean_dist_cjs copy_src_cjs compile_cjs",
     "build_module_es6": "npm-run-all clean_dist_es6 copy_src_es6 compile_module_es6",
-    "build_test": "rm -rf spec-js && tsc test/run.ts -m commonjs --outDir spec-js --sourcemap  --target ES2015 --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node",
+    "build_test": "rm -rf spec-js && tsc -p test/tsconfig.json",
     "clean_dist_cjs": "rm -rf ./dist/cjs",
     "clean_dist_es6": "rm -rf ./dist/es6",
     "check_circular_dependencies": "madge ./dist/cjs --circular",
-    "compile_cjs": "tsc dist/cjs/src/index.ts dist/cjs/src/proxy/index.ts -m commonjs --outDir dist/cjs --sourcemap --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --noImplicitThis --noUnusedLocals --noUnusedParameters --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
-    "compile_module_es6": "rm -rf dist/es6/dist/es6 && tsc dist/es6/src/index.ts src/proxy/index.ts -m ES2015 --outDir dist/es6 --sourcemap --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --noImplicitThis --noUnusedLocals --noUnusedParameters --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
+    "compile_cjs": "tsc dist/cjs/src/index.ts dist/cjs/src/proxy/index.ts -m commonjs --outDir dist/cjs --sourcemap --target ES5 -d --diagnostics --pretty --strict --noImplicitReturns --noUnusedLocals --noUnusedParameters --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
+    "compile_module_es6": "rm -rf dist/es6/dist/es6 && tsc dist/es6/src/index.ts src/proxy/index.ts -m ES2015 --outDir dist/es6 --sourcemap --target ES5 -d --diagnostics --pretty --strict --noImplicitReturns --noUnusedLocals --noUnusedParameters --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
     "copy_src_cjs": "mkdirp ./dist/cjs/src && shx cp -r ./src/* ./dist/cjs/src",
     "copy_src_es6": "mkdirp ./dist/es6/src && shx cp -r ./src/* ./dist/es6/src",
     "cover": "rm -rf ./.nyc_output ./coverage && NODE_ENV=test nyc --reporter=html --reporter=lcov --exclude=node_modules --exclude=spec-js/test --exclude=spec-js/src/storage/lovefield.js --exclude=spec-js/src/shared/Logger.js --exclude=spec-js/src/utils/option.js --exclude=spec-js/src/utils/valid.js tman --mocha spec-js/test/run.js",
@@ -23,8 +23,8 @@
     "test": "npm run lint && NODE_ENV=test tman --mocha spec-js/test/run.js",
     "version": "ts-node tools/version.ts && git add .",
     "watch": "NODE_ENV=test ts-node ./tools/watch.ts & npm run watch_test",
-    "watch_cjs": "tsc src/index.ts -m commonjs --outDir dist --sourcemap --target ES5 -d --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom -w",
-    "watch_test": "tsc test/run.ts -m commonjs --outDir spec-js --sourcemap  --target ES2015 --diagnostics --pretty --noImplicitAny --noImplicitReturns --experimentalDecorators --suppressImplicitAnyIndexErrors --moduleResolution node -w"
+    "watch_cjs": "tsc src/index.ts -m commonjs --outDir dist --sourcemap --target ES5 -d --diagnostics --pretty --strict --noImplicitReturns --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom -w",
+    "watch_test": "tsc -p test/tsconfig.json -w"
   },
   "keywords": [
     "lovefield",
@@ -63,7 +63,7 @@
     "tslint": "^5.1.0",
     "tslint-eslint-rules": "^4.0.0",
     "tslint-loader": "^3.5.3",
-    "typescript": "^2.3.1",
+    "typescript": "^2.3.2",
     "webpack": "^2.4.1",
     "webpack-dev-server": "^2.4.5"
   },

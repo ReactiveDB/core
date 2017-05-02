@@ -27,20 +27,20 @@ export class Database {
 
   private schemaDefs = new Map<string, SchemaDef<any>>()
   private schemas = new Map<string, ParsedSchema>()
-  private schemaBuilder: lf.schema.Builder
+  private schemaBuilder: lf.schema.Builder | null
   private connected = false
   // note thin cache will be unreliable in some eage case
   private storedIds = new Set<string>()
   private subscription: Subscription
 
   private findPrimaryKey = (name: string) => {
-    return this.findSchema(name).pk
+    return this.findSchema(name)!.pk
   }
 
-  private findSchema = (name: string) => {
+  private findSchema = (name: string): ParsedSchema => {
     const schema = this.schemas.get(name)
     assert(schema, Exception.NonExistentTable(name))
-    return schema
+    return schema!
   }
 
   /**
@@ -173,12 +173,12 @@ export class Database {
       .concatMap<any, any>(db => {
         const entity = clone(raw)
         const [ table ] = Database.getTables(db, tableName)
-        const columnMapper = schema.mapper
+        const columnMapper = schema!.mapper
         const hiddenPayload = Object.create(null)
 
         columnMapper.forEach((mapper, key) => {
           // cannot create a hidden column for primary key
-          if (!hasOwn(entity, key) || key === schema.pk) {
+          if (!hasOwn(entity, key) || key === schema!.pk) {
             return
           }
 
@@ -189,11 +189,11 @@ export class Database {
 
         const mut = { ...(entity as any), ...hiddenPayload }
         const predicate = createPredicate(table, clause.where)
-        const query = predicatableQuery(db, table, predicate, StatementType.Update)
+        const query = predicatableQuery(db, table, predicate!, StatementType.Update)
 
         forEach(mut, (val, key) => {
           const column = table[key]
-          if (key === schema.pk) {
+          if (key === schema!.pk) {
             warn(`Primary key is not modifiable.`)
           } else if (!column) {
             warn(`Column: ${key} is not existent on table:${tableName}`)
@@ -215,8 +215,8 @@ export class Database {
     return this.database$
       .concatMap(db => {
         const [ table ] = Database.getTables(db, tableName)
-        const column = table[pk]
-        const provider = new PredicateProvider(table, clause.where)
+        const column = table[pk!]
+        const provider = new PredicateProvider(table, clause.where!)
         const prefetch =
           predicatableQuery(db, table, provider.getPredicate(), StatementType.Select, column)
 
@@ -225,11 +225,11 @@ export class Database {
             const query = predicatableQuery(db, table, provider.getPredicate(), StatementType.Delete)
 
             scopedIds.forEach((entity: any) =>
-              this.storedIds.delete(fieldIdentifier(tableName, entity[pk])))
+              this.storedIds.delete(fieldIdentifier(tableName, entity[pk!])))
 
             return this.executor(db, [query]).do({ error: () => {
               scopedIds.forEach((entity: any) =>
-                this.storedIds.add(fieldIdentifier(tableName, entity[pk])))
+                this.storedIds.add(fieldIdentifier(tableName, entity[pk!])))
             }})
           })
       })
@@ -264,7 +264,7 @@ export class Database {
     if (err) {
       return Observable.throw(err)
     }
-    const disposeHandler = schema.dispose
+    const disposeHandler = schema!.dispose
 
     return this.database$.concatMap((db) => {
       const [ table ] = Database.getTables(db, tableName)
@@ -272,13 +272,13 @@ export class Database {
 
       const queries: lf.query.Builder[] = []
       const removedIds: any = []
-      queries.push(predicatableQuery(db, table, predicate, StatementType.Delete))
+      queries.push(predicatableQuery(db, table, predicate!, StatementType.Delete))
 
-      const prefetch = predicatableQuery(db, table, predicate, StatementType.Select)
+      const prefetch = predicatableQuery(db, table, predicate!, StatementType.Select)
       return Observable.fromPromise(prefetch.exec())
         .concatMap((rootEntities) => {
           rootEntities.forEach(entity => {
-            removedIds.push(fieldIdentifier(tableName, entity[schema.pk]))
+            removedIds.push(fieldIdentifier(tableName, entity[schema!.pk]))
           })
 
           if (disposeHandler) {
@@ -319,7 +319,7 @@ export class Database {
 
   private buildTables() {
     this.schemaDefs.forEach((schemaDef, tableName) => {
-      const tableBuilder = this.schemaBuilder.createTable(tableName)
+      const tableBuilder = this.schemaBuilder!.createTable(tableName)
       this.parseSchemaDef(tableName, schemaDef, tableBuilder)
     })
   }
@@ -412,19 +412,19 @@ export class Database {
       const pk = schema.pk
       const containFields = !!clause.fields
 
-      const containKey = containFields ? contains(pk, clause.fields) : true
+      const containKey = containFields ? contains(pk, clause.fields!) : true
       const fields: Set<Fields> = containFields ? new Set(clause.fields) : new Set(schema.columns.keys())
       const { table, columns, joinInfo, definition } =
         this.traverseQueryFields(db, tableName, fields, containKey, !containFields)
       const query =
-        predicatableQuery(db, table, null, StatementType.Select, ...columns)
+        predicatableQuery(db, table!, null, StatementType.Select, ...columns)
 
       joinInfo.forEach((info: JoinInfo) =>
         query.leftOuterJoin(info.table, info.predicate))
 
       const orderDesc = (clause.orderBy || []).map(desc => {
         return {
-          column: table[desc.fieldName],
+          column: table![desc.fieldName],
           orderBy: !desc.orderBy ? null : lf.Order[desc.orderBy]
         }
       })
@@ -435,10 +435,10 @@ export class Database {
           queried: containKey
         },
         definition,
-        mainTable: table
+        mainTable: table!
       }
       const { limit, skip } = clause
-      const provider = new PredicateProvider(table, clause.where)
+      const provider = new PredicateProvider(table!, clause.where!)
 
       return new Selector<T>(db, query, matcher, provider, limit, skip, orderDesc)
     })
@@ -539,7 +539,7 @@ export class Database {
         rootDefinition[key] = defs
       } else {
         const { where, type } = defs as Association
-        rootDefinition[key] = definition.revise(type, ret.definition)
+        rootDefinition[key] = definition.revise(type!, ret.definition)
         const [ predicate, err ] = tryCatch(createPredicate)(currentTable, where(ret.table))
         if (err) {
           warn(
@@ -558,7 +558,7 @@ export class Database {
     const traversable = new Traversable<SelectContext>(fieldsValue)
 
     traversable.context((field, val, ctx) => {
-      if (ctx.isRoot || typeof field !== 'string') {
+      if (!ctx || ctx.isRoot || typeof field !== 'string') {
         return false
       }
 
@@ -588,7 +588,7 @@ export class Database {
       switch (ctx.type) {
         case LeafType.column:
           const { column, identifier } = ctx.leaf as ColumnLeaf
-          const type = schema.columns.get(ctx.key)
+          const type = schema.columns.get(ctx.key)!
           const columnDef = definition.create(identifier, schema.pk === ctx.key, type)
           handleAdvanced({ columns: [column], advanced: true }, ctx.key, columnDef)
           break
@@ -631,7 +631,7 @@ export class Database {
     const identifier = fieldIdentifier(tableName, pkVal)
     const visited = contains(identifier, sharing)
     const stored =  contains(identifier, this.storedIds)
-    const mut = visited ? sharing.get(identifier) : new Mutation(db, table)
+    const mut = visited ? sharing.get(identifier)! : new Mutation(db, table)
 
     if (!visited) {
       const list = stored ? updateMutList : insertMutList
@@ -646,12 +646,12 @@ export class Database {
       const isColumn = schema.columns.has(key)
       const mapper = (isColumn && schema.mapper.get(key)) || null
 
-      if (!(isColumn || isNavigator || ctx.isRoot)) {
+      if (!(isColumn || isNavigator || ctx!.isRoot)) {
         // 若当前节点非 有效节点、叶子节点或者根节点中任意一种时，直接停止子节点的迭代
-        ctx.skip()
+        ctx!.skip()
       }
 
-      return (ctx.isRoot || (!isColumn && !isNavigator)) ? false : {
+      return (ctx!.isRoot || (!isColumn && !isNavigator)) ? false : {
         mapper,
         visited,
         isNavigatorLeaf: isNavigator
@@ -662,7 +662,7 @@ export class Database {
       // 考虑到叶节点可能存在`Object` type， 所以无论分支节点还是叶节点，其后的结构都不迭代
       ctx.skip()
       if (ctx.isNavigatorLeaf) {
-        const ref = schema.associations.get(ctx.key).name
+        const ref = schema.associations.get(ctx.key)!.name
         return this.traverseCompound(db, ref, node, insertMutList, updateMutList, sharing)
       }
 
@@ -717,20 +717,20 @@ export class Database {
           const pkVal = entity[pk]
           const clause = createPkClause(pk, pkVal)
           const predicate = createPredicate(table, clause)
-          const query = predicatableQuery(db, table, predicate, StatementType.Delete)
+          const query = predicatableQuery(db, table, predicate!, StatementType.Delete)
 
           queryCollection.push(query)
           keys.push(fieldIdentifier(tableName, pkVal))
         })
       }
 
-      const get = (where: Predicate<any> = null) => {
+      const get = (where: Predicate<any> | null = null) => {
         const [ table ] = Database.getTables(db, tableName)
         const [ predicate, err ] = tryCatch(createPredicate)(table, where)
         if (err) {
           return Observable.throw(err)
         }
-        const query = predicatableQuery(db, table, predicate, StatementType.Select)
+        const query = predicatableQuery(db, table, predicate!, StatementType.Select)
 
         return Observable.fromPromise<T[]>(query.exec())
       }

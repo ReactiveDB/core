@@ -99,7 +99,7 @@ export interface TraverseContext {
 }
 
 export interface UpsertContext {
-  mapper: Function
+  mapper: Function | null
   isNavigatorLeaf: boolean,
   visited: boolean,
 }
@@ -139,7 +139,7 @@ export interface ShapeMatcher {
 
 export interface OrderInfo {
   column: lf.schema.Column
-  orderBy: lf.Order
+  orderBy: lf.Order | null
 }
 
 export interface LfFactoryInit {
