@@ -54,7 +54,7 @@ export class QueryToken<T> {
       .combineAll()
       .map((r: Selector<T>[]) => {
         const first = r.shift()
-        return first[method](...r)
+        return first![method](...r)
       })
     return new QueryToken<T>(newSelector$)
   }

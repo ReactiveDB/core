@@ -4,7 +4,7 @@ import { StatementType } from '../../interface'
 export function predicatableQuery(
   db: lf.Database,
   table: lf.schema.Table,
-  predicate: lf.Predicate,
+  predicate: lf.Predicate | null,
   type: StatementType.Select,
   ...columns: lf.schema.Column[]
 ): lf.query.Select
@@ -12,7 +12,7 @@ export function predicatableQuery(
 export function predicatableQuery(
   db: lf.Database,
   table: lf.schema.Table,
-  predicate: lf.Predicate,
+  predicate: lf.Predicate | null,
   type: StatementType.Delete,
   ...columns: lf.schema.Column[]
 ): lf.query.Delete
@@ -20,7 +20,7 @@ export function predicatableQuery(
 export function predicatableQuery(
   db: lf.Database,
   table: lf.schema.Table,
-  predicate: lf.Predicate,
+  predicate: lf.Predicate | null,
   type: StatementType.Update,
   ...columns: lf.schema.Column[]
 ): lf.query.Update
@@ -28,7 +28,7 @@ export function predicatableQuery(
 export function predicatableQuery(
   db: lf.Database,
   table: lf.schema.Table,
-  predicate: lf.Predicate,
+  predicate: lf.Predicate | null,
   type: StatementType.Select | StatementType.Update | StatementType.Delete,
   ...columns: lf.schema.Column[]
 ) {
@@ -44,6 +44,8 @@ export function predicatableQuery(
     case StatementType.Update:
       query = db.update(table)
       break
+    default:
+      throw TypeError('unreachable code path')
   }
 
   return predicate ? query.where(predicate) : query

@@ -74,7 +74,7 @@ export class PredicateProvider<T> {
     private meta: Predicate<T>
   ) { }
 
-  getPredicate(): lf.Predicate {
+  getPredicate(): lf.Predicate | null {
     const predicates = this.normalizeMeta(this.meta)
     if (predicates.length) {
       if (predicates.length === 1) {
@@ -87,8 +87,11 @@ export class PredicateProvider<T> {
     }
   }
 
-  toString() {
-    return this.getPredicate().toString()
+  toString(): string | void {
+    const pred = this.getPredicate()
+    if (pred !== null) {
+      return pred.toString()
+    }
   }
 
   private normalizeMeta(meta: Predicate<T>, column?: lf.schema.Column) {

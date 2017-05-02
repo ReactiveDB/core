@@ -68,7 +68,11 @@ export class Logger {
 
   private static contextMap = new Map<string, ContextLogger>()
   private static defaultLevel = Level.debug
-  private static outputLogger: ContextLogger = null
+  private static outputLogger = new ContextLogger('[ReactiveDB]', Logger.defaultLevel, (name, _, message) => {
+      const current = new Date()
+      const prefix = name ? `[${name}] ` : ''
+      return `${prefix}at ${current.toLocaleString()}: \r\n    ` + message
+    })
 
   static get(name: string, formatter?: Formatter, level?: Level) {
     const logger = Logger.contextMap.get(name)
@@ -84,12 +88,7 @@ export class Logger {
   }
 
   static setLevel(level: Level) {
-    Logger.defaultLevel = level
-    Logger.outputLogger = new ContextLogger('[ReactiveDB]', level, (name, _, message) => {
-      const current = new Date()
-      const prefix = name ? `[${name}] ` : ''
-      return `${prefix}at ${current.toLocaleString()}: \r\n    ` + message
-    })
+    Logger.outputLogger.setLevel(level)
   }
 
   static warn(...message: string[]) {

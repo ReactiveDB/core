@@ -6,12 +6,12 @@
     "module": "commonjs",
     "emitDecoratorMetadata": true,
     "suppressImplicitAnyIndexErrors": true,
-    "noImplicitThis": true,
-    "noImplicitAny": true,
     "noUnusedLocals": true,
-    "noImplicitReturns": true,
     "noUnusedParameters": true,
+    "noImplicitReturns": true,
     "allowJs": true,
+    "importHelpers": true,
+    "noEmitHelpers": true,
     "typeRoots": [
       "node_modules/@types"
     ]

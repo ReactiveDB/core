@@ -1,6 +1,6 @@
 import { forEach } from './for-each'
 
-export const clone = <T>(origin: T, target: T = null): T | null => {
+export const clone = <T>(origin: T, target: T | null = null): T | null => {
   if (origin == null) {
      return origin
   }
@@ -27,7 +27,7 @@ export const clone = <T>(origin: T, target: T = null): T | null => {
   target = target || new (origin as any).constructor()
 
   forEach(origin, (val, key) => {
-    target[key] = clone(val, null)
+    target![key] = clone(val, null)
   })
 
   return target

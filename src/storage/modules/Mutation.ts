@@ -57,7 +57,7 @@ export class Mutation {
 
     return {
       contextIds: keys,
-      queries: [].concat(insertQueries).concat(updateQueries)
+      queries: insertQueries.concat(updateQueries as any[])
     }
   }
 
