@@ -6,33 +6,23 @@ export type SelectorMeta<T> = Selector<T> | ProxySelector<T>
 
 export class QueryToken<T> {
 
-  mapFn: <J, K>(v: J, index?: number, array?: J[]) => K
-  selector$: Observable<SelectorMeta<T>>
+  constructor(public selector$: Observable<SelectorMeta<T>>) { }
 
-  constructor(meta$: Observable<SelectorMeta<T>>) {
-    this.selector$ = meta$
-      .do((selector: SelectorMeta<T>) => {
-        if (!(selector instanceof ProxySelector)) {
-          (selector as Selector<T>).setMapFn(this.mapFn)
-        }
-      })
-      .publishReplay(1)
-      .refCount()
+  map<K>(fn: (stream$: Observable<T[]>) => Observable<K[]>) {
+    this.selector$ = this.selector$
+      .do(s => this.decoratorSelector(s, fn))
+    return this as any as QueryToken<K>
   }
 
-  map<K>(fn: (v: T, index?: number, array?: T[]) => K) {
-    this.mapFn = fn
-    return this
-  }
-
-  values() {
+  values(): Observable<T[]> {
     return (this.selector$ as Observable<Selector<T>>)
-      .switchMap(selector => selector.values()).take(1)
+      .switchMap(s => s.values())
+      .take(1)
   }
 
-  changes() {
+  changes(): Observable<T[]> {
     return (this.selector$ as Observable<Selector<T>>)
-      .switchMap(selector => selector.changes())
+      .switchMap(s => s.changes())
   }
 
   concat(...tokens: QueryToken<T>[]) {
@@ -57,5 +47,19 @@ export class QueryToken<T> {
         return first![method](...r)
       })
     return new QueryToken<T>(newSelector$)
+  }
+
+  private decoratorSelector(selector: SelectorMeta<T>, fn: <K>(stream$: Observable<T[]>) => Observable<K[]>) {
+    const methods = ['changes', 'values']
+    methods.forEach(method => {
+      const originFn = selector[method]
+      selector[method] = () => {
+        const dist$ = originFn.call(selector)
+        if (typeof fn === 'function') {
+          return fn(dist$)
+        }
+        return dist$
+      }
+    })
   }
 }

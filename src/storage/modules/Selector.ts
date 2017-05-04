@@ -75,8 +75,6 @@ export class Selector <T> {
 
   public change$: Observable<T[]>
 
-  private mapFn: <J, K>(v: J, index?: number, array?: J[]) => K = (v: T) => v
-
   private consumed = false
   private predicateBuildErr = false
 
@@ -127,9 +125,7 @@ export class Selector <T> {
       try {
         const predicate = predicateProvider.getPredicate()
         if (!predicate) {
-          predicateProvider = null
-          this.predicateProvider = null
-          this.predicateBuildErr = true
+          throw new TypeError()
         }
       } catch (err) {
         predicateProvider = null
@@ -198,7 +194,7 @@ export class Selector <T> {
     assert(!this.consumed, Exception.TokenConsumed())
 
     this.consumed = true
-    if (this.limit || this.skip) {
+    if (typeof this.limit !== 'undefined' || typeof this.skip !== 'undefined') {
       const p = this.rangeQuery.exec()
         .then(r => r.map(v => v[this.shape.pk.name]))
         .then(pks => this.getValue(pks))
@@ -230,10 +226,6 @@ export class Selector <T> {
     return this.change$
   }
 
-  setMapFn<J, K>(fn: (v: J, index?: number, array?: J[]) => K) {
-    this.mapFn = fn
-  }
-
   private getValue(pks?: (string | number)[]) {
     let q: lf.query.Select
     if (pks) {
@@ -254,12 +246,6 @@ export class Selector <T> {
         const result = graph<T>(rows, this.shape.definition)
         const col = this.shape.pk.name
         return !this.shape.pk.queried ? this.removeKey(result, col) : result
-      })
-      .then(v => {
-        if (typeof this.mapFn === 'function') {
-          v = v.map(this.mapFn)
-        }
-        return v
       })
   }
 

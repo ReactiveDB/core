@@ -24,7 +24,7 @@
     "version": "ts-node tools/version.ts && git add .",
     "watch": "NODE_ENV=test ts-node ./tools/watch.ts & npm run watch_test",
     "watch_cjs": "tsc src/index.ts -m commonjs --outDir dist --sourcemap --target ES5 -d --diagnostics --pretty --strict --noImplicitReturns --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom -w",
-    "watch_test": "tsc -p test/tsconfig.json -w"
+    "watch_test": "tsc -p test/tsconfig.json -w --diagnostics --pretty"
   },
   "keywords": [
     "lovefield",
