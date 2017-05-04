@@ -182,7 +182,7 @@ export default describe('QueryToken Testcase', () => {
 
     describe('Method: map', () => {
       it('should replace the returnValue of `values`', function* () {
-        const q1 = queryToken.map((_: any) => 1)
+        const q1 = queryToken.map(v => v.map(r => r.map(() => 1)))
 
         yield q1.values()
           .do(r => {
@@ -191,7 +191,7 @@ export default describe('QueryToken Testcase', () => {
       })
 
       it('should replace the returnValue of `changes`', function* () {
-        const q2 = queryToken.map((_: any) => 2)
+        const q2 = queryToken.map(v => v.map(r => r.map(() => 2)))
 
         const signal = q2.changes()
           .publish()
@@ -217,7 +217,7 @@ export default describe('QueryToken Testcase', () => {
         const mockSelector1 = new MockSelector(generateMockTestdata(tasks1))
         const queryToken1 = new QueryToken(Observable.of(mockSelector1) as any)
 
-        const q3 = queryToken1.map((_: any) => 3)
+        const q3 = queryToken1.map(v => v.map(r => r.map(() => 3)))
 
         const distToken = q3.combine(queryToken1)
         yield distToken.values()
@@ -232,7 +232,7 @@ export default describe('QueryToken Testcase', () => {
         const mockSelector1 = new MockSelector(generateMockTestdata(tasks1))
         const queryToken1 = new QueryToken(Observable.of(mockSelector1) as any)
 
-        const q4 = queryToken1.map((_: any) => 4)
+        const q4 = queryToken1.map(v => v.map(r => r.map(() => 4)))
 
         const distToken = q4.combine(queryToken1)
         const signal = distToken.changes()
