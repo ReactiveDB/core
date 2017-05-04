@@ -9,8 +9,8 @@ function watch (paths: string[]) {
     .map(p => path.join(process.cwd(), p))
     .mergeMap(path => {
       return Observable.create((observer: Observer<string>) => {
-        fileWacher(path, (evt: any) => {
-          observer.next(evt)
+        fileWacher(path, { recursive: true }, (_: any, fileName: string) => {
+          observer.next(fileName)
         })
       })
     })
