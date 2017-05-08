@@ -1,4 +1,6 @@
 machine:
+  environment:
+    PATH: "${PATH}:${HOME}/${CIRCLE_PROJECT_REPONAME}/node_modules/.bin"
   node:
     version: 6
 
@@ -13,6 +15,10 @@ notify:
     - url: http://teambition.vvlyn.com/api/circle
 
 dependencies:
+  override:
+    - yarn
+  cache_directories:
+    - ~/.cache/yarn
   pre:
     - echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
 
