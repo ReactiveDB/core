@@ -13,11 +13,12 @@ export interface LoggerAdapter {
   debug(...message: string[]): void
 }
 
-export type Formatter = (name: string, level: Level, message: string) => string
+export type Formatter = (name: string, level: Level, ...message: any[]) => string
 
 export class ContextLogger {
 
   public destroy = (): void => void 0
+  private effects: Map<keyof LoggerAdapter, Function[]>
 
   constructor(
     private name: string,
@@ -26,33 +27,36 @@ export class ContextLogger {
     private adapter: LoggerAdapter = console
   ) { }
 
-  private invoke(method: string, message: string[]) {
-    let output = message.join('')
+  private invoke(method: string, message: any[]) {
+    let output = ''
     if (this.formatter) {
-      output = this.formatter(this.name, this.level, output)
+      const params = [this.name, this.level].concat(message)
+      output = this.formatter.apply(this, params)
     }
     this.adapter[method].call(this.adapter, output)
+    const fns = (this.effects.get(method as (keyof LoggerAdapter)) || [])
+    fns.forEach((fn) => fn(...message))
   }
 
-  info(...message: string[]) {
+  info(...message: any[]) {
     if (Level.info >= this.level) {
       this.invoke('info', message)
     }
   }
 
-  warn(...message: string[]) {
+  warn(...message: any[]) {
     if (Level.warning >= this.level) {
       this.invoke('warn', message)
     }
   }
 
-  error(...message: string[]) {
+  error(...message: any[]) {
     if (Level.error >= this.level) {
       this.invoke('error', message)
     }
   }
 
-  debug(...message: string[]) {
+  debug(...message: any[]) {
     if (Level.debug >= this.level) {
       this.invoke('debug', message)
     }
@@ -62,6 +66,33 @@ export class ContextLogger {
     this.level = level
   }
 
+  replaceAdapter(adapter: LoggerAdapter) {
+    if (adapter !== this.adapter) {
+      this.adapter = adapter
+    }
+  }
+
+  replaceFormatter(formatter: Formatter) {
+    if (formatter !== this.formatter) {
+      this.formatter = formatter
+    }
+  }
+
+  effect(method: keyof LoggerAdapter, callback: Function) {
+    if (this.effects.has(method)) {
+      const fns = this.effects.get(method)!
+      if (fns.every((fn) => fn !== callback)) {
+        fns.push(callback)
+      }
+    } else {
+      this.effects.set(method, [callback])
+    }
+  }
+
+  clearEffects() {
+    this.effects.clear()
+  }
+
 }
 
 export class Logger {
@@ -69,18 +100,22 @@ export class Logger {
   private static contextMap = new Map<string, ContextLogger>()
   private static defaultLevel = Level.debug
   private static outputLogger = new ContextLogger('[ReactiveDB]', Logger.defaultLevel, (name, _, message) => {
+      const output = message.join('')
       const current = new Date()
       const prefix = name ? `[${name}] ` : ''
-      return `${prefix}at ${current.toLocaleString()}: \r\n    ` + message
+      return `${prefix}at ${current.toLocaleString()}: \r\n    ` + output
     })
 
-  static get(name: string, formatter?: Formatter, level?: Level) {
+  static get(name: string, formatter?: Formatter, level?: Level, adapter: LoggerAdapter = console) {
     const logger = Logger.contextMap.get(name)
 
     if (!logger) {
-      const ctxLogger = new ContextLogger(name, level || Logger.defaultLevel, formatter)
+      const ctxLogger = new ContextLogger(name, level || Logger.defaultLevel, formatter, adapter)
       Logger.contextMap.set(name, ctxLogger)
-      ctxLogger.destroy = () => Logger.contextMap.delete(name)
+      ctxLogger.destroy = () => {
+        Logger.contextMap.delete(name)
+        ctxLogger.clearEffects()
+      }
       return ctxLogger
     }
 
