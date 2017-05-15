@@ -5,12 +5,16 @@ import { ProxySelector } from './ProxySelector'
 export type SelectorMeta<T> = Selector<T> | ProxySelector<T>
 
 export class QueryToken<T> {
+  selector$: Observable<SelectorMeta<T>>
 
-  constructor(public selector$: Observable<SelectorMeta<T>>) { }
+  constructor(selector$: Observable<SelectorMeta<T>>) {
+    this.selector$ = selector$.publishReplay(1)
+      .refCount()
+  }
 
   map<K>(fn: (stream$: Observable<T[]>) => Observable<K[]>) {
     this.selector$ = this.selector$
-      .do(s => this.decoratorSelector(s, fn))
+      .do(selector => (selector as any).map(fn) )
     return this as any as QueryToken<K>
   }
 
@@ -26,40 +30,30 @@ export class QueryToken<T> {
   }
 
   concat(...tokens: QueryToken<T>[]) {
-    return this.composeFactory(tokens, 'combine')
-  }
-
-  combine(...tokens: QueryToken<T>[]) {
-    return this.composeFactory(tokens, 'combine')
-  }
-
-  toString() {
-    return this.selector$.map(r => r.toString())
-  }
-
-  private composeFactory(tokens: QueryToken<T>[], method: string) {
     tokens.unshift(this)
     const newSelector$ = Observable.from(tokens)
       .map(token => token.selector$.skipWhile(v => v instanceof ProxySelector))
       .combineAll()
       .map((r: Selector<T>[]) => {
         const first = r.shift()
-        return first![method](...r)
+        return first!.concat(...r)
       })
     return new QueryToken<T>(newSelector$)
   }
 
-  private decoratorSelector(selector: SelectorMeta<T>, fn: <K>(stream$: Observable<T[]>) => Observable<K[]>) {
-    const methods = ['changes', 'values']
-    methods.forEach(method => {
-      const originFn = selector[method]
-      selector[method] = () => {
-        const dist$ = originFn.call(selector)
-        if (typeof fn === 'function') {
-          return fn(dist$)
-        }
-        return dist$
-      }
-    })
+  combine(...tokens: QueryToken<T>[]) {
+    tokens.unshift(this)
+    const newSelector$ = Observable.from(tokens)
+      .map(token => token.selector$.skipWhile(v => v instanceof ProxySelector))
+      .combineAll()
+      .map((r: Selector<T>[]) => {
+        const first = r.shift()
+        return first!.combine(...r)
+      })
+    return new QueryToken<T>(newSelector$)
+  }
+
+  toString() {
+    return this.selector$.map(r => r.toString())
   }
 }

@@ -1076,4 +1076,112 @@ export default describe('Selector test', () => {
     })
   })
 
+  describe('Selector.prototype.map', () => {
+    let selector1: Selector<any>
+    let selector2: Selector<any>
+    let selector3: Selector<any>
+    let selector4: Selector<any>
+    let concated: Selector<any>
+    let combined: Selector<any>
+    const mapFn = (stream$: any) => stream$.map((v: any) => v.map(() => 1))
+    const mapFn2 = (stream$: any) => stream$.map((v: any) => v.map(() => 2))
+    const mapFn3 = (stream$: any) => stream$.map((v: any) => v.map(() => 3))
+
+    mapFn.toString = () => 'TEST_MAP_FN'
+
+    beforeEach(() => {
+      selector1 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } }),
+        20, 0
+      )
+        .map(mapFn)
+      selector2 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } }),
+        20, 20
+      )
+        .map(mapFn)
+
+      concated = selector1.concat(selector2)
+
+      selector3 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } }),
+        20, 40
+      )
+        .map(mapFn2)
+
+      selector4 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } }),
+        20, 60
+      )
+        .map(mapFn3)
+
+      combined = selector3.combine(selector4)
+    })
+
+    it('should map all result from value', function* () {
+
+      yield selector1.values()
+        .do(data => {
+          data.forEach(r => expect(r).to.equal(1))
+        })
+    })
+
+    it('should map all result from changes', function* () {
+
+      yield selector1.changes()
+        .take(1)
+        .do(data => {
+          data.forEach(r => expect(r).to.equal(1))
+        })
+    })
+
+    it('should map all result from concated selector#value', function* () {
+      yield concated.values()
+        .do(data => {
+          data.forEach(r => expect(r).to.equal(1))
+        })
+    })
+
+    it('should map all result from concated selector#change', function* () {
+      yield concated.changes()
+        .take(1)
+        .do(data => {
+          data.forEach(r => expect(r).to.equal(1))
+        })
+    })
+
+    it('should map all result from combined selector#value', function* () {
+      yield combined.values()
+        .do(data => {
+          data.splice(0, 20)
+            .forEach(r => expect(r).to.equal(2))
+        })
+        .do(data => {
+          data.splice(20)
+            .forEach(r => expect(r).to.equal(3))
+        })
+    })
+
+    it('should map all result from combined selector#changes', function* () {
+      yield combined.changes()
+        .take(1)
+        .do(data => {
+          data.splice(0, 20)
+            .forEach(r => expect(r).to.equal(2))
+        })
+        .do(data => {
+          data.splice(20)
+            .forEach(r => expect(r).to.equal(3))
+        })
+    })
+  })
+
 })
