@@ -7,6 +7,7 @@ import { predicatableQuery, graph } from '../helper'
 import { identity, forEach, assert, warn } from '../../utils'
 import { PredicateProvider } from './PredicateProvider'
 import { ShapeMatcher, OrderInfo, StatementType } from '../../interface'
+import { mapFn } from './mapFn'
 
 export class Selector <T> {
   private static concatFactory<U>(... metaDatas: Selector<U>[]) {
@@ -29,6 +30,7 @@ export class Selector <T> {
       db, lselect, shape, predicateProvider,
       maxLimit.limit! + maxLimit.skip!, minSkip.skip, meta.orderDescriptions
     )
+      .map(meta.mapFn)
   }
 
   private static combineFactory<U>(... metaDatas: Selector<U>[]) {
@@ -37,7 +39,7 @@ export class Selector <T> {
     // 初始化一个空的 QuerySelector，然后在初始化以后替换它上面的属性和方法
     const dist = new Selector<U>(originalToken.db, fakeQuery as any, { } as any)
     dist.change$ = Observable.from(metaDatas)
-      .map(metas => metas.change$)
+      .map(metas => metas.mapFn(metas.change$))
       .combineAll()
       .map((r: U[][]) => r.reduce((acc, val) => acc.concat(val)))
       .debounceTime(0, async)
@@ -71,9 +73,11 @@ export class Selector <T> {
     return orderStr
   }
 
+  private mapFn: <K>(stream$: Observable<T[]>) => Observable<K[]> = mapFn
+
   public select: string
 
-  public change$: Observable<T[]>
+  private change$: Observable<T[]>
 
   private consumed = false
   private predicateBuildErr = false
@@ -198,32 +202,38 @@ export class Selector <T> {
       const p = this.rangeQuery.exec()
         .then(r => r.map(v => v[this.shape.pk.name]))
         .then(pks => this.getValue(pks))
-      return Observable.fromPromise(p)
+      return this.mapFn(Observable.fromPromise(p))
     } else {
-      return Observable.fromPromise(this.getValue() as Promise<T[]>)
+      return this.mapFn(Observable.fromPromise(this.getValue() as Promise<T[]>))
     }
   }
 
-  combine(... selectMetas: Selector<T>[]): Selector<T> {
-    return Selector.combineFactory(this, ... selectMetas)
+  combine(... selectors: Selector<T>[]): Selector<T> {
+    return Selector.combineFactory(this, ... selectors)
   }
 
-  concat(... selectMetas: Selector<T>[]): Selector<T> {
+  concat(... selectors: Selector<T>[]): Selector<T> {
     const orderStr = Selector.stringifyOrder(this.orderDescriptions!)
-    const equal = selectMetas.every(m =>
+    const equal = selectors.every(m =>
       m.select === this.select &&
       m.predicateProvider!.toString() === this.predicateProvider!.toString() &&
-      Selector.stringifyOrder(m.orderDescriptions!) === orderStr
+      Selector.stringifyOrder(m.orderDescriptions!) === orderStr &&
+      m.mapFn.toString() === this.mapFn.toString()
     )
     assert(equal, Exception.TokenConcatFailed())
 
-    return Selector.concatFactory(this, ... selectMetas)
+    return Selector.concatFactory(this, ... selectors)
   }
 
   changes(): Observable<T[]> | never {
     assert(!this.consumed, Exception.TokenConsumed())
     this.consumed = true
-    return this.change$
+    return this.mapFn(this.change$)
+  }
+
+  map<K>(fn: (stream$: Observable<T[]>) => Observable<K[]>) {
+    this.mapFn = fn
+    return this as any as Selector<K>
   }
 
   private getValue(pks?: (string | number)[]) {

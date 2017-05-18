@@ -14,9 +14,12 @@ export class MockSelector<T> {
     MockSelector.selectMeta.get(_id).notify()
   }
 
+  private static mapFn = <T>(dist$: Observable<T>) => dist$
+
   private subject = new ReplaySubject<T[]>(1)
   private change$ = this.subject
   private datas: T[]
+  private mapFn = MockSelector.mapFn
 
   constructor(datas: Map<string, T>) {
     const result: T[] = []
@@ -33,11 +36,11 @@ export class MockSelector<T> {
   }
 
   changes(): Observable<T[]> {
-    return this.change$
+    return this.mapFn(this.change$)
   }
 
   values () {
-    return this.change$.take(1)
+    return this.mapFn(this.change$.take(1))
   }
 
   concat = this.combine
@@ -62,6 +65,10 @@ export class MockSelector<T> {
 
   toString() {
     return `MockSelector SQL`
+  }
+
+  map(fn: any) {
+    this.mapFn = fn
   }
 
   private notify() {
