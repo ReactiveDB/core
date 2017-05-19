@@ -593,10 +593,8 @@ export default describe('Database Testcase: ', () => {
       }
 
       yield database.update('Task', {
-        where: {
-          created: {
-            $isNotNull: true
-          }
+        created: {
+          $isNotNull: true
         }
       }, data)
 
@@ -611,7 +609,7 @@ export default describe('Database Testcase: ', () => {
 
     it('should be able to update records more than one time', function* () {
       const clause = {
-        where: { _id: target._id }
+        _id: target._id
       }
 
       const u1 = uuid()
@@ -643,7 +641,9 @@ export default describe('Database Testcase: ', () => {
 
     it('should be able to update property which is stored as hidden column', function* () {
       const newCreated = new Date(2017, 1, 1)
-      yield database.update('Task', target._id as string, {
+      yield database.update('Task', {
+        _id: target._id
+      }, {
         created: newCreated.toISOString()
       })
 
@@ -660,7 +660,7 @@ export default describe('Database Testcase: ', () => {
       }
 
       yield database.update<TaskSchema>('Task', {
-        where: { _id: target._id }
+        _id: target._id
       }, patchData)
 
       const [ result ] = yield database.get<TaskSchema>('Task', {
@@ -695,10 +695,8 @@ export default describe('Database Testcase: ', () => {
 
       try {
         yield database.update('Task', {
-          where: {
-            _id: {
-              $isNotNull: true
-            }
+          _id: {
+            $isNotNull: true
           }
         }, patch)
         throw new Error('error code path')
@@ -725,7 +723,7 @@ export default describe('Database Testcase: ', () => {
       const errSpy = sinon.spy((): void => void 0)
 
       tmpDB.connect()
-      tmpDB.update(T, { where: { id: 1 } }, {
+      tmpDB.update(T, { id: 1 }, {
         members: ['1', '2']
       })
       .catch(errSpy)
@@ -774,10 +772,8 @@ export default describe('Database Testcase: ', () => {
       }).length
 
       yield database.delete('Task', {
-        where: {
-          created: {
-            $gte: testDate.valueOf()
-          }
+        created: {
+          $gte: testDate.valueOf()
         }
       })
 
@@ -791,7 +787,7 @@ export default describe('Database Testcase: ', () => {
 
     it('should delete correct values based on pk caluse', function* () {
       yield database.delete('Task', {
-        where: { _id: target._id }
+        _id: target._id
       })
 
       const result = yield database.get('Task', {

@@ -158,7 +158,7 @@ export class Database {
     return new QueryToken<T>(selector$)
   }
 
-  update<T>(tableName: string, clause: Clause<T>, raw: Partial<T>): Observable<ExecutorResult> {
+  update<T>(tableName: string, clause: Predicate<T>, raw: Partial<T>): Observable<ExecutorResult> {
     const type = getType(raw)
     if (type !== 'Object') {
       return Observable.throw(Exception.InvalidType(['Object', type]))
@@ -188,7 +188,7 @@ export class Database {
         })
 
         const mut = { ...(entity as any), ...hiddenPayload }
-        const predicate = createPredicate(table, clause.where)
+        const predicate = createPredicate(table, clause)
         const query = predicatableQuery(db, table, predicate!, StatementType.Update)
 
         forEach(mut, (val, key) => {
@@ -206,7 +206,7 @@ export class Database {
       })
   }
 
-  delete<T>(tableName: string, clause: Clause<T> = {}): Observable<ExecutorResult> {
+  delete<T>(tableName: string, clause: Predicate<T> = {}): Observable<ExecutorResult> {
     const [pk, err] = tryCatch<string>(this.findPrimaryKey)(tableName)
     if (err) {
       return Observable.throw(err)
@@ -216,7 +216,7 @@ export class Database {
       .concatMap(db => {
         const [ table ] = Database.getTables(db, tableName)
         const column = table[pk!]
-        const provider = new PredicateProvider(table, clause.where!)
+        const provider = new PredicateProvider(table, clause)
         const prefetch =
           predicatableQuery(db, table, provider.getPredicate(), StatementType.Select, column)
 
