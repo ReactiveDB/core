@@ -1,4 +1,5 @@
 export * from './Mutation'
 export * from './Selector'
+export * from './ProxySelector'
 export * from './PredicateProvider'
 export * from './QueryToken'
