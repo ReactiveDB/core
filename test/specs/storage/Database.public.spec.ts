@@ -8,7 +8,7 @@ import { uuid, checkExecutorResult } from '../../utils'
 import schemaFactory from '../../schemas'
 import { TestFixture2 } from '../../schemas/Test'
 import { scenarioGen, programGen, postGen, taskGen, subtaskGen } from '../../utils/generators'
-import { RDBType, DataStoreType, Database, clone, forEach } from '../../index'
+import { RDBType, DataStoreType, Database, clone, forEach, JoinMode } from '../../index'
 import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema } from '../../index'
 import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected } from '../../index'
 
@@ -1216,7 +1216,7 @@ export default describe('Database Testcase: ', () => {
       expect(ret).to.deep.equal(programCopy)
     })
 
-    it('should be able to handle circular reference', function* () {
+    it('should be able to handle circular reference in imlicit mode', function* () {
       const [ programRet ] = yield database.get('Program').values()
       const [ engineerRet ] = yield database.get('Engineer', {
         where: {
@@ -1227,6 +1227,27 @@ export default describe('Database Testcase: ', () => {
       expect(programRet._id).to.deep.equal(engineerRet.leadProgram[0]._id)
       expect(programRet.owner.leadProgram).is.undefined
       expect(engineerRet.leadProgram[0].owner).is.undefined
+    })
+
+    it('should be able to handle circular reference in explicit mode', function* () {
+      const [ programRet ] = yield database.get('Program', {
+        fields: ['_id', 'name', {
+          owner: ['_id', 'name']
+        }]
+      }).values()
+
+      const [ engineerRet ] = yield database.get('Engineer', {
+        where: {
+          _id: program.ownerId
+        },
+        fields: ['_id', 'name', {
+          leadProgram: ['_id', 'owner']
+        }]
+      }, JoinMode.explicit).values()
+
+      expect(programRet._id).to.deep.equal(engineerRet.leadProgram[0]._id)
+      expect(programRet.owner.leadProgram).is.undefined
+      expect(engineerRet.leadProgram[0].owner).to.deep.equal(programRet.owner)
     })
 
   })

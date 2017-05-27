@@ -10,7 +10,7 @@ import { Mutation, Selector, QueryToken, PredicateProvider } from './modules'
 import { dispose, contextTableName, fieldIdentifier, hiddenColName } from './symbols'
 import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, identity, warn } from '../utils'
 import { createPredicate, createPkClause, mergeTransactionResult, predicatableQuery, lfFactory } from './helper'
-import { Relationship, RDBType, DataStoreType, LeafType, StatementType } from '../interface/enum'
+import { Relationship, RDBType, DataStoreType, LeafType, StatementType, JoinMode } from '../interface/enum'
 import { Record, Fields, JoinInfo, Query, Clause, Predicate } from '../interface'
 import { SchemaDef, ColumnDef, ParsedSchema, Association, ScopedHandler } from '../interface'
 import { ColumnLeaf, NavigatorLeaf, ExecutorResult, UpsertContext, SelectContext } from '../interface'
@@ -153,8 +153,8 @@ export class Database {
       })
   }
 
-  get<T>(tableName: string, query: Query<T> = {}): QueryToken<T> {
-    const selector$ = this.buildSelector<T>(tableName, query)
+  get<T>(tableName: string, query: Query<T> = {}, mode: JoinMode = JoinMode.imlicit): QueryToken<T> {
+    const selector$ = this.buildSelector<T>(tableName, query, mode)
     return new QueryToken<T>(selector$)
   }
 
@@ -405,7 +405,8 @@ export class Database {
 
   private buildSelector<T>(
     tableName: string,
-    clause: Query<T>
+    clause: Query<T>,
+    mode: JoinMode
   ) {
     return this.database$.map((db) => {
       const schema = this.findSchema(tableName)
@@ -415,7 +416,7 @@ export class Database {
       const containKey = containFields ? contains(pk, clause.fields!) : true
       const fields: Set<Fields> = containFields ? new Set(clause.fields) : new Set(schema.columns.keys())
       const { table, columns, joinInfo, definition } =
-        this.traverseQueryFields(db, tableName, fields, containKey, !containFields)
+        this.traverseQueryFields(db, tableName, fields, containKey, !containFields, [], {}, mode)
       const query =
         predicatableQuery(db, table!, null, StatementType.Select, ...columns)
 
@@ -492,7 +493,8 @@ export class Database {
     hasKey: boolean,
     glob: boolean,
     path: string[] = [],
-    context: Record = {}
+    context: Record = {},
+    mode: JoinMode
   ) {
     const schema = this.findSchema(tableName)
     const rootDefinition = Object.create(null)
@@ -501,7 +503,7 @@ export class Database {
     const columns: lf.schema.Column[] = []
     const joinInfo: JoinInfo[] = []
 
-    if (contains(tableName, path)) { // thinking mode: implicit & explicit
+    if (mode === JoinMode.imlicit && contains(tableName, path)) { // thinking mode: implicit & explicit
       return { columns, joinInfo, advanced: false, table: null, definition: null }
     } else {
       path.push(tableName)
@@ -595,7 +597,7 @@ export class Database {
         case LeafType.navigator:
           const { containKey, fields, assocaiation } = ctx.leaf as NavigatorLeaf
           const ret =
-            this.traverseQueryFields(db, assocaiation.name, new Set(fields), containKey, glob, path.slice(0), context)
+            this.traverseQueryFields(db, assocaiation.name, new Set(fields), containKey, glob, path.slice(0), context, mode)
           handleAdvanced(ret, ctx.key, assocaiation)
           ctx.skip()
           break
