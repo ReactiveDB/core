@@ -58,7 +58,21 @@ export default describe('Database Testcase: ', () => {
     it('should store [[schemas]]', () => {
       const schema = database['schemas'].get('Task')
 
-      expect(schema.columns.keys()).to.deep.equal(new Set(['_id', 'content', 'note', '_projectId']))
+      expect(new Set(schema.columns.keys())).to.deep.equal(new Set([
+        '_creatorId',
+        '_executorId',
+        '_projectId',
+        '_id',
+        '_sourceId',
+        '_stageId',
+        '_tasklistId',
+        'accomplished',
+        'content',
+        'note',
+        'subtasksCount',
+        'involveMembers',
+        'created'
+      ]))
       expect(schema.associations.get('project').name).to.equal('Project')
       assert.isFunction(schema.associations.get('project').where)
     })
