@@ -170,7 +170,7 @@ export default describe('Selector test', () => {
 
     const sql = selector.toString()
 
-    expect(sql).to.equal('SELECT * FROM TestSelectMetadata WHERE TestSelectMetadata.time > 50;')
+    expect(sql).to.equal('SELECT * FROM TestSelectMetadata WHERE (TestSelectMetadata.time > 50);')
   })
 
   it('should get correct results with orderBy', function* () {
@@ -220,6 +220,37 @@ export default describe('Selector test', () => {
         .set(table['name'], newName)
         .where(table['_id'].eq('_id:50'))
         .exec()
+    })
+
+    it('should observe deletion of the only row in db', function* () {
+      db.delete().from(table).exec() // 清空 table
+
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, {}),
+      )
+
+      const row = { _id: '_id:939.5', name: 'name:939.5', time: 939.5, priority: 10 }
+
+      yield db.insert()
+        .into(table)
+        .values([table.createRow(row)])
+        .exec()
+
+      const signal = selector.changes()
+      subscription = signal.subscribe()
+      yield db.delete()
+        .from(table)
+        .where(table['_id'].eq('_id:939.5'))
+        .exec()
+
+      yield signal
+        .subscribeOn(Scheduler.async)
+        .take(1)
+        .do((r: any) => {
+          expect(r).to.deep.equal([])
+        })
     })
 
     it('unsubscribe should ok', function* () {

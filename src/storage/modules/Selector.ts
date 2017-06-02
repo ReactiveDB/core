@@ -143,22 +143,16 @@ export class Selector <T> {
     }
     skip = limit && !skip ? 0 : skip
     if (limit || skip) {
-      const { pk, mainTable } = this.shape
       this.change$ = this.buildPrefetchingObserve()
         .switchMap(pks => {
           return Observable.create((observer: Observer<T[]>) => {
+            const query = this.getQuery(this.inPKs(pks))
             const listener = () => {
-              this.getValue(pks)
+              this.getValue(query)
                 .then(r => observer.next(r as T[]))
                 .catch(e => observer.error(e))
             }
             listener()
-            const $in = mainTable[pk.name].in(pks)
-            const $predicate = predicateProvider
-              ? lf.op.and($in, predicateProvider.getPredicate()!)
-              : $in
-            const query = this.query
-              .where($predicate)
             db.observe(query, listener)
             return () => this.db.unobserve(query, listener)
           })
@@ -167,16 +161,17 @@ export class Selector <T> {
         .refCount()
     } else {
       this.change$ = Observable.create((observer: Observer<T[]>) => {
+        const query = this.getQuery()
         const listener = () => {
-          this.getValue()
+          this.getValue(query)
             .then(r => observer.next(r as T[]))
             .catch(e => observer.error(e))
         }
-        const query = predicateProvider ? this.query
-          .where(predicateProvider.getPredicate()!) : this.query
-        listener()
         db.observe(query, listener)
-
+        listener() // 把 listener 放到 observe 后边执行，是 lovefield issue#209
+                   //   https://github.com/google/lovefield/issues/209
+                   // 的一个 workaround。issue 修复后，listener 也可以放在 observe
+                   // 前面执行。
         return () => this.db.unobserve(query, listener)
       })
         .publishReplay(1)
@@ -186,12 +181,7 @@ export class Selector <T> {
   }
 
   toString(): string {
-    let predicate: lf.Predicate | undefined
-    const { predicateProvider } = this
-    if (predicateProvider && !this.predicateBuildErr) {
-      predicate = predicateProvider.getPredicate()!
-    }
-    return predicate ? this.query.where(predicate).toSql() : this.query.toSql()
+    return this.getQuery().toSql()
   }
 
   values(): Observable<T[]> | never {
@@ -201,10 +191,10 @@ export class Selector <T> {
     if (typeof this.limit !== 'undefined' || typeof this.skip !== 'undefined') {
       const p = this.rangeQuery.exec()
         .then(r => r.map(v => v[this.shape.pk.name]))
-        .then(pks => this.getValue(pks))
+        .then(pks => this.getValue(this.getQuery(this.inPKs(pks))))
       return this.mapFn(Observable.fromPromise(p))
     } else {
-      return this.mapFn(Observable.fromPromise(this.getValue() as Promise<T[]>))
+      return this.mapFn(Observable.fromPromise(this.getValue(this.getQuery()) as Promise<T[]>))
     }
   }
 
@@ -236,27 +226,34 @@ export class Selector <T> {
     return this as any as Selector<K>
   }
 
-  private getValue(pks?: (string | number)[]) {
-    let q: lf.query.Select
-    if (pks) {
-      const predIn = this.shape.mainTable[this.shape.pk.name].in(pks)
-      const predicate = (!this.predicateProvider || this.predicateBuildErr)
-        ? predIn
-        : lf.op.and(predIn, this.predicateProvider.getPredicate()!)
+  private inPKs(pks: (string | number)[]): lf.Predicate {
+    const { pk, mainTable } = this.shape
+    return mainTable[pk.name].in(pks)
+  }
 
-      q = this.query.where(predicate)
-    } else {
-      q = this.query
-      if (!this.predicateBuildErr) {
-        q = q.where(this.predicateProvider!.getPredicate()!)
-      }
-    }
-    return q.exec()
+  private getValue(query: lf.query.Select) {
+    return query.exec()
       .then((rows: any[]) => {
         const result = graph<T>(rows, this.shape.definition)
         const col = this.shape.pk.name
         return !this.shape.pk.queried ? this.removeKey(result, col) : result
       })
+  }
+
+  private getQuery(additional?: lf.Predicate): lf.query.Select {
+    if (this.predicateBuildErr && !additional) {
+      return this.query
+    }
+    // !this.predicateBuildErr || additional
+    const preds: lf.Predicate[] = []
+    if (this.predicateProvider && !this.predicateBuildErr) {
+      preds.push(this.predicateProvider.getPredicate()!)
+    }
+    if (additional) {
+      preds.push(additional)
+    }
+    const pred = lf.op.and(...preds)
+    return this.query.where(pred)
   }
 
   private removeKey(data: any[], key: string) {
