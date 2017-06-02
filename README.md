@@ -2,7 +2,9 @@
 [![Coverage Status](https://coveralls.io/repos/github/teambition/ReactiveDB/badge.svg?branch=master)](https://coveralls.io/github/teambition/ReactiveDB?branch=master)
 [![Dependency Status](https://david-dm.org/teambition/ReactiveDB.svg)](https://david-dm.org/teambition/ReactiveDB)
 [![devDependencies Status](https://david-dm.org/teambition/ReactiveDB/dev-status.svg)](https://david-dm.org/teambition/ReactiveDB?type=dev)
+[![Greenkeeper badge](https://badges.greenkeeper.io/teambition/ReactiveDB.svg)](https://greenkeeper.io/)
 # ReactiveDB
+
 一个 Reactive 风格的前端 ORM。基于 [Lovefield](https://github.com/google/lovefield) 与 [RxJS](https://github.com/ReactiveX/rxjs)。
 
 ## Features
