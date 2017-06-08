@@ -3,7 +3,7 @@ import { expect } from 'chai'
 import { Observable } from 'rxjs/Observable'
 import { MockSelector } from '../../../utils/mocks'
 import { taskGen } from '../../../utils/generators'
-import { QueryToken, TaskSchema, clone } from '../../../index'
+import { QueryToken, TaskSchema, clone, TokenConsumed } from '../../../index'
 
 export default describe('QueryToken Testcase', () => {
 
@@ -44,6 +44,12 @@ export default describe('QueryToken Testcase', () => {
       it('should be completed after values emited', function* () {
         yield queryToken.values()
       })
+
+      it('should throw when reconsumed', function* () {
+        yield queryToken.values()
+        const fn = () => queryToken.values()
+        expect(fn).to.throw(TokenConsumed().message)
+      })
     })
 
     describe('Method: changes', () => {
@@ -66,6 +72,14 @@ export default describe('QueryToken Testcase', () => {
         MockSelector.update(task._id as string, {
           note: newNote
         })
+      })
+
+      it('should throw when reconsumed', function* () {
+        yield queryToken.changes().take(1)
+
+        const fn = () => queryToken.changes().take(1)
+
+        expect(fn).to.throw(TokenConsumed().message)
       })
     })
 
@@ -126,6 +140,22 @@ export default describe('QueryToken Testcase', () => {
             expect(r[tasks.length].note).to.equal(newNote2)
           })
       })
+
+      it('should throw when reconsumed values', function* () {
+        yield combined.values()
+
+        const fn1 = () => combined.values()
+
+        expect(fn1).to.throw(TokenConsumed().message)
+      })
+
+      it('should throw when reconsumed changes', function* () {
+        yield combined.changes().take(1)
+
+        const fn1 = () => combined.changes()
+
+        expect(fn1).to.throw(TokenConsumed().message)
+      })
     })
 
     describe('Method: concat', () => {
@@ -177,6 +207,22 @@ export default describe('QueryToken Testcase', () => {
           .do(r => {
             expect(r[tasks.length].note).to.equal(newNote2)
           })
+      })
+
+      it('should throw when reconsumed values', function* () {
+        yield concated.values()
+
+        const fn1 = () => concated.values()
+
+        expect(fn1).to.throw(TokenConsumed().message)
+      })
+
+      it('should throw when reconsumed changes', function* () {
+        yield concated.changes().take(1)
+
+        const fn1 = () => concated.changes()
+
+        expect(fn1).to.throw(TokenConsumed().message)
       })
     })
 

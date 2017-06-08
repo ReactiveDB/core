@@ -185,9 +185,6 @@ export class Selector <T> {
   }
 
   values(): Observable<T[]> | never {
-    assert(!this.consumed, Exception.TokenConsumed())
-
-    this.consumed = true
     if (typeof this.limit !== 'undefined' || typeof this.skip !== 'undefined') {
       const p = this.rangeQuery.exec()
         .then(r => r.map(v => v[this.shape.pk.name]))
@@ -216,8 +213,6 @@ export class Selector <T> {
   }
 
   changes(): Observable<T[]> | never {
-    assert(!this.consumed, Exception.TokenConsumed())
-    this.consumed = true
     return this.mapFn(this.change$)
   }
 

@@ -1,11 +1,15 @@
 import { Observable } from 'rxjs/Observable'
 import { Selector } from './Selector'
 import { ProxySelector } from './ProxySelector'
+import { assert } from '../../utils/assert'
+import { TokenConsumed } from '../../exception/token'
 
 export type SelectorMeta<T> = Selector<T> | ProxySelector<T>
 
 export class QueryToken<T> {
   selector$: Observable<SelectorMeta<T>>
+
+  private consumed = false
 
   constructor(selector$: Observable<SelectorMeta<T>>) {
     this.selector$ = selector$.publishReplay(1)
@@ -19,12 +23,18 @@ export class QueryToken<T> {
   }
 
   values(): Observable<T[]> {
+    assert(!this.consumed, TokenConsumed())
+
+    this.consumed = true
     return (this.selector$ as Observable<Selector<T>>)
       .switchMap(s => s.values())
       .take(1)
   }
 
   changes(): Observable<T[]> {
+    assert(!this.consumed, TokenConsumed())
+
+    this.consumed = true
     return (this.selector$ as Observable<Selector<T>>)
       .switchMap(s => s.changes())
   }

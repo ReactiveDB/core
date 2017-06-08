@@ -10,7 +10,6 @@ import {
   lfFactory,
   ShapeMatcher,
   PredicateProvider,
-  TokenConsumed,
   TokenConcatFailed
 } from '../../../index'
 
@@ -126,22 +125,6 @@ export default describe('Selector test', () => {
     results.forEach((ret: any) => {
       expect(ret.time >= 50).to.equals(true)
     })
-  })
-
-  it('reconsume should throw', function* () {
-    const selector = new Selector(db,
-      db.select().from(table),
-      tableShape,
-      new PredicateProvider(table, { time: { $gte: 50 } })
-    )
-    yield selector.values()
-
-    try {
-      yield selector.values()
-      throw 1
-    } catch (e) {
-      expect(e.message).to.equal(TokenConsumed().message)
-    }
   })
 
   it('should get correct items when skip and limit', function* () {
@@ -318,19 +301,6 @@ export default describe('Selector test', () => {
           expect(result['name']).to.equal(newName + newName)
         })
 
-    })
-
-    it('reconsume should throw', () => {
-      const selector = new Selector(db,
-        db.select().from(table),
-        tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } })
-      )
-
-      selector.changes()
-      const get = () => selector.changes()
-
-      expect(get).to.throw(TokenConsumed().message)
     })
 
     it('should throw when getValue error', function* () {
@@ -822,31 +792,6 @@ export default describe('Selector test', () => {
           r.filter(v => v['time'] === 136)
             .forEach(v => expect(v['name']).to.equal(newName))
         })
-    })
-
-    it('reconsume combined Selector should throw', function* () {
-      const _selector1 = new Selector(db,
-        db.select().from(table),
-        tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } })
-      )
-
-      const _selector2 = new Selector(db,
-        db.select().from(table),
-        tableShape,
-        new PredicateProvider(table, { time: { $lte: 250 } })
-      )
-
-      const selector = _selector1.combine(_selector2)
-
-      yield selector.values()
-
-      try {
-        yield selector.values()
-        throw 1
-      } catch (e) {
-        expect(e.message).to.equal(TokenConsumed().message)
-      }
     })
 
     it('combined Selector#toString should return query String', () => {
