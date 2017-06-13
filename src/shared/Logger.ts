@@ -18,7 +18,7 @@ export type Formatter = (name: string, level: Level, ...message: any[]) => strin
 export class ContextLogger {
 
   public destroy = (): void => void 0
-  private effects: Map<keyof LoggerAdapter, Function[]>
+  private effects: Map<keyof LoggerAdapter, Function[]> = new Map()
 
   constructor(
     private name: string,
@@ -100,7 +100,7 @@ export class Logger {
   private static contextMap = new Map<string, ContextLogger>()
   private static defaultLevel = Level.debug
   private static outputLogger = new ContextLogger('[ReactiveDB]', Logger.defaultLevel, (name, _, message) => {
-      const output = message.join('')
+      const output = Array.isArray(message) ? message.join('') : message
       const current = new Date()
       const prefix = name ? `[${name}] ` : ''
       return `${prefix}at ${current.toLocaleString()}: \r\n    ` + output
