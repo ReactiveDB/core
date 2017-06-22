@@ -4,6 +4,7 @@
 ```ts
   const queryToken = database.get(...args)
 ```
+
 ## QueryToken.prototype.values()
 ```ts
   queryToken<T>.values(): Observable<T[]>
@@ -18,6 +19,29 @@
 ```
 对已定义的query条件做持续求值操作, 每当监听的query匹配的集合数据发生变化, 数据都将从该接口被推送出来. (live stream)
 
+## QueryToken.prototype.map<K>(fn: (stream$: Observable<T[]>) => Observable<K[]>): QueryToken<K>
+```ts
+  queryToken<K>.map(stream$ => stream$
+    .switchMap(r => request(r._id))
+  )
+    .changes()
+    .subscribe()
+```
+
+下面的 combine 接口会保留 map 的行为，比如:
+
+```ts
+const qt1 = queryToken.map(s$ => s$.map(() => 1))
+const qt2 = queryToken.map(s$ => s$.map(() => 2))
+
+qt1.combine(qt2)
+  .values()
+  .subscribe(r => {
+    // r[0] === 1
+    // r[1] === 2
+  })
+```
+
 ## QueryToken.prototype.concat(...tokens)
 ```ts
   queryToken<T>.concat(...tokens: QueryToken[]): QueryToken
@@ -25,7 +49,7 @@
 对已有的单个或多个QueryToken进行合并操作。在 ReactiveDB 内部会合并这些 `QueryToken` 的 `query`，并且停止被 `concat` query 的 `observe`。具体对应的场景是数据分页。
 使用 `concat` 连接的所有 `QueryToken` 需要满足以下要求:
 
-1. 它们的 `predicate` 与 `select` 都必须完全相等
+1. 它们的 `predicate` 与 `select` 与 `maFn.toString()` 都必须完全相等
 
 2. 它们的查询的数据必须连起来是一块连续的区域，比如:
     ```ts

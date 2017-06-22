@@ -47,7 +47,7 @@ constructor(
 // Database.ts
 improt { Database, DataStoreType } from 'reactivedb'
 
-export default new Database(DataStoreType)
+export default new Database(DataStoreType.INDEXED_DB, true, 'Example', 1)
 ```
 
 ### Database.prototype.defineSchema
@@ -204,71 +204,21 @@ Database.defineSchema(tableName: string, schemaDef: SchemaDef): Database
 
 [example](https://github.com/teambition/ReactiveDB/blob/master/example/rdb/defineSchema.ts)
 
-### Database.defineHook
-```ts
-Database.defineHook(tableName: string, hookDef: HookDef): HookDef
-```
-对已有的表定义hook, hook将会在数据插入或删除时被执行, 可以用于保证单个实体上多个关联数据的一致性.
-
-- ```Method: Database.defineHook(tableName: string, hookDef: HookDef)```
-
-<table>
-  <tr>
-    <td>Parameter</td>
-    <td>Type</td>
-    <td>Required</td>
-    <td>Description</td>
-  </tr>
-  <tr>
-    <td>tableName</td>
-    <td>String</td>
-    <td>required</td>
-    <td>数据表的名字</td>
-  </tr>
-  <tr>
-    <td>hookDef</td>
-    <td>HookDef</td>
-    <td>required</td>
-    <td>hook的定义描述</td>
-  </tr>
-</table>
-
-- ```Interface: HookDef```
-
-<table>
-  <tr>
-    <td>Parameter</td>
-    <td>Type</td>
-    <td>Required</td>
-    <td>Description</td>
-  </tr>
-  <tr>
-    <td>insert</td>
-    <td>Function</td>
-    <td>optional</td>
-    <td>insert Function 数据插入时的 hook Function(trigger)，执行的时候 Database 会将 lovefield Database 实例与数据实体传入，必须返回一个 Promise</td>
-  </tr>
-  <tr>
-    <td>destory</td>
-    <td>Function</td>
-    <td>optional</td>
-    <td>数据销毁时的 hook Function(trigger)，使用方法同insert</td>
-  </tr>
-</table>
-
-*example:*
+### Database.prototype.dump
 
 ```ts
-Database.defineHook('Demo', {
-  destroy: (db, entity) => {
-    // db docs: https://github.com/google/lovefield/blob/master/docs/spec/04_query.md
-    const basicTable = db.getSchema().table('Demo')
-    return db.delete()
-      .from(basicTable)
-      .where(basicTable['_id'].in(entity.basicIds))
-  }
-})
+  database.dump(): Observable<Object>
 ```
+
+dump 整个数据库，用于下次 load。
+
+### Database.prototype.load
+
+```ts
+  database.load(data: Object): Observable<void>
+```
+
+加载 dump 出来的数据，必须在 `connect` 方法调用前调用。
 
 ### Database.prototype.connect
 
