@@ -51,7 +51,7 @@ export class QueryToken<T> {
     return new QueryToken<T>(newSelector$)
   }
 
-  combine(...tokens: QueryToken<T>[]) {
+  combine(...tokens: QueryToken<any>[]) {
     tokens.unshift(this)
     const newSelector$ = Observable.from(tokens)
       .map(token => token.selector$.skipWhile(v => v instanceof ProxySelector))

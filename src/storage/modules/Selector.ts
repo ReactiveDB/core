@@ -10,7 +10,7 @@ import { ShapeMatcher, OrderInfo, StatementType } from '../../interface'
 import { mapFn } from './mapFn'
 
 export class Selector <T> {
-  private static concatFactory<U>(... metaDatas: Selector<U>[]) {
+  private static concatFactory<U>(...metaDatas: Selector<U>[]) {
     const [ meta ] = metaDatas
     const skipsAndLimits = metaDatas
       .map(m => ({ skip: m.skip, limit: m.limit }))
@@ -30,7 +30,7 @@ export class Selector <T> {
       db, lselect, shape, predicateProvider,
       maxLimit.limit! + maxLimit.skip!, minSkip.skip, meta.orderDescriptions
     )
-      .map(meta.mapFn)
+      .map<U>(meta.mapFn)
   }
 
   private static combineFactory<U>(... metaDatas: Selector<U>[]) {
@@ -155,7 +155,7 @@ export class Selector <T> {
             listener()
             db.observe(query, listener)
             return () => this.db.unobserve(query, listener)
-          })
+          }) as Observable<T[]>
         })
         .publishReplay(1)
         .refCount()
@@ -209,7 +209,7 @@ export class Selector <T> {
     )
     assert(equal, Exception.TokenConcatFailed())
 
-    return Selector.concatFactory(this, ... selectors)
+    return Selector.concatFactory(this, ...selectors)
   }
 
   changes(): Observable<T[]> | never {

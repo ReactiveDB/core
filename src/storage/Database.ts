@@ -734,7 +734,7 @@ export class Database {
         }
         const query = predicatableQuery(db, table, predicate!, StatementType.Select)
 
-        return Observable.fromPromise<T[]>(query.exec())
+        return Observable.fromPromise<T[]>(query.exec() as any)
       }
 
       return [get, remove]
