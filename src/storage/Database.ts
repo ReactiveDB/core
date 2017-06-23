@@ -1,4 +1,5 @@
 import { Observable } from 'rxjs/Observable'
+import { ErrorObservable } from 'rxjs/observable/ErrorObservable'
 import { Subscription } from 'rxjs/Subscription'
 import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable'
 import * as lf from 'lovefield'
@@ -297,7 +298,12 @@ export class Database {
     })
   }
 
-  dispose() {
+  dispose(): ErrorObservable | Observable<{
+    insert: number
+    update: number
+    delete: number
+    result: boolean
+  }> {
     if (!this.connected) {
       return Observable.throw(Exception.NotConnected())
     }
