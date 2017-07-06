@@ -89,31 +89,38 @@ export class PredicateProvider<T> {
 
   toString(): string | void {
     const pred = this.getPredicate()
-    if (pred !== null) {
-      return pred.toString()
-    }
+    return pred ? JSON.stringify(this.meta) : ''
   }
 
-  private normalizeMeta(meta: Predicate<T>, column?: lf.schema.Column) {
-    let predicates: lf.Predicate[] = []
+  private normalizeMeta(meta: Predicate<T>, column?: lf.schema.Column): lf.Predicate[] {
+    const buildSinglePred = (col: lf.schema.Column, val: any, key: string): lf.Predicate =>
+      this.checkMethod(key) ? predicateFactory[key](col, val) : col.eq(val as ValueLiteral)
+
+    const predicates: lf.Predicate[] = []
+
     forEach(meta, (val, key) => {
+      let nestedPreds: lf.Predicate[]
+      let resultPred: lf.Predicate
+
       if (this.checkCompound(key)) {
-        predicates.push(compoundPredicateFactory[key](this.normalizeMeta(val as Predicate<T>, column)))
+        nestedPreds = this.normalizeMeta(val as Predicate<T>, column)
+        resultPred = compoundPredicateFactory[key](nestedPreds)
       } else if (this.checkPredicate(val)) {
-        predicates = predicates.concat(this.normalizeMeta(val as any, this.table[key]))
+        nestedPreds = this.normalizeMeta(val as any, this.table[key])
+        resultPred = compoundPredicateFactory['$and'](nestedPreds)
       } else {
         const _column = column || this.table[key]
-        if (!_column) {
-          warn(
-            `Failed to build predicate, since column: ${key} is not exist` +
-            `, on table: ${this.table.getName()}`
-          )
+        if (_column) {
+          resultPred = buildSinglePred(_column, val, key)
         } else {
-          const predicate = this.checkMethod(key) ? predicateFactory[key](_column, val) : _column.eq(val as ValueLiteral)
-          predicates.push(predicate)
+          warn(`Failed to build predicate, since column: ${key} is not exist, on table: ${this.table.getName()}`)
+          return
         }
       }
+
+      predicates.push(resultPred)
     })
+
     return predicates
   }
 

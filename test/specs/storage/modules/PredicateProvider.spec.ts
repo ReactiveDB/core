@@ -5,6 +5,13 @@ import { PredicateProvider, lfFactory, DataStoreType } from '../../../index'
 
 export default describe('PredicateProvider test', () => {
   const dataLength = 1000
+
+  const execQuery = (db: any, table: any, pred?: any) =>
+    db.select()
+      .from(table)
+      .where(pred)
+      .exec()
+
   let db: lf.Database
   let table: lf.schema.Table
   let version = 1
@@ -44,14 +51,22 @@ export default describe('PredicateProvider test', () => {
   })
 
   describe('PredicateProvider#getPredicate', () => {
-    it('invalid key should be ignored', function*() {
+    it('invalid key should be ignored', function* () {
       const fn = () => new PredicateProvider(table, {
         nonExist: 'whatever'
       }).getPredicate()
 
-      const expectResult = yield db.select().from(table).exec()
-      const result = yield db.select().from(table).where(fn()).exec()
+      const expectResult = yield execQuery(db, table)
+      const result = yield execQuery(db, table, fn())
+
       expect(result).deep.equal(expectResult)
+    })
+
+    it('empty meta should ok', function* () {
+      const predicate = new PredicateProvider(table, {}).getPredicate()
+      expect(predicate).to.be.null
+      const result = yield execQuery(db, table, predicate)
+      expect(result).to.have.lengthOf(1000)
     })
 
     it('literal value should ok', function* () {
@@ -59,10 +74,7 @@ export default describe('PredicateProvider test', () => {
         time1: 20
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(1)
       expect(result[0]['time1']).to.equal(20)
@@ -75,13 +87,9 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(dataLength - 1)
-
       result.forEach((r: any) => expect(r['time1'] === 20).to.be.false)
     })
 
@@ -92,10 +100,7 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(20)
       result.forEach((r: any) => expect(r['time1'] < 20).to.be.true)
@@ -108,10 +113,7 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(20)
       result.forEach((r: any) => expect(r['time1'] <= 19).to.be.true)
@@ -124,10 +126,7 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(dataLength - 20)
       result.forEach((r: any) => expect(r['time2'] > 20).to.be.true)
@@ -140,10 +139,7 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(dataLength - 20)
       result.forEach((r: any) => expect(r['time2'] >= 21).to.be.true)
@@ -157,10 +153,7 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(10)
       result.forEach((r: any) => expect(regExp.test(r['name'])).to.be.true)
@@ -174,10 +167,7 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       // 上一个测试中结果长度是 10
       expect(result).to.have.lengthOf(dataLength - 10)
@@ -191,10 +181,7 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(20)
       result.forEach((r: any) => expect(r['time1'] > 0 && r['time1'] <= 20).to.be.true)
@@ -207,10 +194,7 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(3)
       result.forEach((r: any) => {
@@ -226,10 +210,7 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(3)
       result.forEach((r: any) => expect(seed.indexOf(r['time1']) !== -1).to.be.true)
@@ -242,10 +223,7 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(700)
       result.forEach((r: any) => expect(r['nullable']).to.be.null)
@@ -258,10 +236,7 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(300)
       result.forEach((r: any) => expect(r['nullable']).to.not.be.null)
@@ -274,10 +249,7 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(dataLength - 1)
     })
@@ -292,10 +264,7 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(150)
       result.forEach((r: any) => expect(r['time1'] >= 50 && r['time1'] < 200).to.be.true)
@@ -311,13 +280,29 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(100)
       result.forEach((r: any) => expect(r['time1'] >= dataLength - 50 || r['time1'] < 50).to.be.true)
+    })
+
+    it('non-compound predicates should be combined with $and', function* () {
+      const predicate = new PredicateProvider(table, {
+        $or: {
+          time1: { $gte: 0, $lt: 50 },
+          time2: { $gt: 0, $lte: 50 }
+        }
+      }).getPredicate()
+
+      const result = yield execQuery(db, table, predicate)
+
+      expect(result).to.have.lengthOf(100)
+      result.forEach((row: any) => {
+        expect(
+          (row.time1 >= 0 && row.time1 < 50)
+          || (row.time2 <= 50 && row.time2 > 0)
+        ).to.be.true
+      })
     })
 
     it('compoundPredicate should skip null/undefined property', function* () {
@@ -330,10 +315,7 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(50)
       result.forEach((r: any) => expect(r['time1'] >= dataLength - 50).to.be.true)
@@ -359,10 +341,7 @@ export default describe('PredicateProvider test', () => {
         }
       }).getPredicate()
 
-      const result = yield db.select()
-        .from(table)
-        .where(predicate)
-        .exec()
+      const result = yield execQuery(db, table, predicate)
 
       expect(result).to.have.lengthOf(5)
 
@@ -373,6 +352,25 @@ export default describe('PredicateProvider test', () => {
 
         expect(pred1 && pred2 && pred3).to.be.true
       })
+    })
+  })
+
+  describe('PredicateProvider#toString', () => {
+    it('convert empty PredicateProvider to empty string', () => {
+      expect(new PredicateProvider(table, {}).toString()).to.equal('')
+    })
+
+    it('convert to string representation of the predicate', () => {
+      expect(new PredicateProvider(table, { notExist: 20 }).toString()).to.equal('')
+
+      expect(new PredicateProvider(table, { time1: 20 }).toString()).to.equal('{"time1":20}')
+
+      expect(new PredicateProvider(table, {
+        $or: {
+          time1: { $gte: 0, $lt: 50 },
+          time2: { $gt: 0, $lte: 50 }
+        }
+      }).toString()).to.equal('{"$or":{"time1":{"$gte":0,"$lt":50},"time2":{"$gt":0,"$lte":50}}}')
     })
   })
 })

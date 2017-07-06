@@ -153,7 +153,7 @@ export default describe('Selector test', () => {
 
     const sql = selector.toString()
 
-    expect(sql).to.equal('SELECT * FROM TestSelectMetadata WHERE (TestSelectMetadata.time > 50);')
+    expect(sql).to.equal('SELECT * FROM TestSelectMetadata WHERE ((TestSelectMetadata.time > 50));')
   })
 
   it('should get correct results with orderBy', function* () {
@@ -922,7 +922,7 @@ export default describe('Selector test', () => {
         .do(r => expect(r[75].name).equal(update3))
     })
 
-    it('concat two selector predicate not match should throw', function* () {
+    it('concat selector should ok with OrderDescription', function* () {
       const selector6 = new Selector(db,
         db.select().from(table),
         tableShape,
