@@ -7,6 +7,8 @@
 
 一个 Reactive 风格的前端 ORM。基于 [Lovefield](https://github.com/google/lovefield) 与 [RxJS](https://github.com/ReactiveX/rxjs)。
 
+Fork from [teambition/ReactiveDB](https://github.com/teambition/reactivedb)
+
 ## Features
 - 响应式查询
 
