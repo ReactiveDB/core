@@ -153,7 +153,7 @@ export default describe('Selector test', () => {
 
     const sql = selector.toString()
 
-    expect(sql).to.equal('SELECT * FROM TestSelectMetadata WHERE ((TestSelectMetadata.time > 50));')
+    expect(sql).to.equal('SELECT * FROM TestSelectMetadata WHERE (TestSelectMetadata.time > 50);')
   })
 
   it('should get correct results with orderBy', function* () {
@@ -922,6 +922,26 @@ export default describe('Selector test', () => {
         .do(r => expect(r[75].name).equal(update3))
     })
 
+    it('concat selector should ok when neither selectors have predicateProvider', function* () {
+      selector1 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        null,
+        20, 0
+      )
+      selector2 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        null,
+        20, 20
+      )
+      const result = yield selector1.concat(selector2).values()
+      expect(result).to.have.lengthOf(40)
+      result.forEach((r: any, index: number) => {
+        expect(r).to.deep.equal(storeData[index])
+      })
+    })
+
     it('concat selector should ok with OrderDescription', function* () {
       const selector6 = new Selector(db,
         db.select().from(table),
@@ -1010,6 +1030,42 @@ export default describe('Selector test', () => {
       const error = TokenConcatFailed()
 
       expect(fn).to.throw(error.message)
+    })
+
+    it('concat two selector with one of the them not having a predicateProvider should throw with correct error message', () => {
+      const selector6 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        null,
+        20, 0
+      )
+      const selector7 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } }),
+        20, 20
+      )
+
+      const selector6_1 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20, 0
+      )
+      const selector7_1 = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        null,
+        20, 20
+      )
+
+      const error = TokenConcatFailed()
+
+      const fn = () => selector6.concat(selector7)
+      expect(fn).to.throw(error.message)
+
+      const fn_1 = () => selector6_1.concat(selector7_1)
+      expect(fn_1).to.throw(error.message)
     })
 
     it('concat two selector select not match should throw', () => {

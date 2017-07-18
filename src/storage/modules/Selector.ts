@@ -116,31 +116,31 @@ export class Selector <T> {
     return q
   }
 
+  // returns the given PredicateProvider if it is not 'empty';
+  // otherwise, returns undefined
+  private normPredicateProvider(pp?: PredicateProvider<T>): PredicateProvider<T> | undefined {
+    try {
+      return pp && pp.getPredicate() ? pp : undefined
+    } catch (err) {
+      this.predicateBuildErr = true
+      warn(
+        `Failed to build predicate, since ${err.message}` +
+        `, on table: ${this.shape.mainTable.getName()}`
+      )
+      return undefined
+    }
+  }
+
   constructor(
     public db: lf.Database,
     private lselect: lf.query.Select,
     private shape: ShapeMatcher,
-    public predicateProvider?: PredicateProvider<T> | null,
+    public predicateProvider?: PredicateProvider<T>,
     private limit?: number,
     private skip?: number,
     private orderDescriptions?: OrderInfo[]
   ) {
-    if (predicateProvider) {
-      try {
-        const predicate = predicateProvider.getPredicate()
-        if (!predicate) {
-          throw new TypeError()
-        }
-      } catch (err) {
-        predicateProvider = null
-        this.predicateProvider = null
-        this.predicateBuildErr = true
-        warn(
-          `Failed to build predicate, since ${err.message}` +
-          `, on table: ${shape.mainTable.getName()}`
-        )
-      }
-    }
+    this.predicateProvider = this.normPredicateProvider(predicateProvider)
     skip = limit && !skip ? 0 : skip
     if (limit || skip) {
       this.change$ = this.buildPrefetchingObserve()
@@ -203,9 +203,15 @@ export class Selector <T> {
     const orderStr = Selector.stringifyOrder(this.orderDescriptions!)
     const equal = selectors.every(m =>
       m.select === this.select &&
-      m.predicateProvider!.toString() === this.predicateProvider!.toString() &&
       Selector.stringifyOrder(m.orderDescriptions!) === orderStr &&
-      m.mapFn.toString() === this.mapFn.toString()
+      m.mapFn.toString() === this.mapFn.toString() &&
+      (
+        (m.predicateProvider === this.predicateProvider) ||
+        (
+          !!(m.predicateProvider && this.predicateProvider) &&
+          m.predicateProvider!.toString() === this.predicateProvider!.toString()
+        )
+      )
     )
     assert(equal, Exception.TokenConcatFailed())
 
@@ -236,19 +242,27 @@ export class Selector <T> {
   }
 
   private getQuery(additional?: lf.Predicate): lf.query.Select {
-    if (this.predicateBuildErr && !additional) {
-      return this.query
+    if (this.predicateBuildErr) {
+      return additional ? this.query.where(additional) : this.query
     }
-    // !this.predicateBuildErr || additional
+    // !this.predicateBuildErr
+
     const preds: lf.Predicate[] = []
-    if (this.predicateProvider && !this.predicateBuildErr) {
+    if (this.predicateProvider) {
       preds.push(this.predicateProvider.getPredicate()!)
     }
     if (additional) {
       preds.push(additional)
     }
-    const pred = lf.op.and(...preds)
-    return this.query.where(pred)
+
+    switch (preds.length) {
+      case 0:
+        return this.query
+      case 1:
+        return this.query.where(preds[0])
+      default:
+        return this.query.where(lf.op.and(...preds))
+    }
   }
 
   private removeKey(data: any[], key: string) {

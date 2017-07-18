@@ -71,11 +71,11 @@ export class PredicateProvider<T> {
 
   constructor(
     private table: lf.schema.Table,
-    private meta: Predicate<T>
+    private meta?: Predicate<T>
   ) { }
 
   getPredicate(): lf.Predicate | null {
-    const predicates = this.normalizeMeta(this.meta)
+    const predicates = this.meta ? this.normalizeMeta(this.meta) : []
     if (predicates.length) {
       if (predicates.length === 1) {
         return predicates[0]
