@@ -1,8 +1,7 @@
-[![CircleCI](https://circleci.com/gh/Reactive-DB/ReactiveDB.svg?style=svg)](https://circleci.com/gh/Reactive-DB/ReactiveDB)
-[![Coverage Status](https://coveralls.io/repos/github/Reactive-DB/ReactiveDB/badge.svg?branch=master)](https://coveralls.io/github/Reactive-DB/ReactiveDB?branch=master)
-[![Dependency Status](https://david-dm.org/Reactive-DB/ReactiveDB.svg)](https://david-dm.org/Reactive-DB/ReactiveDB)
-[![devDependencies Status](https://david-dm.org/Reactive-DB/ReactiveDB/dev-status.svg)](https://david-dm.org/Reactive-DB/ReactiveDB?type=dev)
-[![Greenkeeper badge](https://badges.greenkeeper.io/Reactive-DB/ReactiveDB.svg)](https://greenkeeper.io/)
+[![CircleCI](https://circleci.com/gh/ReactiveDB/core.svg?style=svg)](https://circleci.com/gh/ReactiveDB/core)
+[![Coverage Status](https://coveralls.io/repos/github/ReactiveDB/core/badge.svg?branch=master)](https://coveralls.io/github/ReactiveDB/core?branch=master)
+[![Dependency Status](https://david-dm.org/ReactiveDB/core.svg)](https://david-dm.org/ReactiveDB/core)
+[![devDependencies Status](https://david-dm.org/ReactiveDB/core/dev-status.svg)](https://david-dm.org/ReactiveDB/core?type=dev)
 # ReactiveDB
 
 一个 Reactive 风格的前端 ORM。基于 [Lovefield](https://github.com/google/lovefield) 与 [RxJS](https://github.com/ReactiveX/rxjs)。
