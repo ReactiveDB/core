@@ -14,7 +14,7 @@ export class MockSelector<T> {
     MockSelector.selectMeta.get(_id).notify()
   }
 
-  private static mapFn = <T>(dist$: Observable<T>) => dist$
+  private static mapFn = <U>(dist$: Observable<U>) => dist$
 
   private subject = new ReplaySubject<T[]>(1)
   private change$ = this.subject

@@ -1,4 +1,4 @@
-import { Database, RDBType, Relationship, EngineerSchema } from '../index'
+import { Database, RDBType, Relationship } from '../index'
 
 export interface ModuleSchema {
   _id: string
@@ -27,7 +27,7 @@ export default (db: Database) => db.defineSchema<ModuleSchema>('Module', {
     type: Relationship.oneToOne,
     virtual: {
       name: 'Engineer',
-      where: (ref: EngineerSchema) => ({
+      where: ref => ({
         ownerId: ref._id
       })
     }

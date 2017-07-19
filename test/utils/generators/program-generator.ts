@@ -27,14 +27,14 @@ export default function(
     }
 
     modules = modules.concat(Array.from({ length: remainModuleCount }, () => {
-      const owner = pickOneEngineer()
+      const _owner = pickOneEngineer()
 
       return {
         _id: uuid(),
         name: random.string(),
-        ownerId: owner._id,
+        ownerId: _owner._id,
         parentId: programId,
-        programmer: owner
+        programmer: _owner
       }
     }))
 

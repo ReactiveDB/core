@@ -1,5 +1,5 @@
 import { RDBType, Relationship } from '../index'
-import { TeambitionTypes, Database, SubtaskSchema, ProjectSchema } from '../index'
+import { TeambitionTypes, Database, SubtaskSchema } from '../index'
 
 export interface TaskSchema {
   _id: TeambitionTypes.TaskId
@@ -62,7 +62,7 @@ export default (db: Database) => {
       type: Relationship.oneToOne,
       virtual: {
         name: 'Project',
-        where: (ref: ProjectSchema) => {
+        where: ref => {
           return {
             _projectId: ref._id
           }
@@ -73,7 +73,7 @@ export default (db: Database) => {
       type: Relationship.oneToMany,
       virtual: {
         name: 'Subtask',
-        where: (ref: SubtaskSchema) => {
+        where: ref => {
           return {
             _id: ref._taskId
           }

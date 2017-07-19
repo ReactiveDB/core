@@ -73,7 +73,7 @@ export class Selector <T> {
     return orderStr
   }
 
-  private mapFn: <K>(stream$: Observable<T[]>) => Observable<K[]> = mapFn
+  private mapFn: (stream$: Observable<T[]>) => Observable<any[]> = mapFn
 
   public select: string
 
