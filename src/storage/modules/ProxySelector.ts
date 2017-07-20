@@ -6,7 +6,7 @@ export class ProxySelector<T> {
 
   public request$: Observable<T[]>
 
-  private mapFn = mapFn
+  private mapFn: (stream$: Observable<T[]>) => Observable<any> = mapFn
 
   constructor (
     request$: Observable<T> | Observable<T[]>,

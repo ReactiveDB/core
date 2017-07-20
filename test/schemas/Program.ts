@@ -1,4 +1,4 @@
-import { Database, RDBType, Relationship, EngineerSchema } from '../index'
+import { Database, RDBType, Relationship } from '../index'
 
 export interface ProgramSchema {
   _id: string
@@ -20,7 +20,7 @@ export default (db: Database) => db.defineSchema<ProgramSchema>('Program', {
     type: Relationship.oneToOne,
     virtual: {
       name: 'Engineer',
-      where: (ref: EngineerSchema) => ({
+      where: ref => ({
         ownerId: ref._id
       })
     }
@@ -32,7 +32,7 @@ export default (db: Database) => db.defineSchema<ProgramSchema>('Program', {
       where: (
         moduleTable: lf.schema.Table
       ) => ({
-        _id: moduleTable['parentId']
+        _id: moduleTable.parentId
       })
     }
   },

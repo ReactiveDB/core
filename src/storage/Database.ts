@@ -4,8 +4,8 @@ import { Subscription } from 'rxjs/Subscription'
 import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable'
 import * as lf from 'lovefield'
 import * as Exception from '../exception'
-import * as definition from './helper/definition'
-import version from '../version'
+import * as typeDefinition from './helper/definition'
+import Version from '../version'
 import { Traversable } from '../shared'
 import { Mutation, Selector, QueryToken, PredicateProvider } from './modules'
 import { dispose, contextTableName, fieldIdentifier, hiddenColName } from './symbols'
@@ -18,7 +18,7 @@ import { ColumnLeaf, NavigatorLeaf, ExecutorResult, UpsertContext, SelectContext
 
 export class Database {
 
-  public static version = version
+  public static version = Version
 
   public static getTables(db: lf.Database, ...tableNames: string[]) {
     return tableNames.map((name) => db.getSchema().table(name))
@@ -547,7 +547,7 @@ export class Database {
         rootDefinition[key] = defs
       } else {
         const { where, type } = defs as Association
-        rootDefinition[key] = definition.revise(type!, ret.definition)
+        rootDefinition[key] = typeDefinition.revise(type!, ret.definition)
         const [ predicate, err ] = tryCatch(createPredicate)(currentTable, where(ret.table))
         if (err) {
           warn(
@@ -597,7 +597,7 @@ export class Database {
         case LeafType.column:
           const { column, identifier } = ctx.leaf as ColumnLeaf
           const type = schema.columns.get(ctx.key)!
-          const columnDef = definition.create(identifier, schema.pk === ctx.key, type)
+          const columnDef = typeDefinition.create(identifier, schema.pk === ctx.key, type)
           handleAdvanced({ columns: [column], advanced: true }, ctx.key, columnDef)
           break
         case LeafType.navigator:

@@ -3,7 +3,7 @@ import { Database, RDBType, Relationship, ProgramSchema } from '../index'
 export interface EngineerSchema {
   _id: string
   name: string
-  leadProgram?: Object[]
+  leadProgram?: ProgramSchema[]
 }
 
 export default (db: Database) => db.defineSchema<EngineerSchema>('Engineer', {
@@ -18,7 +18,7 @@ export default (db: Database) => db.defineSchema<EngineerSchema>('Engineer', {
     type: Relationship.oneToMany,
     virtual: {
       name: 'Program',
-      where(table: ProgramSchema) {
+      where(table) {
         return {
           _id: table.ownerId
         }

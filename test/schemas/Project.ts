@@ -1,4 +1,4 @@
-import { TeambitionTypes, Database, RDBType, Relationship, PostSchema } from '../index'
+import { TeambitionTypes, Database, RDBType, Relationship } from '../index'
 
 export interface ProjectSchema {
   _id: TeambitionTypes.ProjectId
@@ -21,7 +21,7 @@ export default (db: Database) => db.defineSchema<ProjectSchema>('Project', {
     type: Relationship.oneToMany,
     virtual: {
       name: 'Post',
-      where: (ref: PostSchema) => ({
+      where: ref => ({
         _id: ref.belongTo
       })
     }
