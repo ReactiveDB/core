@@ -445,7 +445,7 @@ export class Database {
         mainTable: table!
       }
       const { limit, skip } = clause
-      const provider = new PredicateProvider(table!, clause.where!)
+      const provider = new PredicateProvider(table!, clause.where)
 
       return new Selector<T>(db, query, matcher, provider, limit, skip, orderDesc)
     })

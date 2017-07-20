@@ -1,4 +1,4 @@
-import { Observable } from 'rxjs/Observable'
+import { Observable, Scheduler } from 'rxjs'
 import * as moment from 'moment'
 import { describe, it, beforeEach, afterEach } from 'tman'
 import { expect, assert, use } from 'chai'
@@ -10,7 +10,7 @@ import { TestFixture2 } from '../../schemas/Test'
 import { scenarioGen, programGen, postGen, taskGen, subtaskGen } from '../../utils/generators'
 import { RDBType, DataStoreType, Database, clone, forEach, JoinMode } from '../../index'
 import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema } from '../../index'
-import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected } from '../../index'
+import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector } from '../../index'
 
 use(SinonChai)
 
@@ -249,6 +249,14 @@ export default describe('Database Testcase: ', () => {
 
       expect(_id).to.equal(target._id)
       expect(_projectId).to.equal(target._projectId)
+    })
+
+    it('on query without `where`, should result in QueryToken whose Selector does not have predicateProvider', function* () {
+      yield database.get<TaskSchema>('Task', {}).selector$
+        .subscribeOn(Scheduler.async)
+        .do((x: Selector<TaskSchema>) => {
+          expect(x.predicateProvider).to.be.undefined
+        })
     })
 
     it('should get single record successfully', function* () {
@@ -546,21 +554,36 @@ export default describe('Database Testcase: ', () => {
         }
       })
 
-      it('should throw if failed to build where-clause ', function* () {
+      it('should throw if failed to build where-clause, and treat it as an empty where-clause', function* () {
         let result: any[]
+
+        const throwingWhereStmt = {
+          get whatever() {
+            throw new TypeError('error occured when build execute where clause function')
+          }
+        }
+
         try {
           result = yield database.get<TaskSchema>('Task', {
-            where: {
-              get whatever() {
-                throw new TypeError('error occured when build execute where clause function')
-              }
-            }
+            where: throwingWhereStmt
           } as any).values()
         } catch (e) {
           throw new TypeError('Invalid code path reached.')
         }
 
         expect(result).to.have.length.above(0)
+
+        try {
+          result = yield database.get<TaskSchema>('Task', {
+            where: throwingWhereStmt,
+            limit: 20,
+            skip: 0
+          } as any).values()
+        } catch (e) {
+          throw new TypeError('Invalid code path reached.')
+        }
+
+        expect(result).to.have.length(20)
       })
 
     })
