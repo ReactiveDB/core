@@ -6,9 +6,9 @@ import { PredicateProvider, lfFactory, DataStoreType } from '../../../index'
 export default describe('PredicateProvider test', () => {
   const dataLength = 1000
 
-  const execQuery = (db: any, table: any, pred?: any) =>
-    db.select()
-      .from(table)
+  const execQuery = (_db: any, _table: any, pred?: any) =>
+    _db.select()
+      .from(_table)
       .where(pred)
       .exec()
 

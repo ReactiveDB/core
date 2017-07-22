@@ -49,7 +49,7 @@ export default describe('Mutation Testcase: ', () => {
         const mut = new Mutation(database, table, { foo: 666, bar: 233 })
         mut.withId('id', 42)
 
-        sinon.stub(Mutation, 'aggregate', (_: any, [ m ]: any[], __: any[]) => {
+        sinon.stub(Mutation, 'aggregate').callsFake((_: any, [ m ]: any[], __: any[]) => {
           const meta = { key: 'id', val: 42 }
           expect(m.meta).to.deep.equal(meta)
         })

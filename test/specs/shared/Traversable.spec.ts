@@ -113,7 +113,7 @@ export default describe('Traversable Testcase: ', () => {
       it('should mount ctxgen function successfully', () => {
         const spy = sinon.spy()
         traversable.context(spy)
-        sinon.stub(traversable, 'forEach', function (this: any) {
+        sinon.stub(traversable, 'forEach').callsFake(function (this: any) {
           this.ctxgen()
         })
 
