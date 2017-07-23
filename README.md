@@ -4,6 +4,8 @@
 [![devDependencies Status](https://david-dm.org/ReactiveDB/core/dev-status.svg)](https://david-dm.org/ReactiveDB/core?type=dev)
 # ReactiveDB
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/ReactiveDB/core.svg)](https://greenkeeper.io/)
+
 一个 Reactive 风格的前端 ORM。基于 [Lovefield](https://github.com/google/lovefield) 与 [RxJS](https://github.com/ReactiveX/rxjs)。
 
 Fork from [teambition/ReactiveDB](https://github.com/teambition/reactivedb)
