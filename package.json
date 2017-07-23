@@ -3,21 +3,21 @@
   "version": "0.9.10",
   "description": "Reactive ORM for Lovefield",
   "main": "dist/cjs/index.js",
-  "module": "dist/es6/index.js",
+  "module": "dist/es/index.js",
   "scripts": {
-    "build_all": "npm-run-all build_cjs build_module_es6 build_test",
+    "build_all": "npm-run-all build_cjs build_module_es build_test",
     "build_cjs": "npm-run-all clean_dist_cjs copy_src_cjs compile_cjs",
-    "build_module_es6": "npm-run-all clean_dist_es6 copy_src_es6 compile_module_es6",
+    "build_module_es": "npm-run-all clean_dist_es copy_src_es compile_module_es",
     "build_test": "rm -rf spec-js && tsc -p test/tsconfig.json",
     "clean_dist_cjs": "rm -rf ./dist/cjs",
-    "clean_dist_es6": "rm -rf ./dist/es6",
+    "clean_dist_es": "rm -rf ./dist/es",
     "check_circular_dependencies": "madge ./dist/cjs --circular",
     "compile_cjs": "       tsc dist/cjs/src/index.ts dist/cjs/src/proxy/index.ts -m commonjs --outDir dist/cjs --sourcemap --target ES5 -d --diagnostics --pretty --strict --noImplicitReturns --noUnusedLocals --noUnusedParameters --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
-    "compile_module_es6": "tsc dist/es6/src/index.ts dist/es6/src/proxy/index.ts -m ES2015   --outDir dist/es6 --sourcemap --target ES5 -d --diagnostics --pretty --strict --noImplicitReturns --noUnusedLocals --noUnusedParameters --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
+    "compile_module_es": "tsc dist/es/src/index.ts dist/es/src/proxy/index.ts -m ES2015   --outDir dist/es --sourcemap --target ES5 -d --diagnostics --pretty --strict --noImplicitReturns --noUnusedLocals --noUnusedParameters --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
     "copy_src_cjs": "shx mkdir -p ./dist/cjs/src && shx cp -r ./src/* ./dist/cjs/src",
-    "copy_src_es6": "shx mkdir -p ./dist/es6/src && shx cp -r ./src/* ./dist/es6/src",
+    "copy_src_es": "shx mkdir -p ./dist/es/src && shx cp -r ./src/* ./dist/es/src",
     "cover": "rm -rf ./.nyc_output ./coverage && NODE_ENV=test nyc --reporter=html --reporter=lcov --exclude=node_modules --exclude=spec-js/test --exclude=spec-js/src/storage/lovefield.js --exclude=spec-js/src/shared/Logger.js --exclude=spec-js/src/utils/option.js --exclude=spec-js/src/utils/valid.js tman --mocha spec-js/test/run.js",
-    "lint": "tslint -c tslint.json src/*.ts --project ./tsconfig.json --type-check src/**/*.ts src/**/**/*.ts ./test/*.ts ./test/**/*.ts ./test/**/**/*.ts -e ./test/e2e/*.ts",
+    "lint": "tslint -c tslint.json src/*.ts --project ./tsconfig.json --type-check src/**/*.ts ./test/**/*.ts -e ./test/e2e/*.ts",
     "start": "webpack-dev-server --inline --colors --progress --port 3000",
     "start-demo": "webpack-dev-server --config ./example/webpack.config.js --inline --colors --progress --port 3001 --open",
     "test": "npm run lint && NODE_ENV=test tman --mocha spec-js/test/run.js",
@@ -28,9 +28,35 @@
   },
   "keywords": [
     "lovefield",
-    "RxJS"
+    "RxJS",
+    "TypeScript",
+    "reactivedb",
+    "orm",
+    "orm-library",
+    "relational-database"
   ],
-  "author": "lynweklm@gmail.com",
+  "author": "LongYinan <lynweklm@gmail.com>",
+  "maintainers": [
+    {
+      "name": "LongYinan",
+      "email": "lynweklm@gmail.com"
+    },
+    {
+      "name": "Saviio",
+      "email": "sirius0x9@gmail.com"
+    },
+    {
+      "name": "chuan6",
+      "email": "chuan6.dev@gmail.com"
+    },
+    {
+      "name": "Miloas",
+      "email": "genesis.null@gmail.com"
+    }
+  ],
+  "bugs": {
+    "url": "https://github.com/ReactiveDB/core/issues"
+  },
   "license": "MIT",
   "devDependencies": {
     "@types/chai": "^4.0.1",
