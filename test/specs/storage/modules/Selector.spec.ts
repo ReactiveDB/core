@@ -611,6 +611,61 @@ export default describe('Selector test', () => {
           }
         })
     })
+
+    it('query without prefetch should only emit one values when init', function* () {
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } })
+      )
+
+      const spy = sinon.spy()
+
+      const signal = selector.changes()
+
+      subscription = signal.subscribe(spy)
+
+      yield signal.take(1)
+
+      expect(spy.callCount).to.equal(1)
+    })
+
+    it('query without prefetch and results is empty Array should only emit one values when init', function* () {
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 10000 } })
+      )
+
+      const spy = sinon.spy()
+
+      const signal = selector.changes()
+
+      subscription = signal.subscribe(spy)
+
+      yield signal.take(1)
+
+      expect(spy.callCount).to.equal(1)
+    })
+
+    it('prefetch query should only emit one values when init', function* () {
+      const selector = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20, 20
+      )
+
+      const spy = sinon.spy()
+
+      const signal = selector.changes()
+
+      subscription = signal.subscribe(spy)
+
+      yield signal.take(1)
+
+      expect(spy.callCount).to.equal(1)
+    })
   })
 
   describe('Selector.prototype.combine', () => {

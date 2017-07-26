@@ -77,7 +77,43 @@ export class Selector <T> {
 
   public select: string
 
-  private change$: Observable<T[]>
+  private _change$: Observable<T[]> | null = null
+
+  private get change$ (): Observable<T[]> {
+    if (this._change$) {
+      return this._change$
+    }
+    const { db, limit } = this
+    let { skip } = this
+    skip = limit && !skip ? 0 : skip
+
+    const observeOn = (query: lf.query.Select) =>
+      Observable.create((observer: Observer<T[]>) => {
+        const listener = () => {
+          this.getValue(query)
+            .then(r => observer.next(r as T[]))
+            .catch(e => observer.error(e))
+        }
+        db.observe(query, listener)
+        listener()
+        return () => this.db.unobserve(query, listener)
+      }) as Observable<T[]>
+
+    const changesOnQuery = limit || skip
+      ? this.buildPrefetchingObserve()
+        .switchMap((pks) =>
+          observeOn(this.getQuery(this.inPKs(pks)))
+        )
+      : observeOn(this.getQuery())
+
+    return lfIssueFix(changesOnQuery)
+      .publishReplay(1)
+      .refCount()
+  }
+
+  private set change$ (dist$: Observable<T[]>) {
+    this._change$ = dist$
+  }
 
   private consumed = false
   private predicateBuildErr = false
@@ -141,42 +177,6 @@ export class Selector <T> {
     private orderDescriptions?: OrderInfo[]
   ) {
     this.predicateProvider = this.normPredicateProvider(predicateProvider)
-    skip = limit && !skip ? 0 : skip
-    if (limit || skip) {
-      this.change$ = this.buildPrefetchingObserve()
-        .switchMap(pks => {
-          return Observable.create((observer: Observer<T[]>) => {
-            const query = this.getQuery(this.inPKs(pks))
-            const listener = () => {
-              this.getValue(query)
-                .then(r => observer.next(r as T[]))
-                .catch(e => observer.error(e))
-            }
-            listener()
-            db.observe(query, listener)
-            return () => this.db.unobserve(query, listener)
-          }) as Observable<T[]>
-        })
-        .publishReplay(1)
-        .refCount()
-    } else {
-      this.change$ = Observable.create((observer: Observer<T[]>) => {
-        const query = this.getQuery()
-        const listener = () => {
-          this.getValue(query)
-            .then(r => observer.next(r as T[]))
-            .catch(e => observer.error(e))
-        }
-        db.observe(query, listener)
-        listener() // 把 listener 放到 observe 后边执行，是 lovefield issue#209
-                   //   https://github.com/google/lovefield/issues/209
-                   // 的一个 workaround。issue 修复后，listener 也可以放在 observe
-                   // 前面执行。
-        return () => this.db.unobserve(query, listener)
-      })
-        .publishReplay(1)
-        .refCount()
-    }
     this.select = lselect.toSql()
   }
 
@@ -274,20 +274,44 @@ export class Selector <T> {
     return Observable.create((observer: Observer<(string | number)[]>) => {
       const { rangeQuery } = this
       const listener = () => {
-        rangeQuery.exec()
+        return rangeQuery.exec()
           .then((r) => {
             observer.next(r.map(v => v[this.shape.pk.name]))
           })
           .catch(e => observer.error(e))
       }
-      listener()
-      this.db.observe(rangeQuery, listener)
+
+      listener().then(() => {
+        this.db.observe(rangeQuery, listener)
+      })
+
       return () => this.db.unobserve(rangeQuery, listener)
     })
-    /**
-     * TODO 这里返回的 observable 第一个值和第二个值在它们的值不为空
-     * 的时候是重复的，也许有必要省去做优化；但不能简单 skip(1)，因为
-     * 那样会导致不能推出空结果集。
-     */
   }
 }
+
+interface LfIssueAcc<T> {
+  calledCount: number
+  shouldSkip: boolean
+  result: T[]
+}
+
+/**
+ * Lovefield observe 出来的推送，第一次和第二次在它们的值不为空
+ * 的时候是重复的，这里做优化，省去重复；但不是简单的 skip(1)，因为
+ * 那样会导致不能推出空结果集。详见：Lovefield issue#215
+ */
+const lfIssueFix = <T>(changes: Observable<T[]>) =>
+  (changes as any)
+    .scan((ret: LfIssueAcc<T>, x: T[]) => {
+      ret.calledCount = ret.calledCount + 1
+      const { calledCount } = ret
+      ret.shouldSkip = !!(x && x.length) && calledCount === 2
+      ret.result = x
+      return ret
+    }, {
+      shouldSkip: false,
+      calledCount: 0
+    })
+    .filter((x: LfIssueAcc<T>) => !x.shouldSkip)
+    .map((x: LfIssueAcc<T>) => x.result)
