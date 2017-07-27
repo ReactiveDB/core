@@ -4,12 +4,13 @@ import { describe, it, beforeEach, afterEach } from 'tman'
 import { expect, assert, use } from 'chai'
 import * as sinon from 'sinon'
 import * as SinonChai from 'sinon-chai'
+import { chain } from 'lodash'
 
 import { uuid, checkExecutorResult } from '../../utils'
 import schemaFactory from '../../schemas'
 import { TestFixture2 } from '../../schemas/Test'
 import { scenarioGen, programGen, postGen, taskGen, subtaskGen } from '../../utils/generators'
-import { RDBType, DataStoreType, Database, clone, forEach, JoinMode, Logger } from '../../index'
+import { RDBType, DataStoreType, Database, clone, forEach, JoinMode, Logger, RevertController } from '../../index'
 import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema, OrganizationSchema } from '../../index'
 import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector } from '../../index'
 
@@ -23,9 +24,10 @@ export default describe('Database Testcase: ', () => {
   let version = 0
 
   const taskCleanup = (tasks: TaskSchema[]) =>
-    tasks.forEach(t => {
+    tasks.map(t => {
       delete t.project
       delete t.subtasks
+      return t
     })
 
   const refreshDB = () => {
@@ -1404,6 +1406,148 @@ export default describe('Database Testcase: ', () => {
       expect(engineerRet.leadProgram[0].owner).to.deep.equal(programRet.owner)
     })
 
+  })
+
+  describe('case: Revert', () => {
+    let fixture: TaskSchema[]
+    let target: TaskSchema
+    let revertController: RevertController
+    const maxCount = 20
+
+    beforeEach(function* () {
+      database.connect()
+      fixture = taskGen(maxCount)
+      target = fixture[0]
+      taskCleanup(fixture)
+      yield database.insert('Task', fixture)
+      revertController = RevertController.create()
+    })
+
+    afterEach(function* () {
+      yield database.dispose()
+    })
+
+    it('should revert insert', function* () {
+      const [ taskFixture ] = taskCleanup(taskGen(1))
+
+      yield database.insert('Task', taskFixture, revertController)
+
+      const signal$ = database.get<TaskSchema>('Task', {
+        where: {
+          _id: taskFixture._id
+        }
+      })
+        .values()
+
+      yield signal$.do(result => {
+        expect(taskCleanup(result)).to.deep.equal([taskFixture])
+      })
+
+      yield revertController.revert()
+
+      yield signal$.do(result => {
+        expect(result.length).to.equal(0)
+      })
+    })
+
+    it('should revert update', function* () {
+      const note = 'foo'
+
+      const signal$ = database.get<TaskSchema>('Task', {
+        where: { _id: target._id }
+      })
+        .values()
+
+      const [ original ] = yield signal$
+
+      yield database.update('Task', target._id as string, { note }, revertController)
+
+      yield signal$
+        .do(([ result ]) => {
+           expect(result.note).to.equal(note)
+        })
+
+      yield revertController.revert()
+
+      yield signal$
+        .do(([ result ]) => {
+          expect(result).to.deep.equal(original)
+        })
+    })
+
+    it('should revert delete', function* () {
+      const fields = chain(target)
+        .omit('subtasks', 'project')
+        .keys()
+        .value()
+
+      yield database.delete('Task', { _id: target._id }, revertController)
+
+      yield database.get<TaskSchema>('Task', {
+        where: { _id: target._id }
+      })
+        .values()
+        .do((result) => {
+          expect(result).to.deep.equal([])
+        })
+
+      yield revertController.revert()
+
+      yield database.get<TaskSchema>('Task', {
+        where: { _id: target._id }, fields
+      })
+        .values()
+        .do(([ result ]) => {
+          expect(result).to.deep.equal(target)
+        })
+    })
+
+    it('should revert mutiple actions', function* () {
+      const fields = chain(target)
+        .omit('subtasks', 'project')
+        .keys()
+        .value()
+
+      const buildFixture = async function (fixt: TaskSchema, revertCtrl: RevertController) {
+        await database.delete('Task', { _id: fixt._id }, revertCtrl)
+          .toPromise()
+
+        await database.get<TaskSchema>('Task', {
+          where: { _id: fixt._id }
+        })
+          .values()
+          .do((result) => {
+            expect(result).to.deep.equal([])
+          })
+          .toPromise()
+
+        return revertCtrl
+      }
+
+      const ctrls: RevertController[] = yield fixture.map(fixt => {
+        const ctrl = RevertController.create()
+        return buildFixture(fixt, ctrl)
+      })
+
+      const firstCtrl = ctrls.pop()
+      const distCtrl = firstCtrl.merge(...ctrls)
+
+      yield distCtrl.revert()
+
+      const assterEqual = async function (fixt: TaskSchema) {
+        await database.get<TaskSchema>('Task', {
+          where: { _id: fixt._id }, fields
+        })
+          .values()
+          .do(([ result ]) => {
+            expect(result).to.deep.equal(fixt)
+          })
+          .toPromise()
+      }
+
+      fixture.forEach(assterEqual)
+
+    })
   })
 
 })

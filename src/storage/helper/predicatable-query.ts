@@ -13,16 +13,14 @@ export function predicatableQuery(
   db: lf.Database,
   table: lf.schema.Table,
   predicate: lf.Predicate | null,
-  type: StatementType.Delete,
-  ...columns: lf.schema.Column[]
+  type: StatementType.Delete
 ): lf.query.Delete
 
 export function predicatableQuery(
   db: lf.Database,
   table: lf.schema.Table,
   predicate: lf.Predicate | null,
-  type: StatementType.Update,
-  ...columns: lf.schema.Column[]
+  type: StatementType.Update
 ): lf.query.Update
 
 export function predicatableQuery(

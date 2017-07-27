@@ -13,6 +13,10 @@
     "@types/minimatch" "*"
     "@types/node" "*"
 
+"@types/lodash@^4.14.73":
+  version "4.14.73"
+  resolved "https://registry.npmjs.org/@types/lodash/-/lodash-4.14.73.tgz#9837e47db8643ba5bcef2c7921f37d90f9c24213"
+
 "@types/lovefield@^2.1.0":
   version "2.1.0"
   resolved "https://registry.npmjs.org/@types/lovefield/-/lovefield-2.1.0.tgz#513d88b343c137c033706d4d684a8003256fe485"
