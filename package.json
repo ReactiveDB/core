@@ -1,6 +1,6 @@
 {
   "name": "reactivedb",
-  "version": "0.9.12",
+  "version": "0.9.13",
   "description": "Reactive ORM for Lovefield",
   "main": "dist/cjs/index.js",
   "scripts": {
