@@ -6,13 +6,35 @@
   version "4.0.1"
   resolved "https://registry.npmjs.org/@types/chai/-/chai-4.0.1.tgz#37fea779617cfec3fd2b19a0247e8bbdd5133bf6"
 
+"@types/glob@*":
+  version "5.0.30"
+  resolved "https://registry.npmjs.org/@types/glob/-/glob-5.0.30.tgz#1026409c5625a8689074602808d082b2867b8a51"
+  dependencies:
+    "@types/minimatch" "*"
+    "@types/node" "*"
+
 "@types/lovefield@^2.0.32":
   version "2.1.0"
   resolved "https://registry.npmjs.org/@types/lovefield/-/lovefield-2.1.0.tgz#513d88b343c137c033706d4d684a8003256fe485"
 
+"@types/minimatch@*":
+  version "2.0.29"
+  resolved "https://registry.npmjs.org/@types/minimatch/-/minimatch-2.0.29.tgz#5002e14f75e2d71e564281df0431c8c1b4a2a36a"
+
+"@types/node@*":
+  version "8.0.19"
+  resolved "https://registry.npmjs.org/@types/node/-/node-8.0.19.tgz#e46e2b0243de7d03f15b26b45c59ebb84f657a4e"
+
 "@types/node@^8.0.14":
   version "8.0.14"
   resolved "https://registry.npmjs.org/@types/node/-/node-8.0.14.tgz#4a19dc6bb61d16c01cbadc7b30ac23518fff176b"
+
+"@types/shelljs@^0.7.4":
+  version "0.7.4"
+  resolved "https://registry.npmjs.org/@types/shelljs/-/shelljs-0.7.4.tgz#137b5f31306eaff4de120ffe5b9d74b297809cfc"
+  dependencies:
+    "@types/glob" "*"
+    "@types/node" "*"
 
 "@types/sinon-chai@^2.7.28":
   version "2.7.28"
@@ -4551,7 +4573,7 @@ shell-quote@^1.6.1:
     array-reduce "~0.0.0"
     jsonify "~0.0.0"
 
-shelljs@^0.7.3:
+shelljs@^0.7.3, shelljs@^0.7.8:
   version "0.7.8"
   resolved "https://registry.npmjs.org/shelljs/-/shelljs-0.7.8.tgz#decbcf874b0d1e5fb72e14b164a9683048e9acb3"
   dependencies:

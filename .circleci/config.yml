@@ -46,7 +46,7 @@ jobs:
       - attach_workspace:
           at: ~/ReactiveDB
       - run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
-      - run: sh tools/publish.sh
+      - run: yarn publish_all
 
 workflows:
   version: 2
