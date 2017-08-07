@@ -1,7 +1,7 @@
 import * as lf from 'lovefield'
 import { describe, it, beforeEach } from 'tman'
 import { expect } from 'chai'
-import { PredicateProvider, lfFactory, DataStoreType } from '../../../index'
+import { PredicateProvider, lfFactory, DataStoreType, Predicate } from '../../../index'
 
 export default describe('PredicateProvider test', () => {
   const dataLength = 1000
@@ -14,7 +14,12 @@ export default describe('PredicateProvider test', () => {
 
   let db: lf.Database
   let table: lf.schema.Table
+  let tableDef: { TestPredicateProvider: lf.schema.Table }
   let version = 1
+
+  function predicateFactory(desc: Predicate<any>) {
+    return new PredicateProvider(tableDef, 'TestPredicateProvider', desc)
+  }
 
   beforeEach(function* () {
     const schemaBuilder = lf.schema.create('PredicateProviderDatabase', version++)
@@ -47,12 +52,15 @@ export default describe('PredicateProvider test', () => {
         nullable: i >= 300 ? null : false
       }))
     }
+
+    tableDef = { TestPredicateProvider: table }
+
     yield db.insert().into(table).values(rows).exec()
   })
 
   describe('PredicateProvider#getPredicate', () => {
     it('invalid key should be ignored', function* () {
-      const fn = () => new PredicateProvider(table, {
+      const fn = () => predicateFactory({
         nonExist: 'whatever'
       }).getPredicate()
 
@@ -63,14 +71,14 @@ export default describe('PredicateProvider test', () => {
     })
 
     it('empty meta should ok', function* () {
-      const predicate = new PredicateProvider(table, {}).getPredicate()
+      const predicate = predicateFactory({}).getPredicate()
       expect(predicate).to.be.null
       const result = yield execQuery(db, table, predicate)
       expect(result).to.have.lengthOf(1000)
     })
 
     it('literal value should ok', function* () {
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         time1: 20
       }).getPredicate()
 
@@ -81,7 +89,7 @@ export default describe('PredicateProvider test', () => {
     })
 
     it('$ne should ok', function* () {
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         time1: {
           $ne: 20
         }
@@ -94,7 +102,7 @@ export default describe('PredicateProvider test', () => {
     })
 
     it('$lt should ok', function* () {
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         time1: {
           $lt: 20
         }
@@ -107,7 +115,7 @@ export default describe('PredicateProvider test', () => {
     })
 
     it('$lte should ok', function* () {
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         time1: {
           $lte: 19
         }
@@ -120,7 +128,7 @@ export default describe('PredicateProvider test', () => {
     })
 
     it('$gt should ok', function* () {
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         time2: {
           $gt: 20
         }
@@ -133,7 +141,7 @@ export default describe('PredicateProvider test', () => {
     })
 
     it('$gte should ok', function* () {
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         time2: {
           $gte: 21
         }
@@ -147,7 +155,7 @@ export default describe('PredicateProvider test', () => {
 
     it('$match should ok', function* () {
       const regExp = /\:(\d{0,1}1$)/
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         name: {
           $match: regExp
         }
@@ -161,7 +169,7 @@ export default describe('PredicateProvider test', () => {
 
     it('$notMatch should ok', function* () {
       const regExp = /\:(\d{0,1}1$)/
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         name: {
           $notMatch: regExp
         }
@@ -175,7 +183,7 @@ export default describe('PredicateProvider test', () => {
     })
 
     it('$between should ok', function* () {
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         time1: {
           $between: [1, 20]
         }
@@ -188,7 +196,7 @@ export default describe('PredicateProvider test', () => {
     })
 
     it('$has should ok', function* () {
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         times: {
           $has: 'times: 10'
         }
@@ -204,7 +212,7 @@ export default describe('PredicateProvider test', () => {
 
     it('$in should ok', function* () {
       const seed = [10, 20, 30, 10000]
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         time1: {
           $in: seed
         }
@@ -217,7 +225,7 @@ export default describe('PredicateProvider test', () => {
     })
 
     it('$isNull should ok', function* () {
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         nullable: {
           $isNull: true
         }
@@ -230,7 +238,7 @@ export default describe('PredicateProvider test', () => {
     })
 
     it('$isNotNull should ok', function* () {
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         nullable: {
           $isNotNull: true
         }
@@ -243,7 +251,7 @@ export default describe('PredicateProvider test', () => {
     })
 
     it('$not should ok', function* () {
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         $not: {
           time1: 0
         }
@@ -255,7 +263,7 @@ export default describe('PredicateProvider test', () => {
     })
 
     it('$and should ok', function* () {
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         time1: {
           $and: {
             $lt: 200,
@@ -271,7 +279,7 @@ export default describe('PredicateProvider test', () => {
     })
 
     it('$or should ok', function* () {
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         time1: {
           $or: {
             $gte: dataLength - 50,
@@ -287,7 +295,7 @@ export default describe('PredicateProvider test', () => {
     })
 
     it('non-compound predicates should be combined with $and', function* () {
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         $or: {
           time1: { $gte: 0, $lt: 50 },
           time2: { $gt: 0, $lte: 50 }
@@ -306,7 +314,7 @@ export default describe('PredicateProvider test', () => {
     })
 
     it('compoundPredicate should skip null/undefined property', function* () {
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         time1: {
           $or: {
             $gte: dataLength - 50,
@@ -323,7 +331,7 @@ export default describe('PredicateProvider test', () => {
 
     it('complex PredicateDescription should ok', function* () {
       const reg = /\:(\d{0,1}1$)/
-      const predicate = new PredicateProvider(table, {
+      const predicate = predicateFactory({
         time1: {
           $or: {
             $gte: dataLength - 50,
@@ -357,15 +365,15 @@ export default describe('PredicateProvider test', () => {
 
   describe('PredicateProvider#toString', () => {
     it('convert empty PredicateProvider to empty string', () => {
-      expect(new PredicateProvider(table, {}).toString()).to.equal('')
+      expect(predicateFactory({}).toString()).to.equal('')
     })
 
     it('convert to string representation of the predicate', () => {
-      expect(new PredicateProvider(table, { notExist: 20 }).toString()).to.equal('')
+      expect(predicateFactory({ notExist: 20 }).toString()).to.equal('')
 
-      expect(new PredicateProvider(table, { time1: 20 }).toString()).to.equal('{"time1":20}')
+      expect(predicateFactory({ time1: 20 }).toString()).to.equal('{"time1":20}')
 
-      expect(new PredicateProvider(table, {
+      expect(predicateFactory({
         $or: {
           time1: { $gte: 0, $lt: 50 },
           time2: { $gt: 0, $lte: 50 }

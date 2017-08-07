@@ -7,7 +7,7 @@ import * as Exception from '../exception'
 import * as typeDefinition from './helper/definition'
 import Version from '../version'
 import { Traversable } from '../shared'
-import { Mutation, Selector, QueryToken, PredicateProvider } from './modules'
+import { Mutation, Selector, QueryToken, PredicateProvider, Tables } from './modules'
 import { dispose, contextTableName, fieldIdentifier, hiddenColName } from './symbols'
 import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, identity, warn } from '../utils'
 import { createPredicate, createPkClause, mergeTransactionResult, predicatableQuery, lfFactory } from './helper'
@@ -189,7 +189,8 @@ export class Database {
         })
 
         const mut = { ...(entity as any), ...hiddenPayload }
-        const predicate = createPredicate(table, clause)
+        const tables = this.getAssoTablesDef(db, tableName)
+        const predicate = createPredicate(tables, tableName, clause)
         const query = predicatableQuery(db, table, predicate!, StatementType.Update)
 
         forEach(mut, (val, key) => {
@@ -216,8 +217,9 @@ export class Database {
     return this.database$
       .concatMap(db => {
         const [ table ] = Database.getTables(db, tableName)
+        const tables = this.getAssoTablesDef(db, tableName)
         const column = table[pk!]
-        const provider = new PredicateProvider(table, clause)
+        const provider = new PredicateProvider(tables, tableName, clause)
         const prefetch =
           predicatableQuery(db, table, provider.getPredicate(), StatementType.Select, column)
 
@@ -269,7 +271,8 @@ export class Database {
 
     return this.database$.concatMap((db) => {
       const [ table ] = Database.getTables(db, tableName)
-      const predicate = createPredicate(table, clause.where)
+      const tables = this.getAssoTablesDef(db, tableName)
+      const predicate = createPredicate(tables, tableName, clause.where)
 
       const queries: lf.query.Builder[] = []
       const removedIds: any = []
@@ -422,7 +425,8 @@ export class Database {
         predicatableQuery(db, table!, null, StatementType.Select, ...columns)
 
       joinInfo.forEach((info: JoinInfo) =>
-        query.leftOuterJoin(info.table, info.predicate))
+        query.leftOuterJoin(info.table, info.predicate)
+      )
 
       const orderDesc = (clause.orderBy || []).map(desc => {
         return {
@@ -440,7 +444,8 @@ export class Database {
         mainTable: table!
       }
       const { limit, skip } = clause
-      const provider = new PredicateProvider(table!, clause.where)
+      const tables = this.getAssoTablesDef(db, tableName, table)
+      const provider = new PredicateProvider(tables, tableName, clause.where)
 
       return new Selector<T>(db, query, matcher, provider, limit, skip, orderDesc)
     })
@@ -531,7 +536,8 @@ export class Database {
     const suffix = (context[tableName] || 0) + 1
     context[tableName] = suffix
     const contextName = contextTableName(tableName, suffix)
-    const currentTable = Database.getTables(db, tableName)[0].as(contextName)
+    const [ originTable ] = Database.getTables(db, tableName)
+    const currentTable = originTable.as(contextName)
 
     const handleAdvanced = (ret: any, key: string, defs: Association | ColumnDef) => {
       if (!ret.advanced) {
@@ -546,13 +552,17 @@ export class Database {
       } else {
         const { where, type } = defs as Association
         rootDefinition[key] = typeDefinition.revise(type!, ret.definition)
-        const [ predicate, err ] = tryCatch(createPredicate)(currentTable, where(ret.table))
+        const tables = this.getAssoTablesDef(db, tableName)
+        tables[contextName] = currentTable
+
+        const [ predicate, err ] = tryCatch(createPredicate)(tables, contextName, where(ret.table))
         if (err) {
           warn(
             `Failed to build predicate, since ${err.message}` +
-            `, on table: ${ret.table.getName()}`
+            `, on table: ${ ret.table.getName() }`
           )
         }
+
         const joinLink = predicate
           ? [{ table: ret.table, predicate }, ...ret.joinInfo]
           : ret.joinInfo
@@ -722,7 +732,8 @@ export class Database {
         entities.forEach(entity => {
           const pkVal = entity[pk]
           const clause = createPkClause(pk, pkVal)
-          const predicate = createPredicate(table, clause)
+          const tables = this.getAssoTablesDef(db, tableName)
+          const predicate = createPredicate(tables, tableName, clause)
           const query = predicatableQuery(db, table, predicate!, StatementType.Delete)
 
           queryCollection.push(query)
@@ -732,7 +743,8 @@ export class Database {
 
       const get = (where: Predicate<any> | null = null) => {
         const [ table ] = Database.getTables(db, tableName)
-        const [ predicate, err ] = tryCatch(createPredicate)(table, where)
+        const tables = this.getAssoTablesDef(db, tableName)
+        const [ predicate, err ] = tryCatch(createPredicate)(tables, tableName, where)
         if (err) {
           return Observable.throw(err)
         }
@@ -743,6 +755,22 @@ export class Database {
 
       return [get, remove]
     }
+  }
+
+  private getAssoTablesDef(db: lf.Database, tableName: string, defaultTable: null | lf.schema.Table = null) {
+    const schema = this.findSchema(tableName)
+    const tables: Tables = Object.create(null)
+    if (!defaultTable) {
+      const [ table ] = Database.getTables(db, tableName)
+      tables[tableName] = table
+    } else {
+      tables[tableName] = defaultTable
+    }
+
+    schema.associations.forEach((def, k) => {
+      tables[k] = Database.getTables(db, def.name)[0]
+    })
+    return tables
   }
 
   private executor(db: lf.Database, queries: lf.query.Builder[]) {

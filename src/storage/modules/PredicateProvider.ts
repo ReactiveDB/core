@@ -67,10 +67,17 @@ const compoundPredicateFactory = {
   },
 }
 
+export interface Tables {
+  [index: string]: lf.schema.Table
+}
+
 export class PredicateProvider<T> {
 
+  private table = this.tables[this.tableName]
+
   constructor(
-    private table: lf.schema.Table,
+    private tables: Tables,
+    private tableName: string,
     private meta?: Predicate<T>
   ) { }
 
