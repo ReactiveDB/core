@@ -14,6 +14,7 @@ export default function (limit: number) {
     const _projectId = uuid()
     const _stageId = uuid()
     const _creatorId = uuid()
+    const _organizationId = uuid()
     const _executorId = random.rnd(20) ? uuid() : _creatorId
     const involves = [ _executorId ]
     if (_creatorId !== _executorId) {
@@ -35,7 +36,13 @@ export default function (limit: number) {
         _id: _projectId,
         name: 'project name: ' + uuid(),
         isArchived: true,
-        posts: postGen(5, _projectId)
+        posts: postGen(5, _projectId),
+        _organizationId: _organizationId,
+        organization: {
+          _id: _organizationId,
+          name: 'organization name: ' + uuid(),
+          isArchived: false,
+        }
       },
       involveMembers: involveMembersGen(15, involves),
       created: moment().add(6 - random.number(0, 12), 'month').add(30 - random.number(0, 30), 'day').toISOString()

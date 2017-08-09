@@ -1,5 +1,5 @@
 import { RDBType, Relationship } from '../index'
-import { TeambitionTypes, Database, SubtaskSchema } from '../index'
+import { TeambitionTypes, Database, SubtaskSchema, ProjectSchema } from '../index'
 
 export interface TaskSchema {
   _id: TeambitionTypes.TaskId
@@ -12,12 +12,7 @@ export interface TaskSchema {
   _stageId: TeambitionTypes.StageId
   _tasklistId: TeambitionTypes.TasklistId
   accomplished: string
-  project?: {
-    _id: TeambitionTypes.ProjectId
-    name: string,
-    isArchived: boolean,
-    posts?: any[]
-  }
+  project?: ProjectSchema
   subtasks: SubtaskSchema[]
   subtasksCount: number
   created: string,

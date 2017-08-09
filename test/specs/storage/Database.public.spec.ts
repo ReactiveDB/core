@@ -9,7 +9,7 @@ import schemaFactory from '../../schemas'
 import { TestFixture2 } from '../../schemas/Test'
 import { scenarioGen, programGen, postGen, taskGen, subtaskGen } from '../../utils/generators'
 import { RDBType, DataStoreType, Database, clone, forEach, JoinMode } from '../../index'
-import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema } from '../../index'
+import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema, OrganizationSchema } from '../../index'
 import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector } from '../../index'
 
 use(SinonChai)
@@ -463,6 +463,7 @@ export default describe('Database Testcase: ', () => {
         const projects: ProjectSchema[] = []
         const posts: PostSchema[] = []
         const tasks: TaskSchema[] = []
+        const organizations: OrganizationSchema[] = []
 
         associationFixture.forEach(f => {
           forEach(f, (value, key) => {
@@ -471,6 +472,9 @@ export default describe('Database Testcase: ', () => {
             } else if (key === 'project') {
               if (value.posts) {
                 posts.push(...value.posts)
+              }
+              if (value.organization) {
+                organizations.push(value.organization)
               }
               projects.push(value)
             }
@@ -482,7 +486,8 @@ export default describe('Database Testcase: ', () => {
           database.insert('Task', tasks),
           database.insert('Subtask', subtasks),
           database.insert('Project', projects),
-          database.insert('Post', posts)
+          database.insert('Post', posts),
+          database.insert('Organization', organizations)
         ]
 
         Observable.forkJoin(...queries).subscribe(() => {
@@ -503,6 +508,28 @@ export default describe('Database Testcase: ', () => {
 
         expect(result).to.have.property('project')
         expect(keys(result.project)).to.deep.equal(refFields)
+      })
+
+      it('should get association with nested Association query', function* () {
+        const queryToken = database.get<TaskSchema>('Task', {
+          where: { 'project._id': innerTarget.project._id }
+        })
+
+        const results = yield queryToken.values()
+        const [ result ] = results
+        expect(results.length).to.equal(1)
+        expect(result).to.deep.equal(innerTarget)
+      })
+
+      it('should get association with deep nested Association query', function* () {
+        const queryToken = database.get<TaskSchema>('Task', {
+          where: { 'project.organization._id': innerTarget.project._organizationId }
+        })
+
+        const results = yield queryToken.values()
+        const [ result ] = results
+        expect(results.length).to.equal(1)
+        expect(result).to.deep.equal(innerTarget)
       })
 
       it('should apply `skip` clause on multi joined query', function* () {
@@ -757,7 +784,7 @@ export default describe('Database Testcase: ', () => {
         }
       })
 
-      const errSpy = sinon.spy((): void => void 0)
+      const errSpy = sinon.spy()
 
       tmpDB.connect()
       tmpDB.update(T, { id: 1 }, {

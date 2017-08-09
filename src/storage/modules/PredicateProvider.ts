@@ -1,6 +1,6 @@
 import * as lf from 'lovefield'
 import { forEach, warn } from '../../utils'
-import { ValueLiteral, VaildEqType, Predicate, PredicateMeta } from '../../interface'
+import { ValueLiteral, VaildEqType, Predicate, PredicateMeta, TablesStruct } from '../../interface'
 
 const predicateFactory = {
 
@@ -67,21 +67,23 @@ const compoundPredicateFactory = {
   },
 }
 
-export interface Tables {
-  [index: string]: lf.schema.Table
-}
-
 export class PredicateProvider<T> {
 
-  private table = this.tables[this.tableName]
+  private table: lf.schema.Table | null
 
   constructor(
-    private tables: Tables,
+    private tables: TablesStruct,
     private tableName: string,
     private meta?: Predicate<T>
-  ) { }
+  ) {
+    const tableDef = this.tables[this.tableName]
+    this.table = tableDef ? tableDef.table : null
+  }
 
   getPredicate(): lf.Predicate | null {
+    if (!this.table) {
+      return null
+    }
     const predicates = this.meta ? this.normalizeMeta(this.meta) : []
     if (predicates.length) {
       if (predicates.length === 1) {
@@ -100,6 +102,7 @@ export class PredicateProvider<T> {
   }
 
   private normalizeMeta(meta: Predicate<T>, column?: lf.schema.Column): lf.Predicate[] {
+    const table = this.table!
     const buildSinglePred = (col: lf.schema.Column, val: any, key: string): lf.Predicate =>
       this.checkMethod(key) ? predicateFactory[key](col, val) : col.eq(val as ValueLiteral)
 
@@ -113,14 +116,26 @@ export class PredicateProvider<T> {
         nestedPreds = this.normalizeMeta(val as Predicate<T>, column)
         resultPred = compoundPredicateFactory[key](nestedPreds)
       } else if (this.checkPredicate(val)) {
-        nestedPreds = this.normalizeMeta(val as any, this.table[key])
+        nestedPreds = this.normalizeMeta(val as any, table[key])
         resultPred = compoundPredicateFactory['$and'](nestedPreds)
       } else {
-        const _column = column || this.table[key]
+        const keys: string[] = key.split('.')
+        let _column: lf.schema.Column
+        if (!column) {
+          if (keys.length === 1) {
+            _column = table[key]
+          } else {
+            const columnKey = keys.pop()!
+            const tableName = this.getAliasTableName(keys)
+            _column = this.tables[tableName].table[columnKey]
+          }
+        } else {
+          _column = column
+        }
         if (_column) {
           resultPred = buildSinglePred(_column, val, key)
         } else {
-          warn(`Failed to build predicate, since column: ${key} is not exist, on table: ${this.table.getName()}`)
+          warn(`Failed to build predicate, since column: ${key} is not exist, on table: ${table.getName()}`)
           return
         }
       }
@@ -129,6 +144,19 @@ export class PredicateProvider<T> {
     })
 
     return predicates
+  }
+
+  private getAliasTableName(keys: string[]) {
+    let { length } = keys
+    let ctxName = this.tableName
+    let resultKey = this.tableName
+    while (length > 0) {
+      const localKey = keys.shift()!
+      resultKey = `${ ctxName }@${ localKey }`
+      ctxName = this.tables[resultKey].contextName!
+      length = keys.length
+    }
+    return resultKey
   }
 
   private checkMethod(methodName: string) {

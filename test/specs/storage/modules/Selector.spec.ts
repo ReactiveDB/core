@@ -26,7 +26,7 @@ interface Fixture {
 export default describe('Selector test', () => {
   let db: lf.Database
   let table: lf.schema.Table
-  let tableDef: { TestSelectMetadata: lf.schema.Table }
+  let tableDef: { TestSelectMetadata: { table: lf.schema.Table } }
   let version = 1
 
   let tableShape: ShapeMatcher
@@ -100,7 +100,7 @@ export default describe('Selector test', () => {
       }
     }
 
-    tableDef = { TestSelectMetadata: table }
+    tableDef = { TestSelectMetadata: { table } }
   })
 
   afterEach(() => {

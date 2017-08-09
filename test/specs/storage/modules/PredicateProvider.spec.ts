@@ -14,7 +14,7 @@ export default describe('PredicateProvider test', () => {
 
   let db: lf.Database
   let table: lf.schema.Table
-  let tableDef: { TestPredicateProvider: lf.schema.Table }
+  let tableDef: { TestPredicateProvider: { table: lf.schema.Table } }
   let version = 1
 
   function predicateFactory(desc: Predicate<any>) {
@@ -53,7 +53,7 @@ export default describe('PredicateProvider test', () => {
       }))
     }
 
-    tableDef = { TestPredicateProvider: table }
+    tableDef = { TestPredicateProvider: { table } }
 
     yield db.insert().into(table).values(rows).exec()
   })
