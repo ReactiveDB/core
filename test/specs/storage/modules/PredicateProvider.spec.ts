@@ -70,6 +70,12 @@ export default describe('PredicateProvider test', () => {
       expect(result).deep.equal(expectResult)
     })
 
+    it('should get null when tablesStructure is not contain tableName', () => {
+      const predicateProvider = new PredicateProvider({}, 'whatever', { _id: 1 })
+      const result = predicateProvider.getPredicate()
+      expect(result).to.be.null
+    })
+
     it('empty meta should ok', function* () {
       const predicate = predicateFactory({}).getPredicate()
       expect(predicate).to.be.null
