@@ -4,6 +4,7 @@ import { describe, it, beforeEach, afterEach } from 'tman'
 import { expect, assert, use } from 'chai'
 import * as sinon from 'sinon'
 import * as SinonChai from 'sinon-chai'
+
 import { uuid, checkExecutorResult } from '../../utils'
 import schemaFactory from '../../schemas'
 import { TestFixture2 } from '../../schemas/Test'
@@ -510,7 +511,7 @@ export default describe('Database Testcase: ', () => {
         expect(keys(result.project)).to.deep.equal(refFields)
       })
 
-      it('should get association with nested Association query', function* () {
+      it('should get association by nested Association query', function* () {
         const queryToken = database.get<TaskSchema>('Task', {
           where: { 'project._id': innerTarget.project._id }
         })
@@ -521,7 +522,7 @@ export default describe('Database Testcase: ', () => {
         expect(result).to.deep.equal(innerTarget)
       })
 
-      it('should get association with deep nested Association query', function* () {
+      it('should get association by deep nested Association query', function* () {
         const queryToken = database.get<TaskSchema>('Task', {
           where: { 'project.organization._id': innerTarget.project._organizationId }
         })
@@ -530,6 +531,17 @@ export default describe('Database Testcase: ', () => {
         const [ result ] = results
         expect(results.length).to.equal(1)
         expect(result).to.deep.equal(innerTarget)
+      })
+
+      it('should get nothing by deep nested Association query without association fields', function* () {
+        const fields = ['_id', 'content']
+        const queryToken = database.get<TaskSchema>('Task', {
+          fields,
+          where: { 'project.organization._id': innerTarget.project._organizationId }
+        })
+
+        const results = yield queryToken.values()
+        expect(results.length).to.equal(0)
       })
 
       it('should apply `skip` clause on multi joined query', function* () {

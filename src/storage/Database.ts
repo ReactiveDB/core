@@ -420,12 +420,12 @@ export class Database {
 
       const containKey = containFields ? contains(pk, clause.fields!) : true
       const fields: Set<Field> = containFields ? new Set(clause.fields) : new Set(schema.columns.keys())
+      const tablesStruct: TablesStruct = Object.create(null)
       const { table, columns, joinInfo, definition, contextName } =
-        this.traverseQueryFields(db, tableName, fields, containKey, !containFields, [], {}, {}, mode)
+        this.traverseQueryFields(db, tableName, fields, containKey, !containFields, [], {}, tablesStruct, mode)
       const query =
         predicatableQuery(db, table!, null, StatementType.Select, ...columns)
-
-      const tablesStruct: TablesStruct = Object.create(null)
+      const relatedTables = this.getAllRelatedTables(tableName, contextName)
 
       joinInfo.forEach((info: JoinInfo) => {
         const predicate = info.predicate
@@ -433,6 +433,8 @@ export class Database {
           query.leftOuterJoin(info.table, predicate)
         }
       })
+
+      this.paddingTableStruct(db, relatedTables, tablesStruct)
 
       const orderDesc = (clause.orderBy || []).map(desc => {
         return {
@@ -545,6 +547,8 @@ export class Database {
     const [ originTable ] = Database.getTables(db, tableName)
     const currentTable = originTable.as(contextName)
 
+    assign(tablesStruct, this.buildTablesStructure(currentTable, contextName))
+
     const handleAdvanced = (ret: any, key: string, defs: Association | ColumnDef) => {
       if (!ret.advanced) {
         return
@@ -557,7 +561,6 @@ export class Database {
       } else {
         const { where, type } = defs as Association
         rootDefinition[key] = typeDefinition.revise(type!, ret.definition)
-        tablesStruct = this.buildTablesStructure(currentTable, contextName)
         tablesStruct[`${ contextName }@${ key }`] = {
           table: ret.table,
           contextName: ret.contextName
@@ -623,7 +626,6 @@ export class Database {
           break
       }
     })
-
     return { columns, joinInfo, advanced: true, table: currentTable, definition: rootDefinition, contextName }
   }
 
@@ -776,6 +778,43 @@ export class Database {
         contextName: tableName
       }
     }
+    return tablesStruct
+  }
+
+  private getAllRelatedTables(tableName: string, contextName: string) {
+    const tablesStructure = new Map<string, string>()
+    const schemas = [
+      {
+        schema: this.findSchema(tableName),
+        relatedTo: contextName
+      }
+    ]
+    while (schemas.length) {
+      const { schema, relatedTo } = schemas.pop()!
+      for (const [ key, val ] of schema.associations) {
+        const relatedName = val.name
+        if (!tablesStructure.has(relatedName)) {
+          const path = `${ relatedTo }@${ key }`
+          tablesStructure.set(relatedName, path)
+          schemas.push({
+            schema: this.findSchema(relatedName),
+            relatedTo: relatedName
+          })
+        }
+      }
+    }
+    return tablesStructure
+  }
+
+  private paddingTableStruct(db: lf.Database, tables: Map<string, string>, tablesStruct: TablesStruct): TablesStruct {
+    forEach(tablesStruct, structure => {
+      const tableName = structure.table.getName()
+      tables.delete(tableName)
+    })
+    tables.forEach((key, tableName) => {
+      const [ table ] = Database.getTables(db, tableName)
+      tablesStruct[key] = { table, contextName: tableName }
+    })
     return tablesStruct
   }
 
