@@ -4,6 +4,7 @@ import ProjectSelectMetadata from './Project'
 import SubtaskSelectMetadata from './Subtask'
 import TaskSelectMetadata from './Task'
 import PostSelectMetadata from './Post'
+import OrganizationSelectMetadata from './Organization'
 import EngineerSelectMetadata from './Engineer'
 import ModuleSelectMetadata from './Module'
 import ProgramSelectMetadata from './Program'
@@ -16,10 +17,12 @@ export default (db: Database) => {
   EngineerSelectMetadata(db)
   ModuleSelectMetadata(db)
   ProgramSelectMetadata(db)
+  OrganizationSelectMetadata(db)
 }
 
 export { ProjectSchema } from './Project'
 export { PostSchema } from './Post'
+export { OrganizationSchema } from './Organization'
 export { SubtaskSchema } from './Subtask'
 export { TaskSchema } from './Task'
 export { ProgramSchema } from './Program'
