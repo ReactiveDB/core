@@ -1,5 +1,5 @@
 import * as lf from 'lovefield'
-import { forEach, warn } from '../../utils'
+import { forEach, warn, concat } from '../../utils'
 import { ValueLiteral, VaildEqType, Predicate, PredicateMeta, TablesStruct } from '../../interface'
 
 const predicateFactory = {
@@ -67,6 +67,9 @@ const compoundPredicateFactory = {
   },
 }
 
+export const predicateOperatorNames =
+  new Set(concat(Object.keys(predicateFactory), Object.keys(compoundPredicateFactory)))
+
 export class PredicateProvider<T> {
 
   private table: lf.schema.Table | null
@@ -101,7 +104,7 @@ export class PredicateProvider<T> {
     return pred ? JSON.stringify(this.meta) : ''
   }
 
-  private normalizeMeta(meta: Predicate<T>, column?: lf.schema.Column): lf.Predicate[] {
+  private normalizeMeta(meta: Predicate<T>, column?: lf.schema.Column, parentKey?: string): lf.Predicate[] {
     const table = this.table!
     const buildSinglePred = (col: lf.schema.Column, val: any, key: string): lf.Predicate =>
       this.checkMethod(key) ? predicateFactory[key](col, val) : col.eq(val as ValueLiteral)
@@ -115,10 +118,13 @@ export class PredicateProvider<T> {
       if (this.checkCompound(key)) {
         nestedPreds = this.normalizeMeta(val as Predicate<T>, column)
         resultPred = compoundPredicateFactory[key](nestedPreds)
-      } else if (this.checkPredicate(val)) {
-        nestedPreds = this.normalizeMeta(val as any, table[key])
+      } else if (checkPredicate<T>(val)) {
+        nestedPreds = this.normalizeMeta(val as any, table[key], key)
         resultPred = compoundPredicateFactory['$and'](nestedPreds)
       } else {
+        if (parentKey && !this.checkMethod(key)) {
+          key = `${ parentKey }.${ key }`
+        }
         const keys: string[] = key.split('.')
         let _column: lf.schema.Column
         if (!column) {
@@ -167,11 +173,11 @@ export class PredicateProvider<T> {
     return typeof compoundPredicateFactory[methodName] === 'function'
   }
 
-  private checkPredicate(val: Partial<PredicateMeta<T>> | ValueLiteral) {
-    return val && typeof val === 'object' &&
-      !(val instanceof Array) &&
-      !(val instanceof RegExp) &&
-      !(val instanceof (lf.schema as any).BaseColumn)
-  }
+}
 
+export function checkPredicate<T>(val: Partial<PredicateMeta<T>> | ValueLiteral) {
+  return val && typeof val === 'object' &&
+    !(val instanceof Array) &&
+    !(val instanceof RegExp) &&
+    !(val instanceof (lf.schema as any).BaseColumn)
 }

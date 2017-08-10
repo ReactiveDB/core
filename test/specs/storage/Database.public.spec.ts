@@ -533,7 +533,7 @@ export default describe('Database Testcase: ', () => {
         expect(result).to.deep.equal(innerTarget)
       })
 
-      it('should get nothing by deep nested Association query without association fields', function* () {
+      it('should get value by deep nested Association query without association fields', function* () {
         const fields = ['_id', 'content']
         const queryToken = database.get<TaskSchema>('Task', {
           fields,
@@ -541,7 +541,40 @@ export default describe('Database Testcase: ', () => {
         })
 
         const results = yield queryToken.values()
-        expect(results.length).to.equal(0)
+
+        expect(results.length).to.equal(1)
+      })
+
+      it('should get value by deep nested Association query without nested association fields', function* () {
+        const fields = ['_id', 'content']
+        const queryToken = database.get<TaskSchema>('Task', {
+          fields,
+          where: {
+            project: {
+              'organization._id': innerTarget.project._organizationId
+            }
+          }
+        })
+
+        const results = yield queryToken.values()
+
+        expect(results.length).to.equal(1)
+      })
+
+      it('should merge fields when get value by deep nested Association query without nested association fields', function* () {
+        const fields = ['_id', 'content', { project: ['_id'] }, { project: [ { organization: [ '_id' ] } ] }]
+        const queryToken = database.get<TaskSchema>('Task', {
+          fields,
+          where: {
+            'project.organization': {
+              _id: innerTarget.project._organizationId
+            }
+          }
+        })
+
+        const results = yield queryToken.values()
+
+        expect(results.length).to.equal(1)
       })
 
       it('should apply `skip` clause on multi joined query', function* () {
