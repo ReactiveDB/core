@@ -1,4 +1,4 @@
-import { forEach, clone, getType, assert, hash } from '../../index'
+import { forEach, clone, getType, assert, hash, concat } from '../../index'
 import { describe, it } from 'tman'
 import { expect } from 'chai'
 
@@ -405,6 +405,30 @@ export default describe('Utils Testcase: ', () => {
       expect(hash('  ')).to.equal(1024)
     })
 
+  })
+
+  describe('Func: concat', () => {
+    it('should return target', () => {
+      const target: number[] = []
+      const result = concat(target, [1, 2, 3])
+      expect(result).to.equal(target)
+    })
+
+    it('concat result should be correct', () => {
+      const target = ['foo', 'bar']
+      const patch = [1, 2, 3]
+      const expected = target.concat(patch as any)
+      const result = concat(target, patch as any)
+      expect(result).to.deep.equal(expected)
+    })
+
+    it('should have side effect', () => {
+      const target = ['foo', 'bar']
+      const patch = [1, 2, 3]
+      const expected = target.concat(patch as any)
+      concat(target, patch as any)
+      expect(target).to.deep.equal(expected)
+    })
   })
 
 })
