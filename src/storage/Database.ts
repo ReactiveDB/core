@@ -13,7 +13,7 @@ import { dispose, contextTableName, fieldIdentifier, hiddenColName } from './sym
 import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, identity, warn } from '../utils'
 import { createPredicate, createPkClause, mergeTransactionResult, predicatableQuery, lfFactory } from './helper'
 import { Relationship, RDBType, DataStoreType, LeafType, StatementType, JoinMode } from '../interface/enum'
-import { Record, Fields, JoinInfo, Query, Clause, Predicate } from '../interface'
+import { Record, Fields, JoinInfo, Query, Predicate } from '../interface'
 import { SchemaDef, ColumnDef, ParsedSchema, Association, ScopedHandler } from '../interface'
 import { ColumnLeaf, NavigatorLeaf, ExecutorResult, UpsertContext, SelectContext, TablesStruct } from '../interface'
 
@@ -267,7 +267,7 @@ export class Database {
     })
   }
 
-  remove<T>(tableName: string, clause: Clause<T> = {}): Observable<ExecutorResult> {
+  remove<T>(tableName: string, clause: Predicate<T> = {}): Observable<ExecutorResult> {
     const [schema, err] = tryCatch<ParsedSchema>(this.findSchema)(tableName)
     if (err) {
       return Observable.throw(err)
@@ -277,7 +277,7 @@ export class Database {
     return this.database$.concatMap((db) => {
       const [ table ] = Database.getTables(db, tableName)
       const tables = this.buildTablesStructure(table)
-      const predicate = createPredicate(tables, tableName, clause.where)
+      const predicate = createPredicate(tables, tableName, clause)
 
       const queries: lf.query.Builder[] = []
       const removedIds: any = []
@@ -751,7 +751,7 @@ export class Database {
           const pkVal = entity[pk]
           const clause = createPkClause(pk, pkVal)
           const tables = this.buildTablesStructure(table)
-          const predicate = createPredicate(tables, tableName, clause)
+          const predicate = createPredicate(tables, tableName, clause.where)
           const query = predicatableQuery(db, table, predicate!, StatementType.Delete)
 
           queryCollection.push(query)

@@ -1121,9 +1121,7 @@ export default describe('Database Testcase: ', () => {
       const execRet1 = yield database.upsert<ProgramSchema>('Program', program)
 
       yield database.delete<ProgramSchema>('Program', {
-        where: {
-          _id: program._id
-        }
+        _id: program._id
       })
 
       const execRet2 = yield database.upsert<ProgramSchema>('Program', program)
