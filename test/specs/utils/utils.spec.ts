@@ -1,4 +1,4 @@
-import { forEach, clone, getType, assert, hash, concat } from '../../index'
+import { forEach, clone, getType, assert, hash, concat, keys } from '../../index'
 import { describe, it } from 'tman'
 import { expect } from 'chai'
 
@@ -428,6 +428,30 @@ export default describe('Utils Testcase: ', () => {
       const expected = target.concat(patch as any)
       concat(target, patch as any)
       expect(target).to.deep.equal(expected)
+    })
+  })
+
+  describe('Func: keys', () => {
+    it('should return object keys', () => {
+      const target = {
+        foo: 1,
+        bar: 2
+      }
+
+      expect(keys(target)).to.deep.equal(Object.keys(target))
+    })
+
+    it('should not get property keys in prototype', () => {
+      function a (this: any) {
+        this.foo = 1
+        this.bar = 2
+      }
+
+      a.prototype.whatever = 3
+
+      const target: any = new (a as any)
+      expect(keys(target).length).to.equal(2)
+      expect(keys(target).indexOf('wahtever')).to.equal(-1)
     })
   })
 

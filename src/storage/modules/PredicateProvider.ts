@@ -1,5 +1,5 @@
 import * as lf from 'lovefield'
-import { forEach, warn, concat } from '../../utils'
+import { forEach, warn, concat, keys } from '../../utils'
 import { ValueLiteral, VaildEqType, Predicate, PredicateMeta, TablesStruct } from '../../interface'
 
 const predicateFactory = {
@@ -68,7 +68,7 @@ const compoundPredicateFactory = {
 }
 
 export const predicateOperatorNames =
-  new Set(concat(Object.keys(predicateFactory), Object.keys(compoundPredicateFactory)))
+  new Set(concat(keys(predicateFactory), keys(compoundPredicateFactory)))
 
 export class PredicateProvider<T> {
 
@@ -125,14 +125,14 @@ export class PredicateProvider<T> {
         if (parentKey && !this.checkMethod(key)) {
           key = `${ parentKey }.${ key }`
         }
-        const keys: string[] = key.split('.')
+        const ks: string[] = key.split('.')
         let _column: lf.schema.Column
         if (!column) {
-          if (keys.length === 1) {
+          if (ks.length === 1) {
             _column = table[key]
           } else {
-            const columnKey = keys.pop()!
-            const tableName = this.getAliasTableName(keys)
+            const columnKey = ks.pop()!
+            const tableName = this.getAliasTableName(ks)
             _column = this.tables[tableName].table[columnKey]
           }
         } else {
@@ -152,15 +152,15 @@ export class PredicateProvider<T> {
     return predicates
   }
 
-  private getAliasTableName(keys: string[]) {
-    let { length } = keys
+  private getAliasTableName(ks: string[]) {
+    let { length } = ks
     let ctxName = this.tableName
     let resultKey = this.tableName
     while (length > 0) {
-      const localKey = keys.shift()!
+      const localKey = ks.shift()!
       resultKey = `${ ctxName }@${ localKey }`
       ctxName = this.tables[resultKey].contextName!
-      length = keys.length
+      length = ks.length
     }
     return resultKey
   }
