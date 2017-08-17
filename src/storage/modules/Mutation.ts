@@ -1,4 +1,4 @@
-import { forEach, assert, warn } from '../../utils'
+import { forEach, assert, warn, keys } from '../../utils'
 import { fieldIdentifier } from '../symbols'
 import * as Exception from '../../exception'
 
@@ -21,7 +21,7 @@ export class Mutation {
   }
 
   static aggregate(db: lf.Database, insert: Mutation[], update: Mutation[]) {
-    const keys: any[] = []
+    const ks: any[] = []
     const insertQueries: lf.query.Insert[] = []
 
     const map = new Map()
@@ -31,7 +31,7 @@ export class Mutation {
       const tableName = table.getName()
       const acc = map.get(tableName)
 
-      keys.push(fieldIdentifier(tableName, curr.refId()))
+      ks.push(fieldIdentifier(tableName, curr.refId()))
 
       if (acc) {
         acc.push(row)
@@ -50,13 +50,13 @@ export class Mutation {
 
     const updateQueries: lf.query.Update[] = []
     for (let i = 0; i < update.length; i++) {
-      if (Object.keys(update[i].params).length > 0) {
+      if (keys(update[i].params).length > 0) {
         updateQueries.push(update[i].toUpdater())
       }
     }
 
     return {
-      contextIds: keys,
+      contextIds: ks,
       queries: insertQueries.concat(updateQueries as any[])
     }
   }

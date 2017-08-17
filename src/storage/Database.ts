@@ -3,18 +3,19 @@ import { ErrorObservable } from 'rxjs/observable/ErrorObservable'
 import { Subscription } from 'rxjs/Subscription'
 import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable'
 import * as lf from 'lovefield'
+import { __assign as assign } from 'tslib'
 import * as Exception from '../exception'
 import * as typeDefinition from './helper/definition'
 import Version from '../version'
 import { Traversable } from '../shared'
-import { Mutation, Selector, QueryToken, PredicateProvider } from './modules'
+import { Mutation, Selector, QueryToken, PredicateProvider, checkPredicate, predicateOperatorNames, RevertController } from './modules'
 import { dispose, contextTableName, fieldIdentifier, hiddenColName } from './symbols'
-import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, identity, warn } from '../utils'
-import { createPredicate, createPkClause, mergeTransactionResult, predicatableQuery, lfFactory } from './helper'
+import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, identity, warn, keys as objKeys } from '../utils'
+import { createPredicate, createPkClause, predicatableQuery, lfFactory, executor } from './helper'
 import { Relationship, RDBType, DataStoreType, LeafType, StatementType, JoinMode } from '../interface/enum'
-import { Record, Fields, JoinInfo, Query, Clause, Predicate } from '../interface'
+import { Record, Fields, JoinInfo, Query, Predicate } from '../interface'
 import { SchemaDef, ColumnDef, ParsedSchema, Association, ScopedHandler } from '../interface'
-import { ColumnLeaf, NavigatorLeaf, ExecutorResult, UpsertContext, SelectContext } from '../interface'
+import { ColumnLeaf, NavigatorLeaf, ExecutorResult, UpsertContext, SelectContext, TablesStruct } from '../interface'
 
 export class Database {
 
@@ -52,7 +53,7 @@ export class Database {
     const advanced = !this.schemaDefs.has(tableName) && !this.connected
     assert(advanced, Exception.UnmodifiableTable())
 
-    const hasPK = Object.keys(schema)
+    const hasPK = objKeys(schema)
       .some((key: string) => schema[key].primaryKey === true)
     assert(hasPK, Exception.PrimaryKeyNotProvided())
 
@@ -109,49 +110,43 @@ export class Database {
       })
   }
 
-  insert<T>(tableName: string, raw: T[]): Observable<ExecutorResult>
+  insert<T>(tableName: string, raw: T[], revertController?: RevertController): Observable<ExecutorResult>
 
-  insert<T>(tableName: string, raw: T): Observable<ExecutorResult>
+  insert<T>(tableName: string, raw: T, revertController?: RevertController): Observable<ExecutorResult>
 
-  insert<T>(tableName: string, raw: T | T[]): Observable<ExecutorResult>
+  insert<T>(tableName: string, raw: T | T[], revertController?: RevertController): Observable<ExecutorResult>
 
-  insert<T>(tableName: string, raw: T | T[]): Observable<ExecutorResult> {
-    return this.database$
-      .concatMap(db => {
-        const schema = this.findSchema(tableName)
-        const pk = schema.pk
-        const columnMapper = schema.mapper
-        const [ table ] = Database.getTables(db, tableName)
-        const muts: Mutation[] = []
-        const entities = clone(raw)
-
-        const iterator = Array.isArray(entities) ? entities : [entities]
-
-        iterator.forEach((entity: any) => {
-          const mut = new Mutation(db, table)
-          const hiddenPayload = Object.create(null)
-
-          columnMapper.forEach((mapper, key) => {
-            // cannot create a hidden column for primary key
-            if (!hasOwn(entity, key) || key === pk) {
-              return
+  insert<T>(tableName: string, raw: T | T[], revertController?: RevertController): Observable<ExecutorResult> {
+    return this.database$.concatMap(db => {
+      const { queries, contextIds } = this.buildInsertQuery(db, tableName, raw)
+      const schema = this.findSchema(tableName)
+      const pk = schema.pk
+      const [ table ] = Database.getTables(db, tableName)
+      return Observable.fromPromise(executor(db, queries))
+        .do({
+          next: () => {
+            if (revertController) {
+              const equalClause = (Array.isArray(raw) ? raw : [raw])
+                .map(data => ({
+                  [pk]: data[pk]
+                }))
+              const clause = { $or: equalClause }
+              const tablesStruct: TablesStruct = {
+                [tableName]: {
+                  table, contextName: tableName
+                }
+              }
+              const provider = new PredicateProvider(tablesStruct, tableName, clause)
+              const deleteQuery =
+                predicatableQuery(db, table, provider.getPredicate(), StatementType.Delete)
+              revertController.inject(
+                db, [ deleteQuery ]
+              )
             }
-
-            const val = entity[key]
-            hiddenPayload[key] = mapper(val)
-            hiddenPayload[hiddenColName(key)] = val
-          })
-
-          mut.patch({ ...entity, ...hiddenPayload })
-          mut.withId(pk, entity[pk])
-          muts.push(mut)
+          },
+          error: () => contextIds.forEach(id => this.storedIds.delete(id))
         })
-
-        const { contextIds, queries } = Mutation.aggregate(db, muts, [])
-        contextIds.forEach(id => this.storedIds.add(id))
-        return this.executor(db, queries)
-          .do({ error: () => contextIds.forEach(id => this.storedIds.delete(id)) })
-      })
+    })
   }
 
   get<T>(tableName: string, query: Query<T> = {}, mode: JoinMode = JoinMode.imlicit): QueryToken<T> {
@@ -159,7 +154,7 @@ export class Database {
     return new QueryToken<T>(selector$)
   }
 
-  update<T>(tableName: string, clause: Predicate<T>, raw: Partial<T>): Observable<ExecutorResult> {
+  update<T>(tableName: string, clause: Predicate<T>, raw: Partial<T>, revertController?: RevertController): Observable<ExecutorResult> {
     const type = getType(raw)
     if (type !== 'Object') {
       return Observable.throw(Exception.InvalidType(['Object', type]))
@@ -171,7 +166,7 @@ export class Database {
     }
 
     return this.database$
-      .concatMap<any, any>(db => {
+      .concatMap(db => {
         const entity = clone(raw)
         const [ table ] = Database.getTables(db, tableName)
         const columnMapper = schema!.mapper
@@ -189,7 +184,13 @@ export class Database {
         })
 
         const mut = { ...(entity as any), ...hiddenPayload }
-        const predicate = createPredicate(table, clause)
+        const tables = this.buildTablesStructure(table)
+        const predicate = createPredicate(tables, tableName, clause)
+
+        if (!predicate) {
+          warn(`The result of parsed Predicate is null, you are deleting all ${ tableName } Table!`)
+        }
+
         const query = predicatableQuery(db, table, predicate!, StatementType.Update)
 
         forEach(mut, (val, key) => {
@@ -203,37 +204,80 @@ export class Database {
           }
         })
 
-        return this.executor(db, [query])
+        if (revertController) {
+          const columns = Object.keys(raw).map(key => table[key])
+          predicatableQuery(db, table, predicate!, StatementType.Select, ...columns)
+            .exec()
+            .then(([ value ]) => {
+              const revertQuery = predicatableQuery(db, table, predicate!, StatementType.Update)
+              forEach(value, (val, key) => {
+                const column = table[key]
+                revertQuery.set(column, val)
+              })
+              revertController.inject(
+                db, [ revertQuery ]
+              )
+            })
+            .catch(e => {
+              revertController.giveup()
+              warn(e)
+            })
+        }
+
+        return Observable.fromPromise(executor(db, [ query ]))
+          .do({
+            error: () => {
+              if (revertController) {
+                revertController.giveup()
+              }
+            }
+          })
       })
   }
 
-  delete<T>(tableName: string, clause: Predicate<T> = {}): Observable<ExecutorResult> {
+  delete<T>(tableName: string, clause: Predicate<T> = {}, revertController?: RevertController): Observable<ExecutorResult> {
     const [pk, err] = tryCatch<string>(this.findPrimaryKey)(tableName)
     if (err) {
       return Observable.throw(err)
     }
 
-    return this.database$
-      .concatMap(db => {
-        const [ table ] = Database.getTables(db, tableName)
-        const column = table[pk!]
-        const provider = new PredicateProvider(table, clause)
-        const prefetch =
-          predicatableQuery(db, table, provider.getPredicate(), StatementType.Select, column)
+    if (revertController) {
+      if (!clause) {
+        throw Exception.clauseMissingError()
+      }
+    }
 
-        return Observable.fromPromise(prefetch.exec())
-          .concatMap((scopedIds) => {
-            const query = predicatableQuery(db, table, provider.getPredicate(), StatementType.Delete)
-
-            scopedIds.forEach((entity: any) =>
-              this.storedIds.delete(fieldIdentifier(tableName, entity[pk!])))
-
-            return this.executor(db, [query]).do({ error: () => {
-              scopedIds.forEach((entity: any) =>
-                this.storedIds.add(fieldIdentifier(tableName, entity[pk!])))
-            }})
-          })
-      })
+    return this.database$.concatMap(db => {
+      const [ table ] = Database.getTables(db, tableName)
+      const tablesStruct = this.buildTablesStructure(table)
+      const provider = new PredicateProvider(tablesStruct, tableName, clause)
+      const predicate = provider.getPredicate()
+      if (!predicate) {
+        warn(`The result of parsed Predicate is null, you are deleting all ${ tableName } Tables!`)
+      }
+      const query = predicatableQuery(db, table, predicate, StatementType.Delete)
+      const columns = revertController ? [] as any : [ pk ]
+      return Observable.fromPromise(
+        this.deletePrefetch(db, table, provider, columns)
+      )
+        .concatMap(scopedIds =>
+          Observable.fromPromise(executor(db, [query]))
+            .do({
+              next: () => {
+                if (revertController) {
+                  const { queries } = this.buildInsertQuery(db, tableName, scopedIds)
+                  revertController.inject(db, queries)
+                }
+                scopedIds.forEach((entity: any) =>
+                  this.storedIds.delete(fieldIdentifier(tableName, entity[pk!])))
+                },
+              error: () => {
+                scopedIds.forEach((entity: any) =>
+                  this.storedIds.add(fieldIdentifier(tableName, entity[pk!])))
+              }
+            })
+        )
+    })
   }
 
   upsert<T>(tableName: string, raw: T): Observable<ExecutorResult>
@@ -252,7 +296,7 @@ export class Database {
       const { contextIds, queries } = Mutation.aggregate(db, insert, update)
       if (queries.length > 0) {
         contextIds.forEach(id => this.storedIds.add(id))
-        return this.executor(db, queries)
+        return Observable.fromPromise(executor(db, queries))
           .do({ error: () => contextIds.forEach(id => this.storedIds.delete(id)) })
       } else {
         return Observable.of({ result: false, insert: 0, update: 0, delete: 0, select: 0 })
@@ -260,7 +304,7 @@ export class Database {
     })
   }
 
-  remove<T>(tableName: string, clause: Clause<T> = {}): Observable<ExecutorResult> {
+  remove<T>(tableName: string, clause: Predicate<T> = {}): Observable<ExecutorResult> {
     const [schema, err] = tryCatch<ParsedSchema>(this.findSchema)(tableName)
     if (err) {
       return Observable.throw(err)
@@ -269,10 +313,15 @@ export class Database {
 
     return this.database$.concatMap((db) => {
       const [ table ] = Database.getTables(db, tableName)
-      const predicate = createPredicate(table, clause.where)
+      const tables = this.buildTablesStructure(table)
+      const predicate = createPredicate(tables, tableName, clause)
+
+      if (!predicate) {
+        warn(`The result of parsed Predicate is null, you are removing all ${ tableName } Tables!`)
+      }
 
       const queries: lf.query.Builder[] = []
-      const removedIds: any = []
+      const removedIds: string[] = []
       queries.push(predicatableQuery(db, table, predicate!, StatementType.Delete))
 
       const prefetch = predicatableQuery(db, table, predicate!, StatementType.Select)
@@ -286,10 +335,10 @@ export class Database {
             const scope = this.createScopedHandler<T>(db, queries, removedIds)
             return disposeHandler(rootEntities, scope)
               .do(() => removedIds.forEach((id: string) => this.storedIds.delete(id)))
-              .concatMap(() => this.executor(db, queries))
+              .concatMap(() => executor(db, queries))
           } else {
             removedIds.forEach((id: string) => this.storedIds.delete(id))
-            return this.executor(db, queries)
+            return executor(db, queries)
           }
         })
         .do({ error: () =>
@@ -312,7 +361,7 @@ export class Database {
       db.getSchema().tables().map(t => db.delete().from(t)))
 
     return this.database$.concatMap(db => {
-      return cleanup.concatMap(queries => this.executor(db, queries))
+      return cleanup.concatMap(queries => executor(db, queries))
         .do(() => {
           db.close()
           this.schemas.clear()
@@ -420,14 +469,26 @@ export class Database {
       const containFields = !!clause.fields
 
       const containKey = containFields ? contains(pk, clause.fields!) : true
-      const fields: Set<Fields> = containFields ? new Set(clause.fields) : new Set(schema.columns.keys())
-      const { table, columns, joinInfo, definition } =
-        this.traverseQueryFields(db, tableName, fields, containKey, !containFields, [], {}, mode)
+      const [ additionJoinInfo ] = tryCatch(this.buildJoinFieldsFromPredicate.bind(this))(clause.where!, tableName)
+
+      const fields = containFields ? clause.fields : Array.from(schema.columns.keys())
+      const newFields = containFields && additionJoinInfo ? this.mergeFields(fields!, [ additionJoinInfo as Fields ]) : fields
+      const fieldsSet: Set<Fields> = new Set(newFields)
+      const tablesStruct: TablesStruct = Object.create(null)
+
+      const { table, columns, joinInfo, definition, contextName } =
+        this.traverseQueryFields(db, tableName, fieldsSet, containKey, !containFields, [], {}, tablesStruct, mode)
       const query =
         predicatableQuery(db, table!, null, StatementType.Select, ...columns)
 
-      joinInfo.forEach((info: JoinInfo) =>
-        query.leftOuterJoin(info.table, info.predicate))
+      joinInfo.forEach((info: JoinInfo) => {
+        const predicate = info.predicate
+        if (predicate) {
+          query.leftOuterJoin(info.table, predicate)
+        }
+      })
+
+      this.paddingTablesStruct(db, this.getAllRelatedTables(tableName, contextName), tablesStruct)
 
       const orderDesc = (clause.orderBy || []).map(desc => {
         return {
@@ -445,7 +506,7 @@ export class Database {
         mainTable: table!
       }
       const { limit, skip } = clause
-      const provider = new PredicateProvider(table!, clause.where)
+      const provider = new PredicateProvider(tablesStruct, contextName, clause.where)
 
       return new Selector<T>(db, query, matcher, provider, limit, skip, orderDesc)
     })
@@ -490,6 +551,67 @@ export class Database {
     }
   }
 
+  private buildInsertQuery<T>(db: lf.Database, tableName: string, raw: T | T[]) {
+    const schema = this.findSchema(tableName)
+    const pk = schema.pk
+    const columnMapper = schema.mapper
+    const [ table ] = Database.getTables(db, tableName)
+    const muts: Mutation[] = []
+    const entities = clone(raw)
+
+    const iterator = Array.isArray(entities) ? entities : [entities]
+
+    iterator.forEach((entity: any) => {
+      const mut = new Mutation(db, table)
+      const hiddenPayload = Object.create(null)
+
+      columnMapper.forEach((mapper, key) => {
+        // cannot create a hidden column for primary key
+        if (!hasOwn(entity, key) || key === pk) {
+          return
+        }
+
+        const val = entity[key]
+        hiddenPayload[key] = mapper(val)
+        hiddenPayload[hiddenColName(key)] = val
+      })
+
+      mut.patch({ ...entity, ...hiddenPayload })
+      mut.withId(pk, entity[pk])
+      muts.push(mut)
+    })
+
+    const { contextIds, queries } = Mutation.aggregate(db, muts, [])
+    contextIds.forEach(id => this.storedIds.add(id))
+
+    return { queries, contextIds }
+  }
+
+  private deletePrefetch<T>(
+    db: lf.Database,
+    table: lf.schema.Table,
+    provider: PredicateProvider<T>,
+    columnNames: string[]
+  ) {
+    let columns: lf.schema.Column[]
+    // build revert query
+    if (!columnNames.length) {
+      const tableName = table.getName()
+      columns = Array.from(this.findSchema(tableName).columns.keys())
+        .map(columnName => {
+          const column = table[columnName]
+          const hiddenName = hiddenColName(columnName)
+          const hiddenCol = table[hiddenName]
+          return hiddenCol || column
+        })
+    } else {
+      columns = columnNames.map(columnName => table[columnName])
+    }
+    const prefetch =
+      predicatableQuery(db, table, provider.getPredicate(), StatementType.Select, ...columns)
+    return prefetch.exec()
+  }
+
   // context 用来标记DFS路径中的所有出现过的表，用于解决self-join时的二义性
   // path 用来标记每个查询路径上出现的表，用于解决circular reference
   private traverseQueryFields(
@@ -500,6 +622,7 @@ export class Database {
     glob: boolean,
     path: string[] = [],
     context: Record = {},
+    tablesStruct: TablesStruct = Object.create(null),
     mode: JoinMode
   ) {
     const schema = this.findSchema(tableName)
@@ -510,7 +633,7 @@ export class Database {
     const joinInfo: JoinInfo[] = []
 
     if (mode === JoinMode.imlicit && contains(tableName, path)) { // thinking mode: implicit & explicit
-      return { columns, joinInfo, advanced: false, table: null, definition: null }
+      return { columns, joinInfo, advanced: false, table: null, definition: null, contextName: tableName }
     } else {
       path.push(tableName)
     }
@@ -533,7 +656,10 @@ export class Database {
     const suffix = (context[tableName] || 0) + 1
     context[tableName] = suffix
     const contextName = contextTableName(tableName, suffix)
-    const currentTable = Database.getTables(db, tableName)[0].as(contextName)
+    const [ originTable ] = Database.getTables(db, tableName)
+    const currentTable = originTable.as(contextName)
+
+    assign(tablesStruct, this.buildTablesStructure(currentTable, contextName))
 
     const handleAdvanced = (ret: any, key: string, defs: Association | ColumnDef) => {
       if (!ret.advanced) {
@@ -542,17 +668,20 @@ export class Database {
 
       columns.push(...ret.columns)
       assert(!rootDefinition[key], Exception.AliasConflict(key, tableName))
-
       if ((defs as ColumnDef).column) {
         rootDefinition[key] = defs
       } else {
         const { where, type } = defs as Association
         rootDefinition[key] = typeDefinition.revise(type!, ret.definition)
-        const [ predicate, err ] = tryCatch(createPredicate)(currentTable, where(ret.table))
-        if (err) {
+        tablesStruct[`${ contextName }@${ key }`] = {
+          table: ret.table,
+          contextName: ret.contextName
+        }
+        const [ predicate, e ] = tryCatch(createPredicate)(tablesStruct, contextName, where(ret.table))
+        if (e) {
           warn(
-            `Failed to build predicate, since ${err.message}` +
-            `, on table: ${ret.table.getName()}`
+            `Failed to build predicate, since ${e.message}` +
+            `, on table: ${ ret.table.getName() }`
           )
         }
         const joinLink = predicate
@@ -603,14 +732,13 @@ export class Database {
         case LeafType.navigator:
           const { containKey, fields, assocaiation } = ctx.leaf as NavigatorLeaf
           const ret =
-            this.traverseQueryFields(db, assocaiation.name, new Set(fields), containKey, glob, path.slice(0), context, mode)
+            this.traverseQueryFields(db, assocaiation.name, new Set(fields), containKey, glob, path.slice(0), context, tablesStruct, mode)
           handleAdvanced(ret, ctx.key, assocaiation)
           ctx.skip()
           break
       }
     })
-
-    return { columns, joinInfo, advanced: true, table: currentTable, definition: rootDefinition }
+    return { columns, joinInfo, advanced: true, table: currentTable, definition: rootDefinition, contextName }
   }
 
   private traverseCompound(
@@ -724,7 +852,8 @@ export class Database {
         entities.forEach(entity => {
           const pkVal = entity[pk]
           const clause = createPkClause(pk, pkVal)
-          const predicate = createPredicate(table, clause)
+          const tables = this.buildTablesStructure(table)
+          const predicate = createPredicate(tables, tableName, clause.where)
           const query = predicatableQuery(db, table, predicate!, StatementType.Delete)
 
           queryCollection.push(query)
@@ -734,7 +863,8 @@ export class Database {
 
       const get = (where: Predicate<any> | null = null) => {
         const [ table ] = Database.getTables(db, tableName)
-        const [ predicate, err ] = tryCatch(createPredicate)(table, where)
+        const tables = this.buildTablesStructure(table)
+        const [ predicate, err ] = tryCatch(createPredicate)(tables, tableName, where)
         if (err) {
           return Observable.throw(err)
         }
@@ -747,20 +877,171 @@ export class Database {
     }
   }
 
-  private executor(db: lf.Database, queries: lf.query.Builder[]) {
-    const tx = db.createTransaction()
-    const handler = {
-      error: () => warn(`Execute failed, transaction is already marked for rollback.`)
+  private buildTablesStructure(defaultTable: lf.schema.Table, aliasName?: string, tablesStruct: TablesStruct = Object.create(null)) {
+    if (aliasName) {
+      tablesStruct[aliasName] = {
+        table: defaultTable,
+        contextName: aliasName
+      }
+    } else {
+      const tableName = defaultTable.getName()
+      tablesStruct[tableName] = {
+        table: defaultTable,
+        contextName: tableName
+      }
+    }
+    return tablesStruct
+  }
+
+  private getAllRelatedTables(tableName: string, contextName: string) {
+    const tablesStructure = new Map<string, string>()
+    const schemas = [
+      {
+        schema: this.findSchema(tableName),
+        relatedTo: contextName
+      }
+    ]
+    while (schemas.length) {
+      const { schema, relatedTo } = schemas.pop()!
+      for (const [ key, val ] of schema.associations) {
+        const relatedName = val.name
+        if (!tablesStructure.has(relatedName)) {
+          const path = `${ relatedTo }@${ key }`
+          tablesStructure.set(relatedName, path)
+          schemas.push({
+            schema: this.findSchema(relatedName),
+            relatedTo: relatedName
+          })
+        }
+      }
+    }
+    return tablesStructure
+  }
+
+  private paddingTablesStruct(db: lf.Database, tables: Map<string, string>, tablesStruct: TablesStruct): TablesStruct {
+    forEach(tablesStruct, structure => {
+      const tableName = structure.table.getName()
+      tables.delete(tableName)
+    })
+    tables.forEach((key, tableName) => {
+      const [ table ] = Database.getTables(db, tableName)
+      tablesStruct[key] = { table, contextName: tableName }
+    })
+    return tablesStruct
+  }
+
+  private buildJoinFieldsFromPredicate(predicate: Predicate<any>, tableName: string) {
+    let result = Object.create(null)
+    let schema = this.findSchema(tableName)
+
+    const buildJoinInfo = (keys: string[]) => {
+      return keys.reduce((acc, k, currentIndex) => {
+        if (currentIndex < keys.length - 1) {
+          const _newTableName = schema.associations.get(k)!.name
+          schema = this.findSchema(_newTableName)
+          const pk = schema.pk
+          const f = currentIndex !== keys.length - 2 ? Object.create(null) : keys[currentIndex + 1]
+          acc[k] = [pk]
+          if (f !== pk) {
+            acc[k].push(f)
+          }
+          return f
+        }
+      }, result)
     }
 
-    return Observable.fromPromise(tx.exec(queries))
-      .do(handler)
-      .map((ret) => {
-        return {
-          result: true,
-          ...mergeTransactionResult(queries, ret)
+    forEach(predicate, (val, key) => {
+      if (!predicateOperatorNames.has(key)) {
+        if (checkPredicate(val)) {
+          const keys = key.split('.')
+          const newTableName = this.getTablenameFromNestedPredicate(key, tableName)
+          if (keys.length > 1) {
+            buildJoinInfo(keys)
+          } else {
+            result[key] = [schema.pk, this.buildJoinFieldsFromPredicate(val, newTableName)]
+          }
+        } else {
+          const keys = key.split('.')
+          if (keys.length > 1) {
+            buildJoinInfo(keys)
+          } else {
+            result = key
+          }
+        }
+      }
+    })
+
+    return typeof result === 'object' && objKeys(result).length ? result : null
+  }
+
+  private mergeFields(fields: Fields[], predicateFields: Fields[]) {
+    const newFields = this.buildFieldsTree(fields)
+    predicateFields = this.buildFieldsTree(predicateFields)
+
+    const nestedFields = newFields[newFields.length - 1]
+    const nestedPredicateFields = predicateFields[predicateFields.length - 1]
+    forEach(predicateFields, val => {
+      if (typeof val === 'string') {
+        if (newFields.indexOf(val) === -1) {
+          newFields.push(val)
+        }
+      }
+    })
+
+    if (typeof nestedPredicateFields === 'object') {
+      if (typeof nestedFields === 'object') {
+        forEach(nestedPredicateFields, (val, key) => {
+          const existedVal = nestedFields[key]
+          if (existedVal) {
+            this.mergeFields(existedVal, val)
+          } else {
+            nestedFields[key] = val
+          }
+        })
+      } else {
+        newFields.push(nestedPredicateFields)
+      }
+    }
+    return newFields
+  }
+
+  private buildFieldsTree(fields: Fields[]) {
+    const dist: Fields[] = []
+    const nestedFields: { [index: string]: Fields[] }[] = []
+    forEach(fields, field => {
+      if (typeof field === 'string') {
+        dist.push(field)
+      } else {
+        nestedFields.push(field)
+      }
+    })
+
+    const nestedField = nestedFields.reduce((acc, field) => {
+      forEach(field, (val, key) => {
+        const existedVal = acc[key]
+        if (existedVal) {
+          acc[key] = this.mergeFields(existedVal, val)
+        } else {
+          acc[key] = val
         }
       })
+      return acc
+    }, {})
+    if (objKeys(nestedField).length) {
+      dist.push(nestedField)
+    }
+    return dist
+  }
+
+  private getTablenameFromNestedPredicate(def: string, tableName: string) {
+    const defs = def.split('.')
+    let newTableName: string
+    let schema = this.findSchema(tableName)
+    forEach(defs, de => {
+      newTableName = schema.associations.get(de)!.name
+      schema = this.findSchema(newTableName)
+    })
+    return newTableName!
   }
 
 }

@@ -1,4 +1,5 @@
 import { noop } from './noop'
+import { keys } from './keys'
 
 export function forEach<T> (target: Array<T>, eachFunc: (val: T, key: number) => void, inverse?: boolean): void
 
@@ -40,12 +41,12 @@ export function forEach (target: any, eachFunc: (val: any, key: any) => any, inv
     }
 
   } else if (typeof target === 'object') {
-    const keys = Object.keys(target)
+    const ks = keys(target)
     let key: string
-    length = keys.length
+    length = ks.length
     let i = -1
     while (++i < length) {
-      key = keys[i]
+      key = ks[i]
       if (eachFunc(target[key], key) === false) {
         break
       }
