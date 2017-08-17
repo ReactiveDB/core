@@ -15,7 +15,7 @@
     "compile_module_es": "tsc dist/es/src/index.ts dist/es/src/proxy/index.ts   -m ES2015   --outDir dist/es  --sourcemap --target ES5 -d --diagnostics --pretty --strict --noImplicitReturns --noUnusedLocals --noUnusedParameters --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --downlevelIteration --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
     "copy_src_cjs": "shx mkdir -p ./dist/cjs/src && shx cp -r ./src/* ./dist/cjs/src",
     "copy_src_es": "shx mkdir -p ./dist/es/src && shx cp -r ./src/* ./dist/es/src",
-    "cover": "rm -rf ./.nyc_output ./coverage && NODE_ENV=test nyc --reporter=html --reporter=lcov --exclude=node_modules --exclude=spec-js/test --exclude=spec-js/src/storage/lovefield.js --exclude=spec-js/src/shared/Logger.js --exclude=spec-js/src/utils/option.js --exclude=spec-js/src/utils/valid.js tman --mocha spec-js/test/run.js",
+    "cover": "rm -rf ./.nyc_output ./coverage && NODE_ENV=test nyc --reporter=html --reporter=lcov --exclude=node_modules --exclude=spec-js/test --exclude=spec-js/src/storage/lovefield.js --exclude=spec-js/src/shared/Logger.js --exclude=spec-js/src/utils/option.js --exclude=spec-js/src/utils/valid.js tman --mocha spec-js/test/run.js && nyc report",
     "lint": "tslint -c tslint.json src/*.ts --project ./tsconfig.json --type-check src/**/*.ts ./test/**/*.ts -e ./test/e2e/*.ts",
     "publish_all": "ts-node ./tools/publish.ts",
     "start": "webpack-dev-server --inline --colors --progress --port 3000",
