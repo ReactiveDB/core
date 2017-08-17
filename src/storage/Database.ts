@@ -192,6 +192,11 @@ export class Database {
         const mut = { ...(entity as any), ...hiddenPayload }
         const tables = this.buildTablesStructure(table)
         const predicate = createPredicate(tables, tableName, clause)
+
+        if (!predicate) {
+          warn(`The result of parsed Predicate is null, you are deleting all ${ tableName } Table!`)
+        }
+
         const query = predicatableQuery(db, table, predicate!, StatementType.Update)
 
         forEach(mut, (val, key) => {
@@ -278,6 +283,10 @@ export class Database {
       const [ table ] = Database.getTables(db, tableName)
       const tables = this.buildTablesStructure(table)
       const predicate = createPredicate(tables, tableName, clause)
+
+      if (!predicate) {
+        warn(`The result of parsed Predicate is null, you are removing all ${ tableName } Tables!`)
+      }
 
       const queries: lf.query.Builder[] = []
       const removedIds: any = []

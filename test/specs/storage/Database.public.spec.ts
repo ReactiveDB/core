@@ -9,7 +9,7 @@ import { uuid, checkExecutorResult } from '../../utils'
 import schemaFactory from '../../schemas'
 import { TestFixture2 } from '../../schemas/Test'
 import { scenarioGen, programGen, postGen, taskGen, subtaskGen } from '../../utils/generators'
-import { RDBType, DataStoreType, Database, clone, forEach, JoinMode } from '../../index'
+import { RDBType, DataStoreType, Database, clone, forEach, JoinMode, Logger } from '../../index'
 import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema, OrganizationSchema } from '../../index'
 import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector } from '../../index'
 
@@ -545,7 +545,7 @@ export default describe('Database Testcase: ', () => {
         expect(results.length).to.equal(1)
       })
 
-      it('should get value by deep nested Association query without nested association fields', function* () {
+      it('should get value by deep nested Association query without association fields', function* () {
         const fields = ['_id', 'content']
         const queryToken = database.get<TaskSchema>('Task', {
           fields,
@@ -561,8 +561,24 @@ export default describe('Database Testcase: ', () => {
         expect(results.length).to.equal(1)
       })
 
-      it('should merge fields when get value by deep nested Association query without nested association fields', function* () {
+      it('should merge fields when get value by deep nested Association query with nested association fields', function* () {
         const fields = ['_id', 'content', { project: ['_id'] }, { project: [ { organization: [ '_id' ] } ] }]
+        const queryToken = database.get<TaskSchema>('Task', {
+          fields,
+          where: {
+            'project.organization': {
+              _id: innerTarget.project._organizationId
+            }
+          }
+        })
+
+        const results = yield queryToken.values()
+
+        expect(results.length).to.equal(1)
+      })
+
+      it('should merge fields when get value by deep nested Association query without nested association fields', function* () {
+        const fields = ['_id', 'content', { subtasks: ['_id'] }]
         const queryToken = database.get<TaskSchema>('Task', {
           fields,
           where: {
@@ -913,6 +929,19 @@ export default describe('Database Testcase: ', () => {
       } catch (e) {
         expect(e.message).to.equal(NonExistentTable(FoolishTable).message)
       }
+    })
+
+    it('should warn if predicate is null', function* () {
+      const spy = sinon.spy(Logger, 'warn')
+
+      yield database.delete('Task')
+
+      const result = yield database.get('Task').values()
+
+      expect(result).deep.equal([])
+      expect(spy.callCount).to.equal(1)
+
+      spy.restore()
     })
 
   })
@@ -1278,6 +1307,24 @@ export default describe('Database Testcase: ', () => {
       } catch (e) {
         expect(e.message).to.equal(NonExistentTable(tableName).message)
       }
+    })
+
+    it('should warn if predicate is null', function* () {
+      const spy = sinon.spy(Logger, 'warn')
+      const [ program ] = programGen(1, 1)
+
+      yield database.upsert('Engineer', program.owner)
+      const ret1 = yield database.get('Engineer').values()
+      const execRet = yield database.remove('Engineer')
+      const ret2 = yield database.get('Engineer').values()
+
+      expect(spy.callCount).to.equal(1)
+
+      checkExecutorResult(execRet, 0, 1, 0)
+      expect(ret1).have.lengthOf(1)
+      expect(ret2).to.deep.equal([])
+
+      spy.restore()
     })
 
   })
