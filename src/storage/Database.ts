@@ -10,7 +10,7 @@ import Version from '../version'
 import { Traversable } from '../shared'
 import { Mutation, Selector, QueryToken, PredicateProvider, checkPredicate, predicateOperatorNames } from './modules'
 import { dispose, contextTableName, fieldIdentifier, hiddenColName } from './symbols'
-import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, identity, warn } from '../utils'
+import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, identity, warn, keys as objKeys } from '../utils'
 import { createPredicate, createPkClause, mergeTransactionResult, predicatableQuery, lfFactory } from './helper'
 import { Relationship, RDBType, DataStoreType, LeafType, StatementType, JoinMode } from '../interface/enum'
 import { Record, Field, JoinInfo, Query, Predicate } from '../interface'
@@ -53,7 +53,7 @@ export class Database {
     const advanced = !this.schemaDefs.has(tableName) && !this.connected
     assert(advanced, Exception.UnmodifiableTable())
 
-    const hasPK = Object.keys(schema)
+    const hasPK = objKeys(schema)
       .some((key: string) => schema[key].primaryKey === true)
     assert(hasPK, Exception.PrimaryKeyNotProvided())
 
@@ -876,7 +876,7 @@ export class Database {
       }
     })
 
-    return typeof result === 'object' && Object.keys(result).length ? result : null
+    return typeof result === 'object' && objKeys(result).length ? result : null
   }
 
   private mergeFields(fields: Field[], predicateFields: Field[]) {
@@ -932,7 +932,7 @@ export class Database {
       })
       return acc
     }, {})
-    if (Object.keys(nestedField).length) {
+    if (objKeys(nestedField).length) {
       dist.push(nestedField)
     }
     return dist
