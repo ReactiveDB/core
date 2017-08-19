@@ -3,7 +3,6 @@ import { ErrorObservable } from 'rxjs/observable/ErrorObservable'
 import { Subscription } from 'rxjs/Subscription'
 import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable'
 import * as lf from 'lovefield'
-import { __assign as assign } from 'tslib'
 import * as Exception from '../exception'
 import * as typeDefinition from './helper/definition'
 import Version from '../version'
@@ -534,7 +533,7 @@ export class Database {
     const columns: lf.schema.Column[] = []
     const joinInfo: JoinInfo[] = []
 
-    if (mode === JoinMode.imlicit && contains(tableName, path)) { // thinking mode: implicit & explicit
+    if (mode === JoinMode.imlicit && contains(tableName, path)) {
       return { columns, joinInfo, advanced: false, table: null, definition: null, contextName: tableName }
     } else {
       path.push(tableName)
@@ -564,7 +563,7 @@ export class Database {
     const [ originTable ] = Database.getTables(db, tableName)
     const currentTable = originTable.as(contextName)
 
-    assign(tablesStruct, this.buildTablesStructure(currentTable, contextName))
+    this.buildTablesStructure(currentTable, contextName, tablesStruct)
 
     const handleAdvanced = (ret: any, key: string, defs: Association | ColumnDef) => {
       if (!ret.advanced) {
@@ -578,7 +577,7 @@ export class Database {
       } else {
         const { where, type } = defs as Association
         rootDefinition[key] = typeDefinition.revise(type!, ret.definition)
-        tablesStruct[`${ contextName }@${ key }`] = {
+        tablesStruct[fieldIdentifier(contextName, key)] = {
           table: ret.table,
           contextName: ret.contextName
         }
@@ -811,7 +810,7 @@ export class Database {
       for (const [ key, val ] of schema.associations) {
         const relatedName = val.name
         if (!tablesStructure.has(relatedName)) {
-          const path = `${ relatedTo }@${ key }`
+          const path = fieldIdentifier(relatedTo, key)
           tablesStructure.set(relatedName, path)
           schemas.push({
             schema: this.findSchema(relatedName),
@@ -828,7 +827,7 @@ export class Database {
       const tableName = structure.table.getName()
       tables.delete(tableName)
     })
-    tables.forEach((key, tableName) => {
+    forEach(tables, (key, tableName) => {
       const [ table ] = Database.getTables(db, tableName)
       tablesStruct[key] = { table, contextName: tableName }
     })
@@ -842,8 +841,8 @@ export class Database {
     const buildJoinInfo = (keys: string[]) => {
       return keys.reduce((acc, k, currentIndex) => {
         if (currentIndex < keys.length - 1) {
-          const _newTableName = schema.associations.get(k)!.name
-          schema = this.findSchema(_newTableName)
+          const associatedTable = schema.associations.get(k)!.name
+          schema = this.findSchema(associatedTable)
           const pk = schema.pk
           const f = currentIndex !== keys.length - 2 ? Object.create(null) : keys[currentIndex + 1]
           acc[k] = [pk]
@@ -859,7 +858,7 @@ export class Database {
       if (!predicateOperatorNames.has(key)) {
         if (checkPredicate(val)) {
           const keys = key.split('.')
-          const newTableName = this.getTablenameFromNestedPredicate(key, tableName)
+          const newTableName = this.getTableNameFromNestedPredicate(key, tableName)
           if (keys.length > 1) {
             buildJoinInfo(keys)
           } else {
@@ -938,15 +937,12 @@ export class Database {
     return dist
   }
 
-  private getTablenameFromNestedPredicate(def: string, tableName: string) {
-    const defs = def.split('.')
-    let newTableName: string
-    let schema = this.findSchema(tableName)
-    forEach(defs, de => {
-      newTableName = schema.associations.get(de)!.name
-      schema = this.findSchema(newTableName)
-    })
-    return newTableName!
+  private getTableNameFromNestedPredicate(defs: string, tableName: string) {
+    const defsArr = defs.split('.')
+    return defsArr.reduce((prev, def) => {
+      const assocaiatedTable = prev.schema.associations.get(def)!.name
+      return { schema: this.findSchema(assocaiatedTable), tableName: assocaiatedTable }
+    }, { schema: this.findSchema(tableName), tableName: tableName }).tableName
   }
 
   private executor(db: lf.Database, queries: lf.query.Builder[]) {

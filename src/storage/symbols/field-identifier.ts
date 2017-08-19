@@ -1,5 +1,5 @@
-export const link = '@'
+export const fieldLink = '@'
 
 export function fieldIdentifier(tableName: string, val: string) {
-  return `${tableName}${link}${val}`
+  return `${tableName}${fieldLink}${val}`
 }

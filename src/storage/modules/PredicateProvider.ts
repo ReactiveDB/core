@@ -1,4 +1,5 @@
 import * as lf from 'lovefield'
+import { relateIdentifier, fieldIdentifier } from '../symbols'
 import { forEach, warn, concat, keys } from '../../utils'
 import { ValueLiteral, VaildEqType, Predicate, PredicateMeta, TablesStruct } from '../../interface'
 
@@ -123,25 +124,25 @@ export class PredicateProvider<T> {
         resultPred = compoundPredicateFactory['$and'](nestedPreds)
       } else {
         if (parentKey && !this.checkMethod(key)) {
-          key = `${ parentKey }.${ key }`
+          key = relateIdentifier(parentKey, key)
         }
         const ks: string[] = key.split('.')
-        let _column: lf.schema.Column
+        let targetCol: lf.schema.Column
         if (!column) {
           if (ks.length === 1) {
-            _column = table[key]
+            targetCol = table[key]
           } else {
             const columnKey = ks.pop()!
             const tableName = this.getAliasTableName(ks)
-            _column = this.tables[tableName].table[columnKey]
+            targetCol = this.tables[tableName].table[columnKey]
           }
         } else {
-          _column = column
+          targetCol = column
         }
-        if (_column) {
-          resultPred = buildSinglePred(_column, val, key)
+        if (targetCol) {
+          resultPred = buildSinglePred(targetCol, val, key)
         } else {
-          warn(`Failed to build predicate, since column: ${key} is not exist, on table: ${table.getName()}`)
+          warn(`Failed to build predicate, since column: ${key} is not existed, on table: ${table.getName()}`)
           return
         }
       }
@@ -158,7 +159,7 @@ export class PredicateProvider<T> {
     let resultKey = this.tableName
     while (length > 0) {
       const localKey = ks.shift()!
-      resultKey = `${ ctxName }@${ localKey }`
+      resultKey = fieldIdentifier(ctxName, localKey)
       ctxName = this.tables[resultKey].contextName!
       length = ks.length
     }
