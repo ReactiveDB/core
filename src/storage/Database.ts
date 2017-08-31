@@ -155,6 +155,8 @@ export class Database {
   }
 
   get<T>(tableName: string, query: Query<T> = {}, mode: JoinMode = JoinMode.imlicit): QueryToken<T> {
+    const checkResult = this.checkAssociateFields(query.fields)
+    assert(checkResult, Exception.AssociatedFieldsPostionError())
     const selector$ = this.buildSelector<T>(tableName, query, mode)
     return new QueryToken<T>(selector$)
   }
@@ -943,6 +945,22 @@ export class Database {
       const assocaiatedTable = prev.schema.associations.get(def)!.name
       return { schema: this.findSchema(assocaiatedTable), tableName: assocaiatedTable }
     }, { schema: this.findSchema(tableName), tableName: tableName }).tableName
+  }
+
+  private checkAssociateFields(fields?: Fields[]) {
+    let result = true
+    if (fields) {
+      forEach(fields, (field, index): boolean | void => {
+        const isObject = typeof field === 'object'
+        if (isObject) {
+          if (index !== fields.length - 1) {
+            result = false
+            return false
+          }
+        }
+      })
+    }
+    return result
   }
 
   private executor(db: lf.Database, queries: lf.query.Builder[]) {

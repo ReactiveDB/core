@@ -11,7 +11,7 @@ import { TestFixture2 } from '../../schemas/Test'
 import { scenarioGen, programGen, postGen, taskGen, subtaskGen } from '../../utils/generators'
 import { RDBType, DataStoreType, Database, clone, forEach, JoinMode, Logger } from '../../index'
 import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema, OrganizationSchema } from '../../index'
-import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector } from '../../index'
+import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector, AssociatedFieldsPostionError } from '../../index'
 
 use(SinonChai)
 
@@ -446,6 +446,11 @@ export default describe('Database Testcase: ', () => {
       const sqlB = yield database.get('Task').toString()
 
       expect(sqlA).to.deep.equal(sqlB)
+    })
+
+    it('should throw when associated fields in a wrong position', () => {
+      const fun = () => database.get('Task', { fields: ['_id', { project: ['_id'] }, 'content'] })
+      expect(fun).to.throw(AssociatedFieldsPostionError().message)
     })
 
     describe('case: Associations', () => {
