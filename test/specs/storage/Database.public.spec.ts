@@ -546,8 +546,10 @@ export default describe('Database Testcase: ', () => {
         })
 
         const results = yield queryToken.values()
+        const [ result ] = results
 
         expect(results.length).to.equal(1)
+        expect(result.project.organization._id).to.equal(innerTarget.project._organizationId)
       })
 
       it('should get value by deep nested Association query without association fields', function* () {
@@ -562,12 +564,13 @@ export default describe('Database Testcase: ', () => {
         })
 
         const results = yield queryToken.values()
-
+        const [ result ] = results
         expect(results.length).to.equal(1)
+        expect(result.project.organization._id).to.equal(innerTarget.project._organizationId)
       })
 
       it('should merge fields when get value by deep nested Association query with nested association fields', function* () {
-        const fields = ['_id', 'content', { project: ['_id'] }, { project: [ { organization: [ '_id' ] } ] }]
+        const fields = ['_id', 'content', { project: [ { organization: [ '_id' ] } ] }]
         const queryToken = database.get<TaskSchema>('Task', {
           fields,
           where: {
@@ -578,8 +581,10 @@ export default describe('Database Testcase: ', () => {
         })
 
         const results = yield queryToken.values()
+        const [ result ] = results
 
         expect(results.length).to.equal(1)
+        expect(result.project.organization._id).to.equal(innerTarget.project._organizationId)
       })
 
       it('should merge fields when get value by deep nested Association query without nested association fields', function* () {
@@ -594,8 +599,27 @@ export default describe('Database Testcase: ', () => {
         })
 
         const results = yield queryToken.values()
+        const [ result ] = results
 
         expect(results.length).to.equal(1)
+        expect(result.project.organization._id).to.equal(innerTarget.project._organizationId)
+      })
+
+      it('should warn if build additional join info from predicate failed', function* () {
+        const fields = ['_id', 'content']
+        const queryToken = database.get<TaskSchema>('Task', {
+          fields,
+          where: { 'project._organization._id': innerTarget.project._organizationId }
+        })
+
+        const spy = sinon.spy(Logger, 'warn')
+
+        yield queryToken.values()
+
+        // warning in PredicateProvider and Database
+        expect(spy.callCount).to.equal(2)
+
+        spy.restore()
       })
 
       it('should apply `skip` clause on multi joined query', function* () {

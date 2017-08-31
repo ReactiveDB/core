@@ -9,7 +9,7 @@ import Version from '../version'
 import { Traversable } from '../shared'
 import { Mutation, Selector, QueryToken, PredicateProvider, checkPredicate, predicateOperatorNames } from './modules'
 import { dispose, contextTableName, fieldIdentifier, hiddenColName } from './symbols'
-import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, identity, warn, keys as objKeys } from '../utils'
+import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, identity, warn, keys as objKeys, mergeFields } from '../utils'
 import { createPredicate, createPkClause, mergeTransactionResult, predicatableQuery, lfFactory } from './helper'
 import { Relationship, RDBType, DataStoreType, LeafType, StatementType, JoinMode } from '../interface/enum'
 import { Record, Field, JoinInfo, Query, Predicate } from '../interface'
@@ -433,11 +433,19 @@ export class Database {
       const containFields = !!clause.fields
 
       const containKey = containFields ? contains(pk, clause.fields!) : true
-      const [ additionJoinInfo ] = tryCatch(this.buildJoinFieldsFromPredicate.bind(this))(clause.where!, tableName)
+      const [ additionJoinInfo, err ] = clause.where ? tryCatch(this.buildJoinFieldsFromPredicate)(clause.where, tableName) : [ null, null ]
+
+      if (err) {
+        warn('Build addition join info from predicate failed', err.message)
+      }
 
       const fields = containFields ? clause.fields : Array.from(schema.columns.keys())
-      const newFields = containFields && additionJoinInfo ? this.mergeFields(fields!, [ additionJoinInfo as Field ]) : fields
-      const fieldsSet: Set<Field> = new Set(newFields)
+
+      if (containFields && additionJoinInfo) {
+        mergeFields(fields!, [ additionJoinInfo as Field ])
+      }
+
+      const fieldsSet: Set<Field> = new Set(fields)
       const tablesStruct: TablesStruct = Object.create(null)
 
       const { table, columns, joinInfo, definition, contextName } =
@@ -836,24 +844,30 @@ export class Database {
     return tablesStruct
   }
 
-  private buildJoinFieldsFromPredicate(predicate: Predicate<any>, tableName: string) {
+  private buildJoinFieldsFromPredicate = (predicate: Predicate<any>, tableName: string) => {
     let result = Object.create(null)
     let schema = this.findSchema(tableName)
 
     const buildJoinInfo = (keys: string[]) => {
       return keys.reduce((acc, k, currentIndex) => {
-        if (currentIndex < keys.length - 1) {
-          const associatedTable = schema.associations.get(k)!.name
-          schema = this.findSchema(associatedTable)
-          const pk = schema.pk
-          const f = currentIndex !== keys.length - 2 ? Object.create(null) : keys[currentIndex + 1]
-          acc[k] = [pk]
-          if (f !== pk) {
-            acc[k].push(f)
-          }
-          return f
+        if (currentIndex === keys.length - 1) {
+          return acc
         }
-      }, result)
+        const fieldObject = acc.result
+        const associatedTable = schema.associations.get(k)!.name
+        schema = this.findSchema(associatedTable)
+        const pk = schema.pk
+        const nextField = keys[currentIndex + 1]
+        const f = currentIndex !== keys.length - 2 || schema.associations.get(nextField) ? Object.create(null) : nextField
+        const fields = fieldObject[k] = [pk]
+        if (f !== pk) {
+          fields.push(f)
+        }
+        if (typeof f === 'string') {
+          return { key: f, result: fieldObject }
+        }
+        return { result: f, key: nextField }
+      }, { result, key: tableName })
     }
 
     forEach(predicate, (val, key) => {
@@ -862,9 +876,18 @@ export class Database {
           const keys = key.split('.')
           const newTableName = this.getTableNameFromNestedPredicate(key, tableName)
           if (keys.length > 1) {
-            buildJoinInfo(keys)
+            const joinInfo = buildJoinInfo(keys)
+            const fields = this.buildJoinFieldsFromPredicate(val, newTableName)
+            const results = joinInfo.result[joinInfo.key] = [schema.pk]
+            if (fields) {
+              results.push(fields)
+            }
           } else {
-            result[key] = [schema.pk, this.buildJoinFieldsFromPredicate(val, newTableName)]
+            const joinFields = this.buildJoinFieldsFromPredicate(val, newTableName)
+            const fields =  result[key] = [schema.pk]
+            if (joinFields) {
+              fields.push(joinFields)
+            }
           }
         } else {
           const keys = key.split('.')
@@ -880,65 +903,6 @@ export class Database {
     return typeof result === 'object' && objKeys(result).length ? result : null
   }
 
-  private mergeFields(fields: Field[], predicateFields: Field[]) {
-    const newFields = this.buildFieldsTree(fields)
-    predicateFields = this.buildFieldsTree(predicateFields)
-
-    const nestedFields = newFields[newFields.length - 1]
-    const nestedPredicateFields = predicateFields[predicateFields.length - 1]
-    forEach(predicateFields, val => {
-      if (typeof val === 'string') {
-        if (newFields.indexOf(val) === -1) {
-          newFields.push(val)
-        }
-      }
-    })
-
-    if (typeof nestedPredicateFields === 'object') {
-      if (typeof nestedFields === 'object') {
-        forEach(nestedPredicateFields, (val, key) => {
-          const existedVal = nestedFields[key]
-          if (existedVal) {
-            this.mergeFields(existedVal, val)
-          } else {
-            nestedFields[key] = val
-          }
-        })
-      } else {
-        newFields.push(nestedPredicateFields)
-      }
-    }
-    return newFields
-  }
-
-  private buildFieldsTree(fields: Field[]) {
-    const dist: Field[] = []
-    const nestedFields: { [index: string]: Field[] }[] = []
-    forEach(fields, field => {
-      if (typeof field === 'string') {
-        dist.push(field)
-      } else {
-        nestedFields.push(field)
-      }
-    })
-
-    const nestedField = nestedFields.reduce((acc, field) => {
-      forEach(field, (val, key) => {
-        const existedVal = acc[key]
-        if (existedVal) {
-          acc[key] = this.mergeFields(existedVal, val)
-        } else {
-          acc[key] = val
-        }
-      })
-      return acc
-    }, {})
-    if (objKeys(nestedField).length) {
-      dist.push(nestedField)
-    }
-    return dist
-  }
-
   private getTableNameFromNestedPredicate(defs: string, tableName: string) {
     const defsArr = defs.split('.')
     return defsArr.reduce((prev, def) => {
@@ -947,7 +911,7 @@ export class Database {
     }, { schema: this.findSchema(tableName), tableName: tableName }).tableName
   }
 
-  private checkAssociateFields(fields?: Fields[]) {
+  private checkAssociateFields(fields?: Field[]) {
     let result = true
     if (fields) {
       forEach(fields, (field, index): boolean | void => {

@@ -1,4 +1,4 @@
-import { forEach, clone, getType, assert, hash, concat, keys } from '../../index'
+import { forEach, clone, getType, assert, hash, concat, keys, mergeFields, FieldMustBeArray, AssociatedFieldsPostionError } from '../../index'
 import { describe, it } from 'tman'
 import { expect } from 'chai'
 
@@ -452,6 +452,118 @@ export default describe('Utils Testcase: ', () => {
       const target: any = new (a as any)
       expect(keys(target).length).to.equal(2)
       expect(keys(target).indexOf('wahtever')).to.equal(-1)
+    })
+  })
+
+  describe('Func: mergeFields', () => {
+    it('should merge string fields', () => {
+      const target = ['1', '2', '3']
+      const patch = ['4', '2', '5']
+      mergeFields(target, patch)
+      expect(target).to.deep.equal([
+        '1', '2', '3', '4', '5'
+      ])
+    })
+
+    it('should merge fields with object field', () => {
+      const extenalField = {
+        bar: ['7', '8', '9']
+      }
+
+      const target = ['1', '2', '3']
+      const patch = ['4', '2', '5', extenalField]
+      mergeFields(target, patch)
+      expect(target).to.deep.equal([
+        '1', '2', '3', '4', '5', extenalField
+      ])
+    })
+
+    it('should merge extenal fields', () => {
+      const extenalField = {
+        bar: ['7', '8', '9']
+      }
+
+      const target = ['1', '2', '3', extenalField]
+      const patch = ['4', '2', '5', { bar: ['10', '9', '12'] }]
+      mergeFields(target, patch)
+      expect(target).to.deep.equal([
+        '1', '2', '3', '4', '5', extenalField
+      ])
+
+      expect(extenalField.bar).to.deep.equal([
+        '7', '8', '9', '10', '12'
+      ])
+    })
+
+    it('should deep merge all fields', () => {
+      const target = ['id1', 'id2', {
+        foo: ['1', '2', '3'],
+        bar: ['4', '5', '6', {
+          task: ['_id', 'content', {
+            project: ['_id', 'name', {
+              organization: ['_id', 'name']
+            }]
+          }]
+        }]
+      }]
+
+      const patch = ['id3', 'id1', {
+        foo1: ['1', '2', '3'],
+        bar: ['8', '12', {
+          task: ['_id', 'content', '_tasklistId', {
+            project: ['_organizationId', {
+              organization: ['created']
+            }],
+            stage: ['_id', {
+              tasklist: ['_id']
+            }]
+          }]
+        }]
+      }]
+
+      mergeFields(target, patch)
+
+      expect(target).to.deep.equal(['id1', 'id2', 'id3', {
+        foo: ['1', '2', '3'],
+        bar: ['4', '5', '6', '8', '12',
+          {
+            task: ['_id', 'content', '_tasklistId',
+              {
+                project: ['_id', 'name', '_organizationId',
+                  {
+                    organization: ['_id', 'name', 'created']
+                  }
+                ],
+                stage: [
+                  '_id',
+                  {
+                    tasklist: [
+                      '_id'
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        foo1: ['1', '2', '3']
+      }])
+    })
+
+    it('should throw if field is not a array', () => {
+      const target = ['1', '2']
+      const patch = { 0: '1', 1: '3', length: 2 }
+      const fun = () => mergeFields(target, patch as any)
+      const fun1 = () => mergeFields(patch as any, target)
+      expect(fun).to.throw(FieldMustBeArray(patch).message)
+      expect(fun1).to.throw(FieldMustBeArray(patch).message)
+    })
+
+    it('should throw if associated fields not in right position', () => {
+      const target = ['1', '2']
+      const patch = ['3', '4', { bar: ['6'] }, { baz: ['9'] }]
+      const fun = () => mergeFields(target, patch)
+      expect(fun).to.throw(AssociatedFieldsPostionError().message)
     })
   })
 

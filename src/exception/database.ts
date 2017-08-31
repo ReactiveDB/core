@@ -42,5 +42,8 @@ export const DatabaseIsNotEmpty =
 export const NotConnected =
   () => new ReactiveDBException('Method: dispose cannnot be invoked before database is connected.')
 
+export const FieldMustBeArray =
+  (field: any) => new ReactiveDBException(`Field must be Array, but got: ${ JSON.stringify(field) }`)
+
 export const AssociatedFieldsPostionError =
   () => new ReactiveDBException(`Associated fields description must be the last item in Fields`)
