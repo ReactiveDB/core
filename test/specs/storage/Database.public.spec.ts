@@ -10,7 +10,7 @@ import schemaFactory from '../../schemas'
 import { TestFixture2 } from '../../schemas/Test'
 import { scenarioGen, programGen, postGen, taskGen, subtaskGen } from '../../utils/generators'
 import { RDBType, DataStoreType, Database, clone, forEach, JoinMode, Logger } from '../../index'
-import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema, OrganizationSchema } from '../../index'
+import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema, OrganizationSchema, TasklistSchema } from '../../index'
 import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector, AssociatedFieldsPostionError } from '../../index'
 
 use(SinonChai)
@@ -26,6 +26,7 @@ export default describe('Database Testcase: ', () => {
     tasks.forEach(t => {
       delete t.project
       delete t.subtasks
+      delete t.tasklist
     })
 
   const refreshDB = () => {
@@ -470,6 +471,7 @@ export default describe('Database Testcase: ', () => {
         const posts: PostSchema[] = []
         const tasks: TaskSchema[] = []
         const organizations: OrganizationSchema[] = []
+        const tasklists: TasklistSchema[] = []
 
         associationFixture.forEach(f => {
           forEach(f, (value, key) => {
@@ -483,6 +485,8 @@ export default describe('Database Testcase: ', () => {
                 organizations.push(value.organization)
               }
               projects.push(value)
+            } else if (key === 'tasklist') {
+              tasklists.push(value)
             }
           })
           tasks.push(f)
@@ -493,7 +497,8 @@ export default describe('Database Testcase: ', () => {
           database.insert('Subtask', subtasks),
           database.insert('Project', projects),
           database.insert('Post', posts),
-          database.insert('Organization', organizations)
+          database.insert('Organization', organizations),
+          database.insert('Tasklist', tasklists)
         ]
 
         Observable.forkJoin(...queries).subscribe(() => {
@@ -569,13 +574,13 @@ export default describe('Database Testcase: ', () => {
         expect(result.project.organization._id).to.equal(innerTarget.project._organizationId)
       })
 
-      it('should merge fields when get value by deep nested Association query with nested association fields', function* () {
-        const fields = ['_id', 'content', { project: [ { organization: [ '_id' ] } ] }]
+      it('should merge fields if a nested association in the WHERE clause', function* () {
+        const fields = ['_id', 'content', { project: [ '_id', { organization: [ '_id' ] } ] }]
         const queryToken = database.get<TaskSchema>('Task', {
           fields,
           where: {
-            'project.organization': {
-              _id: innerTarget.project._organizationId
+            'tasklist.project': {
+              'organization._id': innerTarget.project._organizationId
             }
           }
         })
