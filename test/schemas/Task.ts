@@ -1,5 +1,5 @@
 import { RDBType, Relationship } from '../index'
-import { TeambitionTypes, Database, SubtaskSchema } from '../index'
+import { TeambitionTypes, Database, SubtaskSchema, TasklistSchema } from '../index'
 
 export interface TaskSchema {
   _id: TeambitionTypes.TaskId
@@ -12,6 +12,7 @@ export interface TaskSchema {
   _stageId: TeambitionTypes.StageId
   _tasklistId: TeambitionTypes.TasklistId
   accomplished: string
+  tasklist: TasklistSchema
   project?: {
     _id: TeambitionTypes.ProjectId
     name: string,
@@ -67,6 +68,15 @@ export default (db: Database) => {
             _projectId: ref._id
           }
         }
+      }
+    },
+    tasklist: {
+      type: Relationship.oneToOne,
+      virtual: {
+        name: 'Tasklist',
+        where: ref => ({
+          _tasklistId: ref._id
+        })
       }
     },
     subtasks: {

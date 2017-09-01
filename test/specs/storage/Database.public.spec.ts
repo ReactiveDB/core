@@ -9,7 +9,7 @@ import schemaFactory from '../../schemas'
 import { TestFixture2 } from '../../schemas/Test'
 import { scenarioGen, programGen, postGen, taskGen, subtaskGen } from '../../utils/generators'
 import { RDBType, DataStoreType, Database, clone, forEach, JoinMode } from '../../index'
-import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema } from '../../index'
+import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema, TasklistSchema, OrganizationSchema } from '../../index'
 import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector } from '../../index'
 
 use(SinonChai)
@@ -463,6 +463,8 @@ export default describe('Database Testcase: ', () => {
         const projects: ProjectSchema[] = []
         const posts: PostSchema[] = []
         const tasks: TaskSchema[] = []
+        const tasklists: TasklistSchema[] = []
+        const organizations: OrganizationSchema[] = []
 
         associationFixture.forEach(f => {
           forEach(f, (value, key) => {
@@ -472,7 +474,12 @@ export default describe('Database Testcase: ', () => {
               if (value.posts) {
                 posts.push(...value.posts)
               }
+              if (value.organization) {
+                organizations.push(value.organization)
+              }
               projects.push(value)
+            } else if (key === 'tasklist') {
+              tasklists.push(value)
             }
           })
           tasks.push(f)
@@ -482,7 +489,9 @@ export default describe('Database Testcase: ', () => {
           database.insert('Task', tasks),
           database.insert('Subtask', subtasks),
           database.insert('Project', projects),
-          database.insert('Post', posts)
+          database.insert('Post', posts),
+          database.insert('Tasklist', tasklists),
+          database.insert('Organization', organizations)
         ]
 
         Observable.forkJoin(...queries).subscribe(() => {
@@ -584,6 +593,28 @@ export default describe('Database Testcase: ', () => {
         }
 
         expect(result).to.have.length(20)
+      })
+
+      it.only('test', function* () {
+        yield database.get<TaskSchema>('Task', {
+          fields: ['_id', {
+            project: [{
+              organization: ['_id']
+            }],
+            tasklist: ['_id', {
+              project: ['_id', {
+                organization: ['_id']
+              }]
+            }]
+          }],
+          where: {
+            _projectId: innerTarget._projectId
+          }
+        })
+          .values()
+          .do(result => {
+            console.info(JSON.stringify(result, null, 2))
+          })
       })
 
     })

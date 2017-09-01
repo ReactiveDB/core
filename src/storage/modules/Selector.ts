@@ -235,6 +235,7 @@ export class Selector <T> {
   private getValue(query: lf.query.Select) {
     return query.exec()
       .then((rows: any[]) => {
+        console.info(JSON.stringify(this.shape.definition, null, 2))
         const result = graph<T>(rows, this.shape.definition)
         const col = this.shape.pk.name
         return !this.shape.pk.queried ? this.removeKey(result, col) : result
