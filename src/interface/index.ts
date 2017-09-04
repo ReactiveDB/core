@@ -51,7 +51,7 @@ export interface ParsedSchema {
   pk: string
 }
 
-export type Fields = string | { [index: string]: Fields[] }
+export type Field = string | { [index: string]: Field[] }
 
 export interface Clause<T> {
   where?: Predicate<T>
@@ -63,7 +63,7 @@ export interface OrderDescription {
 }
 
 export interface Query<T> extends Clause<T> {
-  fields?: Fields[]
+  fields?: Field[]
   limit?: number
   skip?: number
   orderBy?: OrderDescription[]
@@ -115,7 +115,7 @@ export interface ColumnLeaf {
 }
 
 export interface NavigatorLeaf {
-  fields: Array<Fields> | Set<Fields>
+  fields: Array<Field> | Set<Field>
   containKey: boolean
   assocaiation: Association
 }

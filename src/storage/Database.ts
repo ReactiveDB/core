@@ -12,7 +12,7 @@ import { dispose, contextTableName, fieldIdentifier, hiddenColName } from './sym
 import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, identity, warn } from '../utils'
 import { createPredicate, createPkClause, mergeTransactionResult, predicatableQuery, lfFactory } from './helper'
 import { Relationship, RDBType, DataStoreType, LeafType, StatementType, JoinMode } from '../interface/enum'
-import { Record, Fields, JoinInfo, Query, Clause, Predicate } from '../interface'
+import { Record, Field, JoinInfo, Query, Clause, Predicate } from '../interface'
 import { SchemaDef, ColumnDef, ParsedSchema, Association, ScopedHandler } from '../interface'
 import { ColumnLeaf, NavigatorLeaf, ExecutorResult, UpsertContext, SelectContext } from '../interface'
 
@@ -298,12 +298,7 @@ export class Database {
     })
   }
 
-  dispose(): ErrorObservable | Observable<{
-    insert: number
-    update: number
-    delete: number
-    result: boolean
-  }> {
+  dispose(): ErrorObservable | Observable<ExecutorResult> {
     if (!this.connected) {
       return Observable.throw(Exception.NotConnected())
     }
@@ -420,7 +415,7 @@ export class Database {
       const containFields = !!clause.fields
 
       const containKey = containFields ? contains(pk, clause.fields!) : true
-      const fields: Set<Fields> = containFields ? new Set(clause.fields) : new Set(schema.columns.keys())
+      const fields: Set<Field> = containFields ? new Set(clause.fields) : new Set(schema.columns.keys())
       const { table, columns, joinInfo, definition } =
         this.traverseQueryFields(db, tableName, fields, containKey, !containFields, [], {}, mode)
       const query =
@@ -495,7 +490,7 @@ export class Database {
   private traverseQueryFields(
     db: lf.Database,
     tableName: string,
-    fieldsValue: Set<Fields>,
+    fieldsValue: Set<Field>,
     hasKey: boolean,
     glob: boolean,
     path: string[] = [],
@@ -509,7 +504,7 @@ export class Database {
     const columns: lf.schema.Column[] = []
     const joinInfo: JoinInfo[] = []
 
-    if (mode === JoinMode.imlicit && contains(tableName, path)) { // thinking mode: implicit & explicit
+    if (mode === JoinMode.imlicit && contains(tableName, path)) {
       return { columns, joinInfo, advanced: false, table: null, definition: null }
     } else {
       path.push(tableName)
@@ -527,7 +522,10 @@ export class Database {
     assert(!onlyNavigator, Exception.InvalidQuery())
 
     if (!hasKey) {
-      fieldsValue.add(schema.pk)
+      // 保证主键一定比关联字段更早的被遍历到
+      const fields = Array.from(fieldsValue)
+      fields.unshift(schema.pk)
+      fieldsValue = new Set(fields)
     }
 
     const suffix = (context[tableName] || 0) + 1
