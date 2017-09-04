@@ -298,12 +298,7 @@ export class Database {
     })
   }
 
-  dispose(): ErrorObservable | Observable<{
-    insert: number
-    update: number
-    delete: number
-    result: boolean
-  }> {
+  dispose(): ErrorObservable | Observable<ExecutorResult> {
     if (!this.connected) {
       return Observable.throw(Exception.NotConnected())
     }
@@ -509,7 +504,7 @@ export class Database {
     const columns: lf.schema.Column[] = []
     const joinInfo: JoinInfo[] = []
 
-    if (mode === JoinMode.imlicit && contains(tableName, path)) { // thinking mode: implicit & explicit
+    if (mode === JoinMode.imlicit && contains(tableName, path)) {
       return { columns, joinInfo, advanced: false, table: null, definition: null }
     } else {
       path.push(tableName)
@@ -527,7 +522,7 @@ export class Database {
     assert(!onlyNavigator, Exception.InvalidQuery())
 
     if (!hasKey) {
-      fieldsValue.add(schema.pk)
+      fieldsValue = new Set([schema.pk, ...fieldsValue])
     }
 
     const suffix = (context[tableName] || 0) + 1
