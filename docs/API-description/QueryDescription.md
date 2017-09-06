@@ -1,14 +1,14 @@
-## QueryDescription
+## Query
 
 ```ts
-interface QueryDescription<T> extends ClauseDescription<T> {
-  fields?: FieldsValue[]
+interface Query<T> extends Clause<T> {
+  fields?: Field[]
   limit?: number
   skip?: number
   orderBy?: OrderDescription[]
 }
 
-interface ClauseDescription<T> {
+interface Clause<T> {
   where?: PredicateDescription<T>
 }
 
@@ -26,7 +26,7 @@ interface OrderDescription {
   </tr>
   <tr>
     <td>fields</td>
-    <td>查询哪些字段，数组，合法值为字符串或字面量对象</td>
+    <td>查询哪些字段，数组，合法值为字符串或字面量对象, 详细定义: <a href='#fields'>fields</a></td>
   </tr>
   <tr>
     <td>limit</td>
@@ -78,6 +78,72 @@ interface OrderDescription {
     }
   }
 }
+```
+
+<h2 id='fields'>Fields</h2>
+
+### Description
+
+fields 是一个数组，其中的值可为 string | Field 它的形状为:
+
+```ts
+type Field<T> = [...keyof T[], VirtualField<T>]
+
+type Field<T> = {
+  [key in keyof T]: [...keyof (key in keyof T), Field<T[key]>]
+}
+```
+> 注，源码里面并没有 VirtualField 这个类型，这里只是为了描述它的形状而用 `VirtualField` 来表达
+
+其中，可以包含一个 `VirtualField` 类型的元素，用来查询`关联表`的数据，它必须位于数组的最后，不然会抛出一个类型错误。
+`VirtualField` 的每一个字段的 key 都对应着查询的数据表上对应的 schema 上定义了 `virtual` 的字段，对应的值则是对应的 `Table` 的形状。
+
+### example:
+
+```ts
+// query
+database.get('Task', {
+  fields: ['_id', 'content', {
+    project: ['_id', 'name', {
+      organization: ['_id']
+    }]
+  }]
+})
+
+// schema definations
+database.defineSchema('Task', {
+  _id: {
+    type: RDBType.string,
+    primaryKey: true
+  },
+  project: {
+    type: Relationship.oneToOne,
+    virtual: {
+      name: 'Project',
+      where: ref => {
+        return {
+          _projectId: ref._id
+        }
+      }
+    }
+  },
+})
+
+database.defineSchema('Project', {
+  _id: {
+    type: RDBType.string,
+    primaryKey: true
+  },
+  organization: {
+    type: Relationship.oneToOne,
+    virtual: {
+      name: 'Organization',
+      where: (organizationTable) => ({
+         _organizationId: organizationTable._id
+      })
+    }
+  }
+})
 ```
 
 <h2 id="OrderDescription">OrderDescription</h2>
@@ -167,7 +233,7 @@ interface PredicateMeta<T> {
   }
 }
 ```
-默认表示 `lf.op.and(taskTable.dueDate.lte(...), taskTable.startDate.gte(...) )`
+默认表示 `dueDate` 小于或等于七天后 ***并且*** `startDate` 大于或等于一天后
 
 ### *example:*
 ```ts
