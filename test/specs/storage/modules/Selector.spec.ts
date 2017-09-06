@@ -11,7 +11,8 @@ import {
   ShapeMatcher,
   PredicateProvider,
   Predicate,
-  TokenConcatFailed
+  TokenConcatFailed,
+  Logger
 } from '../../../index'
 
 use(SinonChai)
@@ -24,6 +25,7 @@ interface Fixture {
 }
 
 export default describe('Selector test', () => {
+  const dataLength = 1000
   let db: lf.Database
   let table: lf.schema.Table
   let tableDef: { TestSelectMetadata: { table: lf.schema.Table } }
@@ -60,7 +62,7 @@ export default describe('Selector test', () => {
 
     const rows: lf.Row[] = []
     storeData = []
-    for (let i = 0; i < 1000; i ++) {
+    for (let i = 0; i < dataLength; i ++) {
       const priority = Math.ceil(i / 100)
       const row = {
         _id: `_id:${i}`,
@@ -188,6 +190,25 @@ export default describe('Selector test', () => {
 
         expect(result).to.deep.equal(expectResult)
       })
+  })
+
+  it('should ignore predicate when build predicate failed and give a warning', function* () {
+    const err = new TypeError('not happy')
+
+    const spy = sinon.spy(Logger, 'warn')
+
+    const selector = new Selector(db,
+      db.select().from(table),
+      tableShape,
+      predicateFactory({ get time() { throw err } }),
+    )
+
+    const results = yield selector.values()
+
+    expect(results.length).to.equal(dataLength)
+    expect(spy.callCount).to.equal(1)
+
+    spy.restore()
   })
 
   describe('Selector.prototype.changes', () => {

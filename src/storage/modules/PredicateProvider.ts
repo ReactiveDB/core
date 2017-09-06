@@ -1,5 +1,5 @@
 import * as lf from 'lovefield'
-import { relateIdentifier, fieldIdentifier } from '../symbols'
+import { fieldIdentifier } from '../symbols'
 import { forEach, warn, concat, keys } from '../../utils'
 import { ValueLiteral, VaildEqType, Predicate, PredicateMeta, TablesStruct } from '../../interface'
 
@@ -54,6 +54,8 @@ const predicateFactory = {
   },
 }
 
+export const predicateOperators = new Set(keys(predicateFactory))
+
 const compoundPredicateFactory = {
   $and (predicates: lf.Predicate[]): lf.Predicate {
     return lf.op.and(...predicates)
@@ -67,9 +69,6 @@ const compoundPredicateFactory = {
     return lf.op.not(predicates[0])
   },
 }
-
-export const predicateOperatorNames =
-  new Set(concat(keys(predicateFactory), keys(compoundPredicateFactory)))
 
 export class PredicateProvider<T> {
 
@@ -105,36 +104,44 @@ export class PredicateProvider<T> {
     return pred ? JSON.stringify(this.meta) : ''
   }
 
-  private normalizeMeta(meta: Predicate<T>, column?: lf.schema.Column, parentKey?: string): lf.Predicate[] {
-    const table = this.table!
+  private normalizeMeta(meta: Predicate<T>, column?: lf.schema.Column, parentKey?: string, tableName = this.tableName): lf.Predicate[] {
+    const identifier = parentKey ? fieldIdentifier(tableName, parentKey) : tableName
+    const struct = parentKey ? this.tables[identifier] : { table: this.table!, contextName: this.tableName }
+    let table: lf.schema.Table
+    let contextName: string | undefined
+    if (!struct) {
+      const parentStruct = this.tables[tableName]
+      table = parentStruct.table
+      contextName = parentStruct.contextName
+    } else {
+      table = struct.table
+      contextName = struct.contextName
+    }
     const buildSinglePred = (col: lf.schema.Column, val: any, key: string): lf.Predicate =>
       this.checkMethod(key) ? predicateFactory[key](col, val) : col.eq(val as ValueLiteral)
 
     const predicates: lf.Predicate[] = []
 
-    forEach(meta, (val, key) => {
+    forEach(meta, (val: any, key) => {
       let nestedPreds: lf.Predicate[]
       let resultPred: lf.Predicate
 
       if (this.checkCompound(key)) {
-        nestedPreds = this.normalizeMeta(val as Predicate<T>, column)
+        nestedPreds = (Array.isArray(val) ? val : [val]).reduce((acc: Predicate<any>[], pred: Predicate<any>) => {
+          return concat(acc, this.normalizeMeta(pred as Predicate<T>, column, parentKey, contextName))
+        }, [])
         resultPred = compoundPredicateFactory[key](nestedPreds)
       } else if (checkPredicate<T>(val)) {
-        nestedPreds = this.normalizeMeta(val as any, table[key], key)
+        nestedPreds = this.normalizeMeta(val as any, table[key], key, contextName)
         resultPred = compoundPredicateFactory['$and'](nestedPreds)
       } else {
-        if (parentKey && !this.checkMethod(key)) {
-          key = relateIdentifier(parentKey, key)
-        }
-        const ks: string[] = key.split('.')
-        let targetCol: lf.schema.Column
+        let targetCol: lf.schema.Column | null = null
         if (!column) {
-          if (ks.length === 1) {
-            targetCol = table[key]
+          if (struct) {
+            targetCol = struct.table[key]
           } else {
-            const columnKey = ks.pop()!
-            const tableName = this.getAliasTableName(ks)
-            targetCol = this.tables[tableName].table[columnKey]
+            this.warn(parentKey!, table.getName())
+            return
           }
         } else {
           targetCol = column
@@ -142,28 +149,14 @@ export class PredicateProvider<T> {
         if (targetCol) {
           resultPred = buildSinglePred(targetCol, val, key)
         } else {
-          warn(`Failed to build predicate, since column: ${key} is not existed, on table: ${table.getName()}`)
+          this.warn(key, table.getName())
           return
         }
       }
 
       predicates.push(resultPred)
     })
-
     return predicates
-  }
-
-  private getAliasTableName(ks: string[]) {
-    let { length } = ks
-    let ctxName = this.tableName
-    let resultKey = this.tableName
-    while (length > 0) {
-      const localKey = ks.shift()!
-      resultKey = fieldIdentifier(ctxName, localKey)
-      ctxName = this.tables[resultKey].contextName!
-      length = ks.length
-    }
-    return resultKey
   }
 
   private checkMethod(methodName: string) {
@@ -172,6 +165,10 @@ export class PredicateProvider<T> {
 
   private checkCompound(methodName: string) {
     return typeof compoundPredicateFactory[methodName] === 'function'
+  }
+
+  private warn(key: string, tableName: string) {
+    warn(`Failed to build predicate, since column: ${key} is not existed, on table: ${tableName}`)
   }
 
 }

@@ -4,6 +4,7 @@ export interface OrganizationSchema {
   _id: TeambitionTypes.OrganizationId
   name: string
   isArchived: boolean
+  expireDate: number
 }
 
 export default (db: Database) => db.defineSchema<OrganizationSchema>('Organization', {
@@ -16,5 +17,8 @@ export default (db: Database) => db.defineSchema<OrganizationSchema>('Organizati
   },
   isArchived: {
     type: RDBType.BOOLEAN
+  },
+  expireDate: {
+    type: RDBType.NUMBER
   }
 })

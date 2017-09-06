@@ -32,6 +32,7 @@ export default function (limit: number) {
         _id: _organizationId,
         name: 'organization name: ' + uuid(),
         isArchived: false,
+        expireDate: moment().add(limit, 'day').valueOf()
       }
     }
     result.push({

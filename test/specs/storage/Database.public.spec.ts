@@ -610,6 +610,40 @@ export default describe('Database Testcase: ', () => {
         expect(result.project.organization._id).to.equal(innerTarget.project._organizationId)
       })
 
+      it('should get value by nested predicate in compound operator', function* () {
+        const fields = ['_id', 'content', { subtasks: ['_id'], project: ['_id', { organization: ['_id', 'expireDate'] }] }]
+        const day = 24 * 60 * 60 * 1000 - 2
+        const queryToken = database.get<TaskSchema>('Task', {
+          fields,
+          where: {
+            $and: [
+              {
+                'project.organization': {
+                  expireDate: {
+                    $gt: innerTarget.project.organization.expireDate - 10 * day
+                  }
+                }
+              },
+              {
+                'project.organization': {
+                  expireDate: {
+                    $lt: innerTarget.project.organization.expireDate - 8 * day
+                  }
+                }
+              }
+            ]
+          }
+        })
+
+        const results = yield queryToken.values()
+        expect(results.length).to.equal(2)
+
+        results.forEach((task: TaskSchema) => {
+          expect(task.project.organization.expireDate).gt(innerTarget.project.organization.expireDate - 10 * day)
+          expect(task.project.organization.expireDate).lt(innerTarget.project.organization.expireDate - 8 * day)
+        })
+      })
+
       it('should warn if build additional join info from predicate failed', function* () {
         const fields = ['_id', 'content']
         const queryToken = database.get<TaskSchema>('Task', {
@@ -1008,13 +1042,15 @@ export default describe('Database Testcase: ', () => {
       const posts: PostSchema[] = postGen(10, null)
       const execRet = yield database.upsert<PostSchema>('Post', posts)
 
-      const rets = yield database.get<PostSchema>('Post', {
+      const queryToken = database.get<PostSchema>('Post', {
         where: {
           _id: {
             $in: posts.map(p => p._id)
           }
         }
-      }).values()
+      })
+
+      const rets = yield queryToken.values()
 
       expect(posts).to.deep.equal(rets)
       checkExecutorResult(execRet, 10)
