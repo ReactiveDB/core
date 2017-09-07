@@ -11,7 +11,7 @@ import { TestFixture2 } from '../../schemas/Test'
 import { scenarioGen, programGen, postGen, taskGen, subtaskGen } from '../../utils/generators'
 import { RDBType, DataStoreType, Database, clone, forEach, JoinMode, Logger } from '../../index'
 import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema, OrganizationSchema, TasklistSchema } from '../../index'
-import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector, AssociatedFieldsPostionError } from '../../index'
+import { NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector, AssociatedFieldsPostionError } from '../../index'
 
 use(SinonChai)
 
@@ -543,7 +543,7 @@ export default describe('Database Testcase: ', () => {
         expect(result).to.deep.equal(innerTarget)
       })
 
-      it('should get value by deep nested Association query without association fields', function* () {
+      it('should get value by deep nested Association query without association fields #1', function* () {
         const fields = ['_id', 'content']
         const queryToken = database.get<TaskSchema>('Task', {
           fields,
@@ -557,7 +557,7 @@ export default describe('Database Testcase: ', () => {
         expect(result.project.organization._id).to.equal(innerTarget.project._organizationId)
       })
 
-      it('should get value by deep nested Association query without association fields', function* () {
+      it('should get value by deep nested Association query without association fields #2', function* () {
         const fields = ['_id', 'content']
         const queryToken = database.get<TaskSchema>('Task', {
           fields,
@@ -693,21 +693,6 @@ export default describe('Database Testcase: ', () => {
           .do(r => {
             expect(r).to.deep.equal(result)
           })
-      })
-
-      it('should throw if only navigator was included in query', function* () {
-
-        try {
-          yield database.get('Task', {
-            fields: [ 'project', 'subtasks' ],
-            where: { _id: innerTarget._id }
-          }).values()
-
-          throw new Error('error path reached')
-        } catch (err) {
-          const standardErr = InvalidQuery()
-          expect(err.message).to.equal(standardErr.message)
-        }
       })
 
       it('should throw if failed to build where-clause, and treat it as an empty where-clause', function* () {

@@ -130,10 +130,7 @@ export type SchemaDisposeFunction<T> =
 
 export interface ShapeMatcher {
   mainTable: lf.schema.Table
-  pk: {
-    name: string,
-    queried: boolean
-  }
+  pk: string
   definition: Object
 }
 

@@ -6,9 +6,6 @@ export const NonExistentTable =
 export const UnmodifiableTable =
   () => new ReactiveDBException(`Method: defineSchema cannot be invoked since schema is existed or database is connected`)
 
-export const InvalidQuery =
-  () => new ReactiveDBException('Only navigation properties were included in query.')
-
 export const AliasConflict =
   (column: string, tableName: string) => new ReactiveDBException(`Definition conflict, Column: \`${column}\` on table: ${tableName}.`)
 

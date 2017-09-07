@@ -78,10 +78,7 @@ export default describe('Selector test', () => {
 
     tableShape = {
       mainTable: table,
-      pk: {
-        queried: true,
-        name: '_id'
-      },
+      pk: '_id',
       definition: {
         _id: {
           column: '_id',

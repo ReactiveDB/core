@@ -173,7 +173,7 @@ export class Database {
     }
 
     return this.database$
-      .concatMap<any, any>(db => {
+      .concatMap(db => {
         const entity = clone(raw)
         const [ table ] = Database.getTables(db, tableName)
         const columnMapper = schema!.mapper
@@ -290,7 +290,7 @@ export class Database {
       }
 
       const queries: lf.query.Builder[] = []
-      const removedIds: any = []
+      const removedIds: string[] = []
       queries.push(predicatableQuery(db, table, predicate!, StatementType.Delete))
 
       const prefetch = predicatableQuery(db, table, predicate!, StatementType.Select)
@@ -433,7 +433,6 @@ export class Database {
       const containFields = !!clause.fields
       let predicate: Predicate<T>
 
-      const containKey = containFields ? contains(pk, clause.fields!) : true
       const [ additionJoinInfo, err ] = !clause.where ? [ null, null ] :
         tryCatch(() => {
           predicate = parsePredicate(clause.where!)
@@ -444,24 +443,30 @@ export class Database {
         warn('Build addition join info from predicate failed', err.message)
       }
 
-      const fields = containFields ? clause.fields : Array.from(schema.columns.keys())
-
-      if (containFields && additionJoinInfo) {
-        mergeFields(fields!, additionJoinInfo)
+      let fields: Field[]
+      if (containFields) {
+        fields = [ schema.pk, ...clause.fields! ]
+      } else {
+        fields = Array.from(schema.columns.keys())
       }
 
-      const fieldsSet: Set<Field> = new Set(fields)
+      if (containFields && additionJoinInfo) {
+        mergeFields(fields, additionJoinInfo)
+      }
+
+      const fieldsSet = new Set(fields)
+
       const tablesStruct: TablesStruct = Object.create(null)
 
       const { table, columns, joinInfo, definition, contextName } =
-        this.traverseQueryFields(db, tableName, fieldsSet, containKey, !containFields, [], {}, tablesStruct, mode)
+        this.traverseQueryFields(db, tableName, fieldsSet, !containFields, [], {}, tablesStruct, mode)
       const query =
         predicatableQuery(db, table!, null, StatementType.Select, ...columns)
 
       joinInfo.forEach((info: JoinInfo) => {
-        const pred = info.predicate
-        if (pred) {
-          query.leftOuterJoin(info.table, pred)
+        const joinPredicate = info.predicate
+        if (joinPredicate) {
+          query.leftOuterJoin(info.table, joinPredicate)
         }
       })
 
@@ -475,10 +480,7 @@ export class Database {
       })
 
       const matcher = {
-        pk: {
-          name: pk,
-          queried: containKey
-        },
+        pk,
         definition,
         mainTable: table!
       }
@@ -533,7 +535,6 @@ export class Database {
     db: lf.Database,
     tableName: string,
     fieldsValue: Set<Field>,
-    hasKey: boolean,
     glob: boolean,
     path: string[] = [],
     context: Record = {},
@@ -559,17 +560,6 @@ export class Database {
       }
       navigators.push(nav)
     })
-
-    const onlyNavigator = Array.from(fieldsValue.keys())
-      .every(key => contains(key, navigators))
-    assert(!onlyNavigator, Exception.InvalidQuery())
-
-    if (!hasKey) {
-      // 保证主键一定比关联字段更早的被遍历到
-      const fields = Array.from(fieldsValue)
-      fields.unshift(schema.pk)
-      fieldsValue = new Set(fields)
-    }
 
     const suffix = (context[tableName] || 0) + 1
     context[tableName] = suffix
@@ -648,9 +638,9 @@ export class Database {
           handleAdvanced({ columns: [column], advanced: true }, ctx.key, columnDef)
           break
         case LeafType.navigator:
-          const { containKey, fields, assocaiation } = ctx.leaf as NavigatorLeaf
+          const { fields, assocaiation } = ctx.leaf as NavigatorLeaf
           const ret =
-            this.traverseQueryFields(db, assocaiation.name, new Set(fields), containKey, glob, path.slice(0), context, tablesStruct, mode)
+            this.traverseQueryFields(db, assocaiation.name, new Set(fields), glob, path.slice(0), context, tablesStruct, mode)
           handleAdvanced(ret, ctx.key, assocaiation)
           ctx.skip()
           break
