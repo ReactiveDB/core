@@ -1,7 +1,7 @@
-import { forEach, getType } from '../utils'
+import { forEach, getType, keys } from '../utils'
 import { TraverseContext } from '../interface'
 
-export class Traversable<T> {
+export class Traversable<T = {}> {
 
   private ctxgen: (key: any, val: any, ctx: TraverseContext) => T | boolean
 
@@ -29,7 +29,7 @@ export class Traversable<T> {
         } else if (target && typeof target.keys === 'function') {
           return Array.from(target.keys())
         } else {
-          return (typeof target === 'object' && target !== null) || Array.isArray(target) ? Object.keys(target) : []
+          return (typeof target === 'object' && target !== null) || Array.isArray(target) ? keys(target) : []
         }
     }
   }

@@ -31,7 +31,7 @@ export enum StatementType {
 }
 
 export enum JoinMode {
-  imlicit = 2001,
+  implicit = 2001,
   explicit = 2002
 }
 

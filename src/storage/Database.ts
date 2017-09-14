@@ -9,12 +9,13 @@ import Version from '../version'
 import { Traversable } from '../shared'
 import { Mutation, Selector, QueryToken, PredicateProvider } from './modules'
 import { dispose, contextTableName, fieldIdentifier, hiddenColName } from './symbols'
-import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, identity, warn } from '../utils'
-import { createPredicate, createPkClause, mergeTransactionResult, predicatableQuery, lfFactory } from './helper'
+import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, identity, warn, keys as objKeys, mergeFields } from '../utils'
+import { checkAssociateFields, createPkClause, mergeTransactionResult, predicatableQuery, lfFactory, tableStruct } from './helper'
 import { Relationship, RDBType, DataStoreType, LeafType, StatementType, JoinMode } from '../interface/enum'
-import { Record, Field, JoinInfo, Query, Clause, Predicate } from '../interface'
-import { SchemaDef, ColumnDef, ParsedSchema, Association, ScopedHandler } from '../interface'
-import { ColumnLeaf, NavigatorLeaf, ExecutorResult, UpsertContext, SelectContext } from '../interface'
+import {
+  Record, Field, JoinInfo, Query, Predicate, SchemaDef, ColumnDef, ParsedSchema, Association, ScopedHandler,
+  ColumnLeaf, NavigatorLeaf, ExecutorResult, UpsertContext, SelectContext, TableStruct
+} from '../interface'
 
 export class Database {
 
@@ -52,7 +53,7 @@ export class Database {
     const advanced = !this.schemaDefs.has(tableName) && !this.connected
     assert(advanced, Exception.UnmodifiableTable())
 
-    const hasPK = Object.keys(schema)
+    const hasPK = objKeys(schema)
       .some((key: string) => schema[key].primaryKey === true)
     assert(hasPK, Exception.PrimaryKeyNotProvided())
 
@@ -154,7 +155,9 @@ export class Database {
       })
   }
 
-  get<T>(tableName: string, query: Query<T> = {}, mode: JoinMode = JoinMode.imlicit): QueryToken<T> {
+  get<T>(tableName: string, query: Query<T> = {}, mode: JoinMode = JoinMode.implicit): QueryToken<T> {
+    const checkResult = checkAssociateFields(query.fields)
+    assert(checkResult, Exception.IncorrectAssocFieldDescription())
     const selector$ = this.buildSelector<T>(tableName, query, mode)
     return new QueryToken<T>(selector$)
   }
@@ -171,7 +174,7 @@ export class Database {
     }
 
     return this.database$
-      .concatMap<any, any>(db => {
+      .concatMap(db => {
         const entity = clone(raw)
         const [ table ] = Database.getTables(db, tableName)
         const columnMapper = schema!.mapper
@@ -189,7 +192,10 @@ export class Database {
         })
 
         const mut = { ...(entity as any), ...hiddenPayload }
-        const predicate = createPredicate(table, clause)
+        const tables = tableStruct.build(table)
+        const predicate = PredicateProvider.create(tables, tableName, clause)
+        PredicateProvider.checkNull(predicate, tableName)
+
         const query = predicatableQuery(db, table, predicate!, StatementType.Update)
 
         forEach(mut, (val, key) => {
@@ -216,14 +222,17 @@ export class Database {
     return this.database$
       .concatMap(db => {
         const [ table ] = Database.getTables(db, tableName)
+        const tables = tableStruct.build(table)
         const column = table[pk!]
-        const provider = new PredicateProvider(table, clause)
+        const provider = new PredicateProvider(tables, tableName, clause)
         const prefetch =
           predicatableQuery(db, table, provider.getPredicate(), StatementType.Select, column)
 
         return Observable.fromPromise(prefetch.exec())
           .concatMap((scopedIds) => {
-            const query = predicatableQuery(db, table, provider.getPredicate(), StatementType.Delete)
+            const predicate = provider.getPredicate()
+            PredicateProvider.checkNull(predicate, tableName)
+            const query = predicatableQuery(db, table, predicate, StatementType.Delete)
 
             scopedIds.forEach((entity: any) =>
               this.storedIds.delete(fieldIdentifier(tableName, entity[pk!])))
@@ -260,8 +269,8 @@ export class Database {
     })
   }
 
-  remove<T>(tableName: string, clause: Clause<T> = {}): Observable<ExecutorResult> {
-    const [schema, err] = tryCatch<ParsedSchema>(this.findSchema)(tableName)
+  remove<T>(tableName: string, clause: Predicate<T> = {}): Observable<ExecutorResult> {
+    const [ schema, err ] = tryCatch<ParsedSchema>(this.findSchema)(tableName)
     if (err) {
       return Observable.throw(err)
     }
@@ -269,10 +278,12 @@ export class Database {
 
     return this.database$.concatMap((db) => {
       const [ table ] = Database.getTables(db, tableName)
-      const predicate = createPredicate(table, clause.where)
+      const tables = tableStruct.build(table)
+      const predicate = PredicateProvider.create(tables, tableName, clause)
+      PredicateProvider.checkNull(predicate, tableName)
 
       const queries: lf.query.Builder[] = []
-      const removedIds: any = []
+      const removedIds: string[] = []
       queries.push(predicatableQuery(db, table, predicate!, StatementType.Delete))
 
       const prefetch = predicatableQuery(db, table, predicate!, StatementType.Select)
@@ -414,15 +425,43 @@ export class Database {
       const pk = schema.pk
       const containFields = !!clause.fields
 
-      const containKey = containFields ? contains(pk, clause.fields!) : true
-      const fields: Set<Field> = containFields ? new Set(clause.fields) : new Set(schema.columns.keys())
-      const { table, columns, joinInfo, definition } =
-        this.traverseQueryFields(db, tableName, fields, containKey, !containFields, [], {}, mode)
+      const [ ret, err ] = !clause.where
+        ? [null, null]
+        : tryCatch(() => {
+            const builtPredicate = PredicateProvider.parse(clause.where!)
+            const extraJoinInfo = this.traversePredicate(builtPredicate, tableName)
+            return [builtPredicate, extraJoinInfo]
+          })()
+
+      if (err) {
+        warn('Failed to build additional join info from predicate, ', err.message)
+      }
+      const [ predicate, additionJoinInfo ] = ret ? ret : [null, null]
+
+      const fields = containFields
+        ? [schema.pk, ...clause.fields!]
+        : Array.from(schema.columns.keys())
+
+      if (containFields && additionJoinInfo) {
+        mergeFields(fields, additionJoinInfo)
+      }
+
+      const fieldsSet = new Set(fields)
+      const struct: TableStruct = Object.create(null)
+
+      const { table, columns, joinInfo, definition, contextName } =
+        this.traverseQueryFields(db, tableName, fieldsSet, !containFields, [], {}, struct, mode)
       const query =
         predicatableQuery(db, table!, null, StatementType.Select, ...columns)
 
-      joinInfo.forEach((info: JoinInfo) =>
-        query.leftOuterJoin(info.table, info.predicate))
+      joinInfo.forEach((info: JoinInfo) => {
+        const joinPredicate = info.predicate
+        if (joinPredicate) {
+          query.leftOuterJoin(info.table, joinPredicate)
+        }
+      })
+
+      tableStruct.pad(db, this.getAllRelatedTables(tableName, contextName), struct)
 
       const orderDesc = (clause.orderBy || []).map(desc => {
         return {
@@ -431,17 +470,9 @@ export class Database {
         }
       })
 
-      const matcher = {
-        pk: {
-          name: pk,
-          queried: containKey
-        },
-        definition,
-        mainTable: table!
-      }
+      const matcher = { pk, definition, mainTable: table! }
       const { limit, skip } = clause
-      const provider = new PredicateProvider(table!, clause.where)
-
+      const provider = new PredicateProvider(struct, contextName, predicate!)
       return new Selector<T>(db, query, matcher, provider, limit, skip, orderDesc)
     })
   }
@@ -491,10 +522,10 @@ export class Database {
     db: lf.Database,
     tableName: string,
     fieldsValue: Set<Field>,
-    hasKey: boolean,
     glob: boolean,
     path: string[] = [],
     context: Record = {},
+    struct: TableStruct = {},
     mode: JoinMode
   ) {
     const schema = this.findSchema(tableName)
@@ -504,8 +535,8 @@ export class Database {
     const columns: lf.schema.Column[] = []
     const joinInfo: JoinInfo[] = []
 
-    if (mode === JoinMode.imlicit && contains(tableName, path)) {
-      return { columns, joinInfo, advanced: false, table: null, definition: null }
+    if (mode === JoinMode.implicit && contains(tableName, path)) {
+      return { columns, joinInfo, advanced: false, table: null, definition: null, contextName: tableName }
     } else {
       path.push(tableName)
     }
@@ -517,21 +548,13 @@ export class Database {
       navigators.push(nav)
     })
 
-    const onlyNavigator = Array.from(fieldsValue.keys())
-      .every(key => contains(key, navigators))
-    assert(!onlyNavigator, Exception.InvalidQuery())
-
-    if (!hasKey) {
-      // 保证主键一定比关联字段更早的被遍历到
-      const fields = Array.from(fieldsValue)
-      fields.unshift(schema.pk)
-      fieldsValue = new Set(fields)
-    }
-
     const suffix = (context[tableName] || 0) + 1
     context[tableName] = suffix
     const contextName = contextTableName(tableName, suffix)
-    const currentTable = Database.getTables(db, tableName)[0].as(contextName)
+    const [ originTable ] = Database.getTables(db, tableName)
+    const currentTable = originTable.as(contextName)
+
+    tableStruct.build(currentTable, contextName, struct)
 
     const handleAdvanced = (ret: any, key: string, defs: Association | ColumnDef) => {
       if (!ret.advanced) {
@@ -540,17 +563,20 @@ export class Database {
 
       columns.push(...ret.columns)
       assert(!rootDefinition[key], Exception.AliasConflict(key, tableName))
-
       if ((defs as ColumnDef).column) {
         rootDefinition[key] = defs
       } else {
         const { where, type } = defs as Association
         rootDefinition[key] = typeDefinition.revise(type!, ret.definition)
-        const [ predicate, err ] = tryCatch(createPredicate)(currentTable, where(ret.table))
+        struct[fieldIdentifier(contextName, key)] = {
+          table: ret.table,
+          contextName: ret.contextName
+        }
+        const [ predicate, err ] = tryCatch(PredicateProvider.create)(struct, contextName, where(ret.table))
         if (err) {
           warn(
             `Failed to build predicate, since ${err.message}` +
-            `, on table: ${ret.table.getName()}`
+            `, on table: ${ ret.table.getName() }`
           )
         }
         const joinLink = predicate
@@ -599,16 +625,15 @@ export class Database {
           handleAdvanced({ columns: [column], advanced: true }, ctx.key, columnDef)
           break
         case LeafType.navigator:
-          const { containKey, fields, assocaiation } = ctx.leaf as NavigatorLeaf
+          const { fields, assocaiation } = ctx.leaf as NavigatorLeaf
           const ret =
-            this.traverseQueryFields(db, assocaiation.name, new Set(fields), containKey, glob, path.slice(0), context, mode)
+            this.traverseQueryFields(db, assocaiation.name, new Set(fields), glob, path.slice(0), context, struct, mode)
           handleAdvanced(ret, ctx.key, assocaiation)
           ctx.skip()
           break
       }
     })
-
-    return { columns, joinInfo, advanced: true, table: currentTable, definition: rootDefinition }
+    return { columns, joinInfo, advanced: true, table: currentTable, definition: rootDefinition, contextName }
   }
 
   private traverseCompound(
@@ -722,7 +747,8 @@ export class Database {
         entities.forEach(entity => {
           const pkVal = entity[pk]
           const clause = createPkClause(pk, pkVal)
-          const predicate = createPredicate(table, clause)
+          const tables = tableStruct.build(table)
+          const predicate = PredicateProvider.create(tables, tableName, clause.where)
           const query = predicatableQuery(db, table, predicate!, StatementType.Delete)
 
           queryCollection.push(query)
@@ -732,7 +758,8 @@ export class Database {
 
       const get = (where: Predicate<any> | null = null) => {
         const [ table ] = Database.getTables(db, tableName)
-        const [ predicate, err ] = tryCatch(createPredicate)(table, where)
+        const struct = tableStruct.build(table)
+        const [ predicate, err ] = tryCatch(PredicateProvider.create)(struct, tableName, where)
         if (err) {
           return Observable.throw(err)
         }
@@ -743,6 +770,70 @@ export class Database {
 
       return [get, remove]
     }
+  }
+
+  private getAllRelatedTables(tableName: string, contextName: string) {
+    const tablesStructure = new Map<string, string>()
+    const schemas = [{
+      schema: this.findSchema(tableName),
+      relatedTo: contextName
+    }]
+
+    while (schemas.length) {
+      const { schema, relatedTo } = schemas.pop()!
+      for (const [ key, val ] of schema.associations) {
+        const relatedName = val.name
+        if (!tablesStructure.has(relatedName)) {
+          const path = fieldIdentifier(relatedTo, key)
+          tablesStructure.set(relatedName, path)
+          schemas.push({
+            schema: this.findSchema(relatedName),
+            relatedTo: relatedName
+          })
+        }
+      }
+    }
+    return tablesStructure
+  }
+
+  private traversePredicate(predicate: Predicate<any>, tableName: string) {
+    const result = Object.create(null)
+    const schema = this.findSchema(tableName)
+
+    const traversable = new Traversable(predicate)
+
+    traversable.context((_, __, ctx) => {
+      if (!ctx || ctx.isRoot || ctx.type() === 'Array' || typeof ctx.key === 'number') {
+        return false
+      }
+      return ctx
+    })
+
+    traversable.forEach((ctx, node) => {
+      if (PredicateProvider.check(node)) {
+        const nextTableName = this.findAssociatedTableName(ctx.key, tableName)
+        if (nextTableName !== tableName) {
+          const assocFields = this.traversePredicate(node, nextTableName) || []
+          result[ctx.key] = [schema.pk].concat(assocFields)
+          ctx.skip()
+        }
+      }
+    })
+
+    if (typeof result === 'object' && objKeys(result).length) {
+      return [result]
+    }
+
+    return null
+  }
+
+  private findAssociatedTableName(def: string, tableName: string) {
+    const schema = this.findSchema(tableName)
+    const associatedDef = schema.associations.get(def)
+    if (!associatedDef) {
+      return tableName
+    }
+    return associatedDef.name
   }
 
   private executor(db: lf.Database, queries: lf.query.Builder[]) {

@@ -96,7 +96,7 @@ export default describe('Mutation Testcase: ', () => {
 
     describe('Static Method: aggregate', () => {
 
-      it('should be able to transform mutations to queries which will be executed as update statement', () => {
+      it('should be able to transform mutation into query which will be executed as update statement', () => {
         const muts = fixture.map((item, index) => {
           const mut = new Mutation(database, table, item)
           mut.withId('id', index)
@@ -112,7 +112,7 @@ export default describe('Mutation Testcase: ', () => {
         expect(queries).have.lengthOf(3)
       })
 
-      it('should be able to transform mutations to queries which will be executed as insert statement', () => {
+      it('should be able to transform mutation to query which will be executed as insert statement', () => {
         const muts = fixture.map((item, index) => {
           return new Mutation(database, table, item).withId('id', index)
         })

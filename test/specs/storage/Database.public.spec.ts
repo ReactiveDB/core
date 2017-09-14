@@ -4,13 +4,14 @@ import { describe, it, beforeEach, afterEach } from 'tman'
 import { expect, assert, use } from 'chai'
 import * as sinon from 'sinon'
 import * as SinonChai from 'sinon-chai'
+
 import { uuid, checkExecutorResult } from '../../utils'
 import schemaFactory from '../../schemas'
 import { TestFixture2 } from '../../schemas/Test'
 import { scenarioGen, programGen, postGen, taskGen, subtaskGen } from '../../utils/generators'
-import { RDBType, DataStoreType, Database, clone, forEach, JoinMode } from '../../index'
-import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema } from '../../index'
-import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector } from '../../index'
+import { RDBType, DataStoreType, Database, clone, forEach, JoinMode, Logger } from '../../index'
+import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema, OrganizationSchema, TasklistSchema } from '../../index'
+import { NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector, IncorrectAssocFieldDescription } from '../../index'
 
 use(SinonChai)
 
@@ -25,6 +26,7 @@ export default describe('Database Testcase: ', () => {
     tasks.forEach(t => {
       delete t.project
       delete t.subtasks
+      delete t.tasklist
     })
 
   const refreshDB = () => {
@@ -447,6 +449,11 @@ export default describe('Database Testcase: ', () => {
       expect(sqlA).to.deep.equal(sqlB)
     })
 
+    it('should throw when associated fields in a wrong position', () => {
+      const fun = () => database.get('Task', { fields: ['_id', { project: ['_id'] }, 'content'] })
+      expect(fun).to.throw(IncorrectAssocFieldDescription().message)
+    })
+
     describe('case: Associations', () => {
 
       let associationFixture: TaskSchema[] = []
@@ -463,6 +470,8 @@ export default describe('Database Testcase: ', () => {
         const projects: ProjectSchema[] = []
         const posts: PostSchema[] = []
         const tasks: TaskSchema[] = []
+        const organizations: OrganizationSchema[] = []
+        const tasklists: TasklistSchema[] = []
 
         associationFixture.forEach(f => {
           forEach(f, (value, key) => {
@@ -472,7 +481,12 @@ export default describe('Database Testcase: ', () => {
               if (value.posts) {
                 posts.push(...value.posts)
               }
+              if (value.organization) {
+                organizations.push(value.organization)
+              }
               projects.push(value)
+            } else if (key === 'tasklist') {
+              tasklists.push(value)
             }
           })
           tasks.push(f)
@@ -482,7 +496,9 @@ export default describe('Database Testcase: ', () => {
           database.insert('Task', tasks),
           database.insert('Subtask', subtasks),
           database.insert('Project', projects),
-          database.insert('Post', posts)
+          database.insert('Post', posts),
+          database.insert('Organization', organizations),
+          database.insert('Tasklist', tasklists)
         ]
 
         Observable.forkJoin(...queries).subscribe(() => {
@@ -503,6 +519,132 @@ export default describe('Database Testcase: ', () => {
 
         expect(result).to.have.property('project')
         expect(keys(result.project)).to.deep.equal(refFields)
+      })
+
+      it('should get association by nested Association query', function* () {
+        const queryToken = database.get<TaskSchema>('Task', {
+          where: { 'project._id': innerTarget.project._id }
+        })
+
+        const results = yield queryToken.values()
+        const [ result ] = results
+        expect(results.length).to.equal(1)
+        expect(result).to.deep.equal(innerTarget)
+      })
+
+      it('should get association by deep nested Association query', function* () {
+        const queryToken = database.get<TaskSchema>('Task', {
+          where: { 'project.organization._id': innerTarget.project._organizationId }
+        })
+
+        const results = yield queryToken.values()
+        const [ result ] = results
+        expect(results.length).to.equal(1)
+        expect(result).to.deep.equal(innerTarget)
+      })
+
+      it('should get value by deep nested Association query without association fields #1', function* () {
+        const fields = ['_id', 'content']
+        const queryToken = database.get<TaskSchema>('Task', {
+          fields,
+          where: { 'project.organization._id': innerTarget.project._organizationId }
+        })
+
+        const results = yield queryToken.values()
+        const [ result ] = results
+
+        expect(results.length).to.equal(1)
+        expect(result.project.organization._id).to.equal(innerTarget.project._organizationId)
+      })
+
+      it('should get value by deep nested Association query without association fields #2', function* () {
+        const fields = ['_id', 'content']
+        const queryToken = database.get<TaskSchema>('Task', {
+          fields,
+          where: {
+            project: {
+              'organization._id': innerTarget.project._organizationId
+            }
+          }
+        })
+
+        const results = yield queryToken.values()
+        const [ result ] = results
+        expect(results.length).to.equal(1)
+        expect(result.project.organization._id).to.equal(innerTarget.project._organizationId)
+      })
+
+      it('should merge fields if a nested association in the WHERE clause #1', function* () {
+        const fields = ['_id', 'content', { project: [ '_id', { organization: [ '_id' ] } ] }]
+        const queryToken = database.get<TaskSchema>('Task', {
+          fields,
+          where: {
+            'tasklist.project': {
+              'organization._id': innerTarget.project._organizationId
+            }
+          }
+        })
+
+        const results = yield queryToken.values()
+        const [ result ] = results
+
+        expect(results.length).to.equal(1)
+        expect(result.project.organization._id).to.equal(innerTarget.project._organizationId)
+      })
+
+      it('should merge fields if a nested association in the WHERE clause #2', function* () {
+        const fields = ['_id', 'content', { subtasks: ['_id'], project: ['_id', { organization: ['_id', 'expireDate'] }] }]
+        const day = 24 * 60 * 60 * 1000 - 2
+        const queryToken = database.get<TaskSchema>('Task', {
+          fields,
+          where: {
+            $and: [
+              {
+                'project.organization': {
+                  expireDate: {
+                    $gt: innerTarget.project.organization.expireDate - 10 * day
+                  }
+                }
+              },
+              {
+                'project.organization': {
+                  expireDate: {
+                    $lt: innerTarget.project.organization.expireDate - 8 * day
+                  }
+                }
+              }
+            ]
+          }
+        })
+
+        const results = yield queryToken.values()
+        expect(results.length).to.equal(2)
+
+        results.forEach((task: TaskSchema) => {
+          expect(task.project.organization.expireDate).gt(innerTarget.project.organization.expireDate - 10 * day)
+          expect(task.project.organization.expireDate).lt(innerTarget.project.organization.expireDate - 8 * day)
+        })
+      })
+
+      it('should be able to handle implici self-join', () => {
+        // todo
+      })
+
+      it('should warn if failed to build additional join from predicate', function* () {
+        const fields = ['_id', 'content']
+        const queryToken = database.get<TaskSchema>('Task', {
+          fields,
+          where: { 'project._organization._id': innerTarget.project._organizationId }
+        })
+
+        const spy = sinon.spy(Logger, 'warn')
+
+        yield queryToken.values()
+
+        // warning in PredicateProvider and Database
+        expect(spy.callCount).to.equal(2)
+
+        spy.restore()
       })
 
       it('should apply `skip` clause on multi joined query', function* () {
@@ -537,21 +679,6 @@ export default describe('Database Testcase: ', () => {
           .do(r => {
             expect(r).to.deep.equal(result)
           })
-      })
-
-      it('should throw if only navigator was included in query', function* () {
-
-        try {
-          yield database.get('Task', {
-            fields: [ 'project', 'subtasks' ],
-            where: { _id: innerTarget._id }
-          }).values()
-
-          throw new Error('error path reached')
-        } catch (err) {
-          const standardErr = InvalidQuery()
-          expect(err.message).to.equal(standardErr.message)
-        }
       })
 
       it('should throw if failed to build where-clause, and treat it as an empty where-clause', function* () {
@@ -757,7 +884,7 @@ export default describe('Database Testcase: ', () => {
         }
       })
 
-      const errSpy = sinon.spy((): void => void 0)
+      const errSpy = sinon.spy()
 
       tmpDB.connect()
       tmpDB.update(T, { id: 1 }, {
@@ -843,6 +970,19 @@ export default describe('Database Testcase: ', () => {
       }
     })
 
+    it('should warn if predicate is null', function* () {
+      const spy = sinon.spy(Logger, 'warn')
+
+      yield database.delete('Task')
+
+      const result = yield database.get('Task').values()
+
+      expect(result).deep.equal([])
+      expect(spy.callCount).to.equal(1)
+
+      spy.restore()
+    })
+
   })
 
   describe('Method: upsert', () => {
@@ -873,13 +1013,15 @@ export default describe('Database Testcase: ', () => {
       const posts: PostSchema[] = postGen(10, null)
       const execRet = yield database.upsert<PostSchema>('Post', posts)
 
-      const rets = yield database.get<PostSchema>('Post', {
+      const queryToken = database.get<PostSchema>('Post', {
         where: {
           _id: {
             $in: posts.map(p => p._id)
           }
         }
-      }).values()
+      })
+
+      const rets = yield queryToken.values()
 
       expect(posts).to.deep.equal(rets)
       checkExecutorResult(execRet, 10)
@@ -1049,9 +1191,7 @@ export default describe('Database Testcase: ', () => {
       const execRet1 = yield database.upsert<ProgramSchema>('Program', program)
 
       yield database.delete<ProgramSchema>('Program', {
-        where: {
-          _id: program._id
-        }
+        _id: program._id
       })
 
       const execRet2 = yield database.upsert<ProgramSchema>('Program', program)
@@ -1208,6 +1348,24 @@ export default describe('Database Testcase: ', () => {
       } catch (e) {
         expect(e.message).to.equal(NonExistentTable(tableName).message)
       }
+    })
+
+    it('should warn if predicate is null', function* () {
+      const spy = sinon.spy(Logger, 'warn')
+      const [ program ] = programGen(1, 1)
+
+      yield database.upsert('Engineer', program.owner)
+      const ret1 = yield database.get('Engineer').values()
+      const execRet = yield database.remove('Engineer')
+      const ret2 = yield database.get('Engineer').values()
+
+      expect(spy.callCount).to.equal(1)
+
+      checkExecutorResult(execRet, 0, 1, 0)
+      expect(ret1).have.lengthOf(1)
+      expect(ret2).to.deep.equal([])
+
+      spy.restore()
     })
 
   })

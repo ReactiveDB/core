@@ -130,10 +130,7 @@ export type SchemaDisposeFunction<T> =
 
 export interface ShapeMatcher {
   mainTable: lf.schema.Table
-  pk: {
-    name: string,
-    queried: boolean
-  }
+  pk: string
   definition: Object
 }
 
@@ -174,3 +171,10 @@ export type Predicate<T> = {
 }
 
 export { StatementType, JoinMode, LeafType, Relationship, DataStoreType, RDBType }
+
+export interface TableStruct {
+  [index: string]: {
+    table: lf.schema.Table
+    contextName?: string
+  }
+}

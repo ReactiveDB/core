@@ -10,7 +10,9 @@ import {
   lfFactory,
   ShapeMatcher,
   PredicateProvider,
-  TokenConcatFailed
+  Predicate,
+  TokenConcatFailed,
+  Logger
 } from '../../../index'
 
 use(SinonChai)
@@ -23,13 +25,19 @@ interface Fixture {
 }
 
 export default describe('Selector test', () => {
+  const dataLength = 1000
   let db: lf.Database
   let table: lf.schema.Table
+  let tableDef: { TestSelectMetadata: { table: lf.schema.Table } }
   let version = 1
 
   let tableShape: ShapeMatcher
   let storeData: any[]
   let subscription: Subscription
+
+  function predicateFactory(desc: Predicate<any>) {
+    return new PredicateProvider(tableDef, 'TestSelectMetadata', desc)
+  }
 
   beforeEach(function * () {
     const schemaBuilder = lf.schema.create('SelectorTest', version ++)
@@ -54,7 +62,7 @@ export default describe('Selector test', () => {
 
     const rows: lf.Row[] = []
     storeData = []
-    for (let i = 0; i < 1000; i ++) {
+    for (let i = 0; i < dataLength; i ++) {
       const priority = Math.ceil(i / 100)
       const row = {
         _id: `_id:${i}`,
@@ -70,10 +78,7 @@ export default describe('Selector test', () => {
 
     tableShape = {
       mainTable: table,
-      pk: {
-        queried: true,
-        name: '_id'
-      },
+      pk: '_id',
       definition: {
         _id: {
           column: '_id',
@@ -93,6 +98,8 @@ export default describe('Selector test', () => {
         }
       }
     }
+
+    tableDef = { TestSelectMetadata: { table } }
   })
 
   afterEach(() => {
@@ -116,7 +123,7 @@ export default describe('Selector test', () => {
     const selector = new Selector<Fixture>(db,
       db.select().from(table),
       tableShape,
-      new PredicateProvider(table, { time: { $gte: 50 } })
+      predicateFactory({ time: { $gte: 50 } })
     )
 
     const results = yield selector.values()
@@ -131,7 +138,7 @@ export default describe('Selector test', () => {
     const selector = new Selector(db,
       db.select().from(table),
       tableShape,
-      new PredicateProvider(table, { time: { $gt: 50 } }),
+      predicateFactory({ time: { $gt: 50 } }),
       20, 20
     )
     const result = yield selector.values()
@@ -147,7 +154,7 @@ export default describe('Selector test', () => {
     const selector = new Selector(db,
       db.select().from(table),
       tableShape,
-      new PredicateProvider(table, { time: { $gt: 50 } }),
+      predicateFactory({ time: { $gt: 50 } }),
       20, 20
     )
 
@@ -160,7 +167,7 @@ export default describe('Selector test', () => {
     const selector = new Selector(db,
       db.select().from(table),
       tableShape,
-      new PredicateProvider(table, { time: { $gte: 50 } }),
+      predicateFactory({ time: { $gte: 50 } }),
       null, null,
       [
         { column: table['priority'], orderBy: lf.Order.ASC },
@@ -182,12 +189,31 @@ export default describe('Selector test', () => {
       })
   })
 
+  it('should ignore predicate when build predicate failed and give a warning', function* () {
+    const err = new TypeError('not happy')
+
+    const spy = sinon.spy(Logger, 'warn')
+
+    const selector = new Selector(db,
+      db.select().from(table),
+      tableShape,
+      predicateFactory({ get time() { throw err } }),
+    )
+
+    const results = yield selector.values()
+
+    expect(results.length).to.equal(dataLength)
+    expect(spy.callCount).to.equal(1)
+
+    spy.restore()
+  })
+
   describe('Selector.prototype.changes', () => {
     it('observe should ok', done => {
       const selector = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } })
+        predicateFactory({ time: { $gte: 50 } })
       )
 
       const newName = 'test name change'
@@ -211,7 +237,7 @@ export default describe('Selector test', () => {
       const selector = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, {}),
+        predicateFactory({}),
       )
 
       const row = { _id: '_id:939.5', name: 'name:939.5', time: 939.5, priority: 10 }
@@ -240,7 +266,7 @@ export default describe('Selector test', () => {
       const selector = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } })
+        predicateFactory({ time: { $gte: 50 } })
       )
       const spy = sinon.spy((): void => void 0)
 
@@ -268,7 +294,7 @@ export default describe('Selector test', () => {
       const selector = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } })
+        predicateFactory({ time: { $gte: 50 } })
       )
 
       const newName = 'test name change'
@@ -307,7 +333,7 @@ export default describe('Selector test', () => {
       const selector = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } })
+        predicateFactory({ time: { $gte: 50 } })
       )
 
       const changes = selector.changes()
@@ -345,7 +371,7 @@ export default describe('Selector test', () => {
       const selector = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $eq: impossibleTime } }),
+        predicateFactory({ time: { $eq: impossibleTime } }),
         1, 0 // 添加 limit, skip 以模仿实际使用场景
       )
 
@@ -386,7 +412,7 @@ export default describe('Selector test', () => {
       const selector = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 50 } }),
+        predicateFactory({ time: { $gt: 50 } }),
         20, 20
       )
 
@@ -415,7 +441,7 @@ export default describe('Selector test', () => {
       const selector = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 50 } }),
+        predicateFactory({ time: { $gt: 50 } }),
         20, 20,
         [
           { column: table['priority'], orderBy: lf.Order.DESC },
@@ -473,7 +499,7 @@ export default describe('Selector test', () => {
       const selector = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 50 } }),
+        predicateFactory({ time: { $gt: 50 } }),
         20, 20
       )
 
@@ -514,7 +540,7 @@ export default describe('Selector test', () => {
       const selector = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 50 } }),
+        predicateFactory({ time: { $gt: 50 } }),
         20, 20
       )
 
@@ -544,7 +570,7 @@ export default describe('Selector test', () => {
       const selector = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 960 } }),
+        predicateFactory({ time: { $gt: 960 } }),
         20, 20
       )
 
@@ -574,7 +600,7 @@ export default describe('Selector test', () => {
       const selector = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $lt: 0 } }),
+        predicateFactory({ time: { $lt: 0 } }),
         20
       )
 
@@ -616,7 +642,7 @@ export default describe('Selector test', () => {
       const selector = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 50 } })
+        predicateFactory({ time: { $gt: 50 } })
       )
 
       const spy = sinon.spy()
@@ -634,7 +660,7 @@ export default describe('Selector test', () => {
       const selector = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 10000 } })
+        predicateFactory({ time: { $gt: 10000 } })
       )
 
       const spy = sinon.spy()
@@ -652,7 +678,7 @@ export default describe('Selector test', () => {
       const selector = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 50 } }),
+        predicateFactory({ time: { $gt: 50 } }),
         20, 20
       )
 
@@ -679,12 +705,12 @@ export default describe('Selector test', () => {
       selector1 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $lt: 50 } })
+        predicateFactory({ time: { $lt: 50 } })
       )
       selector2 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, {
+        predicateFactory({
           time: {
             $gte: 50,
             $lt: 100
@@ -694,14 +720,14 @@ export default describe('Selector test', () => {
 
       const select1And2 = selector1.combine(selector2)
 
-      selector3 = new Selector(db, db.select().from(table), tableShape, new PredicateProvider(table, {
+      selector3 = new Selector(db, db.select().from(table), tableShape, predicateFactory({
         time: {
           $gte: 100,
           $lt: 150
         }
       }))
 
-      selector4 = new Selector(db, db.select().from(table), tableShape, new PredicateProvider(table, {
+      selector4 = new Selector(db, db.select().from(table), tableShape, predicateFactory({
         time: {
           $gte: 150,
           $lt: 200
@@ -775,13 +801,13 @@ export default describe('Selector test', () => {
       const selector5 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 50 } }),
+        predicateFactory({ time: { $gt: 50 } }),
         20, 20
       )
       const selector6 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 100 } }),
+        predicateFactory({ time: { $gt: 100 } }),
         20, 20
       )
 
@@ -853,13 +879,13 @@ export default describe('Selector test', () => {
       const _selector1 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } })
+        predicateFactory({ time: { $gte: 50 } })
       )
 
       const _selector2 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $lte: 250 } })
+        predicateFactory({ time: { $lte: 250 } })
       )
 
       const selector = _selector1.combine(_selector2)
@@ -885,34 +911,34 @@ export default describe('Selector test', () => {
       selector1 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } }),
+        predicateFactory({ time: { $gte: 50 } }),
         20, 0
       )
       selector2 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } }),
+        predicateFactory({ time: { $gte: 50 } }),
         20, 20
       )
 
       selector3 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } }),
+        predicateFactory({ time: { $gte: 50 } }),
         20, 40
       )
 
       selector4 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } }),
+        predicateFactory({ time: { $gte: 50 } }),
         10, 60
       )
 
       selector5 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } }),
+        predicateFactory({ time: { $gte: 50 } }),
         20, 70
       )
 
@@ -1001,7 +1027,7 @@ export default describe('Selector test', () => {
       const selector6 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $lt: 930 } }),
+        predicateFactory({ time: { $lt: 930 } }),
         20, 0,
         [
           { column: table['priority'], orderBy: lf.Order.DESC },
@@ -1011,7 +1037,7 @@ export default describe('Selector test', () => {
       const selector7 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $lt: 930 } }),
+        predicateFactory({ time: { $lt: 930 } }),
         20, 20,
         [
           { column: table['priority'], orderBy: lf.Order.DESC },
@@ -1052,13 +1078,13 @@ export default describe('Selector test', () => {
       const selector6 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } }),
+        predicateFactory({ time: { $gte: 50 } }),
         10, 0
       )
       const selector7 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } }),
+        predicateFactory({ time: { $gte: 50 } }),
         20, 11
       )
 
@@ -1071,13 +1097,13 @@ export default describe('Selector test', () => {
       const selector6 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 50 } }),
+        predicateFactory({ time: { $gt: 50 } }),
         20, 0
       )
       const selector7 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } }),
+        predicateFactory({ time: { $gte: 50 } }),
         20, 20
       )
 
@@ -1097,14 +1123,14 @@ export default describe('Selector test', () => {
       const selector7 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } }),
+        predicateFactory({ time: { $gte: 50 } }),
         20, 20
       )
 
       const selector6_1 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 50 } }),
+        predicateFactory({ time: { $gt: 50 } }),
         20, 0
       )
       const selector7_1 = new Selector(db,
@@ -1127,13 +1153,13 @@ export default describe('Selector test', () => {
       const selector6 = new Selector(db,
         db.select(table['name']).from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 50 } }),
+        predicateFactory({ time: { $gt: 50 } }),
         20, 0
       )
       const selector7 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 50 } }),
+        predicateFactory({ time: { $gt: 50 } }),
         20, 20
       )
 
@@ -1147,13 +1173,13 @@ export default describe('Selector test', () => {
       const selector6 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 50 } }),
+        predicateFactory({ time: { $gt: 50 } }),
         20, 0
       )
       const selector7 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gt: 50 } }),
+        predicateFactory({ time: { $gt: 50 } }),
         20, 40
       )
 
@@ -1180,14 +1206,14 @@ export default describe('Selector test', () => {
       selector1 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } }),
+        predicateFactory({ time: { $gte: 50 } }),
         20, 0
       )
         .map(mapFn)
       selector2 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } }),
+        predicateFactory({ time: { $gte: 50 } }),
         20, 20
       )
         .map(mapFn)
@@ -1197,7 +1223,7 @@ export default describe('Selector test', () => {
       selector3 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } }),
+        predicateFactory({ time: { $gte: 50 } }),
         20, 40
       )
         .map(mapFn2)
@@ -1205,7 +1231,7 @@ export default describe('Selector test', () => {
       selector4 = new Selector(db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } }),
+        predicateFactory({ time: { $gte: 50 } }),
         20, 60
       )
         .map(mapFn3)

@@ -126,7 +126,7 @@ export class Selector <T> {
     }
     const { pk, mainTable } = this.shape
 
-    const column = mainTable[pk.name]
+    const column = mainTable[pk]
     const rangeQuery = predicatableQuery(this.db, mainTable, predicate, StatementType.Select, column)
 
     if (this.orderDescriptions && this.orderDescriptions.length) {
@@ -187,7 +187,7 @@ export class Selector <T> {
   values(): Observable<T[]> | never {
     if (typeof this.limit !== 'undefined' || typeof this.skip !== 'undefined') {
       const p = this.rangeQuery.exec()
-        .then(r => r.map(v => v[this.shape.pk.name]))
+        .then(r => r.map(v => v[this.shape.pk]))
         .then(pks => this.getValue(this.getQuery(this.inPKs(pks))))
       return this.mapFn(Observable.fromPromise(p))
     } else {
@@ -229,15 +229,15 @@ export class Selector <T> {
 
   private inPKs(pks: (string | number)[]): lf.Predicate {
     const { pk, mainTable } = this.shape
-    return mainTable[pk.name].in(pks)
+    return mainTable[pk].in(pks)
   }
 
   private getValue(query: lf.query.Select) {
     return query.exec()
       .then((rows: any[]) => {
         const result = graph<T>(rows, this.shape.definition)
-        const col = this.shape.pk.name
-        return !this.shape.pk.queried ? this.removeKey(result, col) : result
+        const col = this.shape.pk
+        return !this.shape.pk ? this.removeKey(result, col) : result
       })
   }
 
@@ -245,12 +245,13 @@ export class Selector <T> {
     if (this.predicateBuildErr) {
       return additional ? this.query.where(additional) : this.query
     }
-    // !this.predicateBuildErr
 
     const preds: lf.Predicate[] = []
+
     if (this.predicateProvider) {
       preds.push(this.predicateProvider.getPredicate()!)
     }
+
     if (additional) {
       preds.push(additional)
     }
@@ -276,7 +277,7 @@ export class Selector <T> {
       const listener = () => {
         return rangeQuery.exec()
           .then((r) => {
-            observer.next(r.map(v => v[this.shape.pk.name]))
+            observer.next(r.map(v => v[this.shape.pk]))
           })
           .catch(e => observer.error(e))
       }
