@@ -1,4 +1,4 @@
-import { forEach, clone, getType, assert, hash, concat, keys, mergeFields, FieldMustBeArray, AssociatedFieldsPostionError } from '../../index'
+import { forEach, clone, getType, assert, hash, concat, keys, mergeFields, IncorrectFieldType, IncorrectAssocFieldDescription } from '../../index'
 import { describe, it } from 'tman'
 import { expect } from 'chai'
 
@@ -555,15 +555,15 @@ export default describe('Utils Testcase: ', () => {
       const patch = { 0: '1', 1: '3', length: 2 }
       const fun = () => mergeFields(target, patch as any)
       const fun1 = () => mergeFields(patch as any, target)
-      expect(fun).to.throw(FieldMustBeArray(patch).message)
-      expect(fun1).to.throw(FieldMustBeArray(patch).message)
+      expect(fun).to.throw(IncorrectFieldType(patch).message)
+      expect(fun1).to.throw(IncorrectFieldType(patch).message)
     })
 
     it('should throw if associated fields not in right position', () => {
       const target = ['1', '2']
       const patch = ['3', '4', { bar: ['6'] }, { baz: ['9'] }]
       const fun = () => mergeFields(target, patch)
-      expect(fun).to.throw(AssociatedFieldsPostionError().message)
+      expect(fun).to.throw(IncorrectAssocFieldDescription().message)
     })
   })
 

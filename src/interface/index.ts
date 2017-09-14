@@ -172,7 +172,7 @@ export type Predicate<T> = {
 
 export { StatementType, JoinMode, LeafType, Relationship, DataStoreType, RDBType }
 
-export interface TablesStruct {
+export interface TableStruct {
   [index: string]: {
     table: lf.schema.Table
     contextName?: string

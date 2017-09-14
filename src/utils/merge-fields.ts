@@ -1,12 +1,12 @@
 import { forEach } from './for-each'
-import { FieldMustBeArray, AssociatedFieldsPostionError } from '../exception'
+import { IncorrectFieldType, IncorrectAssocFieldDescription } from '../exception'
 
 export const mergeFields = (targetFields: any[], patchFields: any[]): void => {
   if (!Array.isArray(targetFields)) {
-    throw FieldMustBeArray(targetFields)
+    throw IncorrectFieldType(targetFields)
   }
   if (!Array.isArray(patchFields)) {
-    throw FieldMustBeArray(patchFields)
+    throw IncorrectFieldType(patchFields)
   }
 
   let targetLength = targetFields.length
@@ -14,7 +14,7 @@ export const mergeFields = (targetFields: any[], patchFields: any[]): void => {
   forEach(patchFields, (field: any, index: number) => {
     if (typeof field === 'object') {
       if (index !== fieldLength - 1) {
-        throw AssociatedFieldsPostionError()
+        throw IncorrectAssocFieldDescription()
       }
       const lastTargetField = targetFields[targetLength - 1]
       if (typeof lastTargetField === 'object') {

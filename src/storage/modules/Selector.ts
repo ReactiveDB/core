@@ -245,12 +245,13 @@ export class Selector <T> {
     if (this.predicateBuildErr) {
       return additional ? this.query.where(additional) : this.query
     }
-    // !this.predicateBuildErr
 
     const preds: lf.Predicate[] = []
+
     if (this.predicateProvider) {
       preds.push(this.predicateProvider.getPredicate()!)
     }
+
     if (additional) {
       preds.push(additional)
     }

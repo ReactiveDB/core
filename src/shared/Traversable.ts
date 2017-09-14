@@ -1,7 +1,7 @@
 import { forEach, getType, keys } from '../utils'
 import { TraverseContext } from '../interface'
 
-export class Traversable<T> {
+export class Traversable<T = {}> {
 
   private ctxgen: (key: any, val: any, ctx: TraverseContext) => T | boolean
 

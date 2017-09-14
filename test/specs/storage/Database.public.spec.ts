@@ -11,7 +11,7 @@ import { TestFixture2 } from '../../schemas/Test'
 import { scenarioGen, programGen, postGen, taskGen, subtaskGen } from '../../utils/generators'
 import { RDBType, DataStoreType, Database, clone, forEach, JoinMode, Logger } from '../../index'
 import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema, OrganizationSchema, TasklistSchema } from '../../index'
-import { NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector, AssociatedFieldsPostionError } from '../../index'
+import { NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector, IncorrectAssocFieldDescription } from '../../index'
 
 use(SinonChai)
 
@@ -451,7 +451,7 @@ export default describe('Database Testcase: ', () => {
 
     it('should throw when associated fields in a wrong position', () => {
       const fun = () => database.get('Task', { fields: ['_id', { project: ['_id'] }, 'content'] })
-      expect(fun).to.throw(AssociatedFieldsPostionError().message)
+      expect(fun).to.throw(IncorrectAssocFieldDescription().message)
     })
 
     describe('case: Associations', () => {
@@ -574,7 +574,7 @@ export default describe('Database Testcase: ', () => {
         expect(result.project.organization._id).to.equal(innerTarget.project._organizationId)
       })
 
-      it('should merge fields if a nested association in the WHERE clause', function* () {
+      it('should merge fields if a nested association in the WHERE clause #1', function* () {
         const fields = ['_id', 'content', { project: [ '_id', { organization: [ '_id' ] } ] }]
         const queryToken = database.get<TaskSchema>('Task', {
           fields,
@@ -592,25 +592,7 @@ export default describe('Database Testcase: ', () => {
         expect(result.project.organization._id).to.equal(innerTarget.project._organizationId)
       })
 
-      it('should merge fields when get value by deep nested Association query without nested association fields', function* () {
-        const fields = ['_id', 'content', { subtasks: ['_id'] }]
-        const queryToken = database.get<TaskSchema>('Task', {
-          fields,
-          where: {
-            'project.organization': {
-              _id: innerTarget.project._organizationId
-            }
-          }
-        })
-
-        const results = yield queryToken.values()
-        const [ result ] = results
-
-        expect(results.length).to.equal(1)
-        expect(result.project.organization._id).to.equal(innerTarget.project._organizationId)
-      })
-
-      it('should get value by nested predicate in compound operator', function* () {
+      it('should merge fields if a nested association in the WHERE clause #2', function* () {
         const fields = ['_id', 'content', { subtasks: ['_id'], project: ['_id', { organization: ['_id', 'expireDate'] }] }]
         const day = 24 * 60 * 60 * 1000 - 2
         const queryToken = database.get<TaskSchema>('Task', {
@@ -644,7 +626,11 @@ export default describe('Database Testcase: ', () => {
         })
       })
 
-      it('should warn if build additional join info from predicate failed', function* () {
+      it('should be able to handle implici self-join', () => {
+        // todo
+      })
+
+      it('should warn if failed to build additional join from predicate', function* () {
         const fields = ['_id', 'content']
         const queryToken = database.get<TaskSchema>('Task', {
           fields,
