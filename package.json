@@ -83,7 +83,7 @@
     "sinon": "^4.0.0",
     "sinon-chai": "^2.11.0",
     "source-map-loader": "^0.2.1",
-    "style-loader": "^0.18.2",
+    "style-loader": "^0.19.0",
     "tman": "^1.7.1",
     "ts-node": "^3.2.0",
     "tslint": "^5.5.0",
