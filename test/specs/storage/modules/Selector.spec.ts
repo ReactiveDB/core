@@ -31,7 +31,7 @@ export default describe('Selector test', () => {
   let storeData: any[]
   let subscription: Subscription
 
-  beforeEach(function * () {
+  const constructDBAndATable = () => {
     const schemaBuilder = lf.schema.create('SelectorTest', version ++)
     const db$ = lfFactory(schemaBuilder, {
       storeType: DataStoreType.MEMORY,
@@ -47,9 +47,16 @@ export default describe('Selector test', () => {
 
     db$.connect()
 
-    yield db$.do(r => {
-      db = r
-      table = db.getSchema().table('TestSelectMetadata')
+    return db$.map((testDB) => ({
+      db: testDB,
+      table: testDB.getSchema().table('TestSelectMetadata')
+    }))
+  }
+
+  beforeEach(function * () {
+    yield constructDBAndATable().do((r) => {
+      db = r.db
+      table = r.table
     })
 
     const rows: lf.Row[] = []
@@ -203,6 +210,43 @@ export default describe('Selector test', () => {
         .set(table['name'], newName)
         .where(table['_id'].eq('_id:50'))
         .exec()
+    })
+
+    it('observe asynchronous insertions completely', function* () {
+      yield constructDBAndATable().do((r) => {
+        db = r.db
+        table = r.table // ensure empty table
+      })
+
+      const n = 3
+      const rows = [
+        { _id: '_id:939.1', name: 'name:939.1', time: 939.1, priority: 10 },
+        { _id: '_id:939.2', name: 'name:939.2', time: 939.2, priority: 20 },
+        { _id: '_id:939.3', name: 'name:939.3', time: 939.3, priority: 30 }
+      ]
+      const insertRow = (i: number) =>
+        db.insert().into(table).values([table.createRow(rows[i])]).exec()
+
+      const count$ = Observable.range(0, n + 1)
+
+      const insert$ = Observable.concat(
+        Observable.of({}).subscribeOn(Scheduler.async),
+        Observable.defer(() => insertRow(0)).subscribeOn(Scheduler.async),
+        Observable.defer(() => insertRow(1)).subscribeOn(Scheduler.async),
+        Observable.defer(() => insertRow(2)).subscribeOn(Scheduler.async)
+      )
+
+      const change$ = new Selector(db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, {}),
+      ).changes()
+
+      yield Observable.zip(count$, insert$, change$,
+        (nth, _, result) => {
+          expect(result).to.deep.equal(rows.slice(0, nth))
+        }
+      )
     })
 
     it('should observe deletion of the only row in db', function* () {
