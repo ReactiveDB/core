@@ -36,6 +36,7 @@ jobs:
       - run: npm run lint
       - run: npm run check_circular_dependencies
       - run: npm run cover
+      - run: npm run test_O1
       - run:
           name: test-coverage
           command: cat ./coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js

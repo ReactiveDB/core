@@ -1,6 +1,6 @@
 import { Observable, Scheduler } from 'rxjs'
 import * as moment from 'moment'
-import { describe, it, beforeEach, afterEach } from 'tman'
+import { describe, it, before, beforeEach, afterEach } from 'tman'
 import { expect, assert, use } from 'chai'
 import * as sinon from 'sinon'
 import * as SinonChai from 'sinon-chai'
@@ -8,7 +8,7 @@ import { uuid, checkExecutorResult } from '../../utils'
 import schemaFactory from '../../schemas'
 import { TestFixture2 } from '../../schemas/Test'
 import { scenarioGen, programGen, postGen, taskGen, subtaskGen } from '../../utils/generators'
-import { RDBType, DataStoreType, Database, clone, forEach, JoinMode } from '../../index'
+import { RDBType, DataStoreType, Database, clone, forEach, JoinMode, aggresiveOptimizer } from '../../index'
 import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema } from '../../index'
 import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector } from '../../index'
 
@@ -32,6 +32,12 @@ export default describe('Database Testcase: ', () => {
     database = new Database(DataStoreType.MEMORY, false, `test:${version}`, version)
     schemaFactory(database)
   }
+
+  before(() => {
+    if (!!process.env.optimize) {
+      aggresiveOptimizer()
+    }
+  })
 
   beforeEach(() => {
     refreshDB()
