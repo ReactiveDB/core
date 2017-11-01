@@ -290,28 +290,16 @@ export class Selector <T> {
   }
 }
 
-interface LfIssueAcc<T> {
-  calledCount: number
-  shouldSkip: boolean
-  result: T[]
-}
-
 /**
  * Lovefield observe 出来的推送，第一次和第二次在它们的值不为空
  * 的时候是重复的，这里做优化，省去重复；但不是简单的 skip(1)，因为
  * 那样会导致不能推出空结果集。详见：Lovefield issue#215
  */
-const lfIssueFix = <T>(changes: Observable<T[]>) =>
-  (changes as any)
-    .scan((ret: LfIssueAcc<T>, x: T[]) => {
-      ret.calledCount = ret.calledCount + 1
-      const { calledCount } = ret
-      ret.shouldSkip = !!(x && x.length) && calledCount === 2
-      ret.result = x
-      return ret
-    }, {
-      shouldSkip: false,
-      calledCount: 0
-    })
-    .filter((x: LfIssueAcc<T>) => !x.shouldSkip)
-    .map((x: LfIssueAcc<T>) => x.result)
+const lfIssueFix = <T>(changes: Observable<T[]>) => {
+  const doKeep = (prev: T[] | null, curr: T[] | null, idx: number) =>
+    idx === 1 && prev && prev.length && curr && curr.length
+      ? null
+      : curr
+
+  return (changes as any).scan(doKeep, null).filter(Boolean)
+}
