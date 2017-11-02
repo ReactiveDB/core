@@ -2,11 +2,16 @@ const lf = require('lovefield')
 
 const shallowEqual = function(thisArg: any, columns: any[], left: any, right: any) {
   return columns.every(function(this: any, column) {
-    if (column.getType() == lf.Type.OBJECT || column.getType() == lf.Type.ARRAY_BUFFER) {
-      return left.getField(column) === right.getField(column)
+    const colType = column.getType()
+    const leftField = left.getField(column)
+    const rightField = right.getField(column)
+
+    if (colType == lf.Type.OBJECT || colType == lf.Type.ARRAY_BUFFER) {
+      return leftField === rightField
     }
-    const evalFn = this.evalRegistry_.getEvaluator(column.getType(), lf.eval.Type.EQ)
-    return evalFn(left.getField(column), right.getField(column))
+
+    const evalEqual = this.evalRegistry_.getEvaluator(colType, lf.eval.Type.EQ)
+    return evalEqual(leftField, rightField)
   }, thisArg)
 }
 
