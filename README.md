@@ -255,3 +255,21 @@ database.get<ItemSchema>('Item', {
     console.log(items)
   })
 ```
+
+
+## Publish
+On `master` branch,
+```
+> npm version [version name]
+> git push --follow-tags
+```
+The [./.circleci/config.yml](./.circleci/config.yml) script should take care of the following jobs:
+ 1. build ReactiveDB/core packages;
+ 2. verify that all tests are passing;
+ 3. given that the current commit is a release commit, publish the built packages to [NPM repository](https://www.npmjs.com/package/reactivedb).
+
+
+Done :)
+
+
+If a release is to be published from a branch other than `master`, please make sure to version it as an _alpha_ or a _beta_; `v0.9.15-alpha.1-description` for example. And you will have to build (`npm run build_all`) and publish (`npm run publish_all`) from local.
