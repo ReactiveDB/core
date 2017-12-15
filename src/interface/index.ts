@@ -47,7 +47,7 @@ export interface ParsedSchema {
   associations: Map<string, Association>
   mapper: Map<string, Function>
   columns: Map<string, RDBType>
-  dispose: SchemaDisposeFunction<any>
+  dispose?: SchemaDisposeFunction<any>
   pk: string
 }
 

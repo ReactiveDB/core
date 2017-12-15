@@ -9,7 +9,7 @@ export class ProxySelector<T> {
   private mapFn: (stream$: Observable<T[]>) => Observable<any> = mapFn
 
   constructor (
-    request$: Observable<T> | Observable<T[]>,
+    request$: Observable<T | T[]>,
     public query: Query<T>,
     public tableName: string
   ) {

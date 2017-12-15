@@ -40,7 +40,7 @@ export class Selector <T> {
     const dist = new Selector<U>(originalToken.db, fakeQuery as any, { } as any)
     dist.change$ = Observable.from(metaDatas)
       .map(metas => metas.mapFn(metas.change$))
-      .combineAll()
+      .combineAll<any, any>()
       .map((r: U[][]) => r.reduce((acc, val) => acc.concat(val)))
       .debounceTime(0, async)
       .publishReplay(1)

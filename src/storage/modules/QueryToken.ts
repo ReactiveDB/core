@@ -43,7 +43,7 @@ export class QueryToken<T> {
     tokens.unshift(this)
     const newSelector$ = Observable.from(tokens)
       .map(token => token.selector$.skipWhile(v => v instanceof ProxySelector))
-      .combineAll()
+      .combineAll<any, any>()
       .map((r: Selector<T>[]) => {
         const first = r.shift()
         return first!.concat(...r)
@@ -55,7 +55,7 @@ export class QueryToken<T> {
     tokens.unshift(this)
     const newSelector$ = Observable.from(tokens)
       .map(token => token.selector$.skipWhile(v => v instanceof ProxySelector))
-      .combineAll()
+      .combineAll<any, any>()
       .map((r: Selector<T>[]) => {
         const first = r.shift()
         return first!.combine(...r)

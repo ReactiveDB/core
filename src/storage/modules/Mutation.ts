@@ -1,3 +1,5 @@
+import * as lf from 'lovefield'
+
 import { forEach, assert, warn } from '../../utils'
 import { fieldIdentifier } from '../symbols'
 import * as Exception from '../../exception'
@@ -20,7 +22,10 @@ export class Mutation {
     }
   }
 
-  static aggregate(db: lf.Database, insert: Mutation[], update: Mutation[]) {
+  static aggregate(db: lf.Database, insert: Mutation[], update: Mutation[]): {
+    contextIds: any[]
+    queries: lf.query.Insert[]
+  } {
     const keys: any[] = []
     const insertQueries: lf.query.Insert[] = []
 

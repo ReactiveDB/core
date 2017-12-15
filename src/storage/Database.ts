@@ -342,7 +342,7 @@ export class Database {
     const mapper = new Map<string, Function>()
     const disposeHandler =
       (typeof schemaDef.dispose === 'function' && schemaDef.dispose) ||
-      (typeof schemaDef[dispose] === 'function' && schemaDef[dispose]) || null
+      (typeof schemaDef[dispose] === 'function' && schemaDef[dispose]) || undefined
 
     // src: schemaDef; dest: uniques, indexes, primaryKey, nullable, associations, mapper
     // no short-curcuiting
@@ -353,7 +353,7 @@ export class Database {
 
       if (!def.virtual) {
         this.createColumn(tableBuilder, key, def.type as RDBType, nullable, mapper)
-        columns.set(key, def.type)
+        columns.set(key, def.type as RDBType)
 
         if (def.primaryKey) {
           assert(!primaryKey[0], Exception.PrimaryKeyConflict())
