@@ -4,6 +4,7 @@
     "target": "ES2015",
     "noImplicitThis": true,
     "noImplicitAny": true,
+    "skipLibCheck": true,
     "noImplicitReturns": true,
     "outDir": "../spec-js"
   }
