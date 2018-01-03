@@ -14,7 +14,7 @@ function watch (paths: string[]) {
         })
       })
     })
-    .debounceTime(300)
+    .debounceTime(500)
 }
 
 watch(['spec-js'])
