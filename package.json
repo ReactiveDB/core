@@ -61,7 +61,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/chai": "^4.0.10",
-    "@types/node": "^8.5.1",
+    "@types/node": "^9.3.0",
     "@types/shelljs": "^0.7.7",
     "@types/sinon": "^4.1.2",
     "@types/sinon-chai": "^2.7.29",
