@@ -30,6 +30,9 @@ export const InvalidType =
     return new ReactiveDBException(message + '.')
   }
 
+export const UnexpectedTransactionUse =
+  () => new ReactiveDBException('Please use Database#transaction to get a transaction scope first.')
+
 export const PrimaryKeyNotProvided =
   () => new ReactiveDBException(`Primary key was not provided.`)
 

@@ -10,7 +10,7 @@ import { TestFixture2 } from '../../schemas/Test'
 import { scenarioGen, programGen, postGen, taskGen, subtaskGen } from '../../utils/generators'
 import { RDBType, DataStoreType, Database, clone, forEach, JoinMode } from '../../index'
 import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema } from '../../index'
-import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector } from '../../index'
+import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector, UnexpectedTransactionUse } from '../../index'
 
 use(SinonChai)
 
@@ -1285,6 +1285,164 @@ export default describe('Database Testcase: ', () => {
       expect(programRet._id).to.deep.equal(engineerRet.leadProgram[0]._id)
       expect(programRet.owner.leadProgram).is.undefined
       expect(engineerRet.leadProgram[0].owner).to.deep.equal(programRet.owner)
+    })
+
+  })
+
+  describe('Method: transaction', () => {
+
+    beforeEach(() => {
+      database.connect()
+    })
+
+    it('should able to create a transaction scope for multi query [1]', (done) => {
+      const programCount = 10
+      const moduleCount = 20
+
+      const programs1 = programGen(programCount, moduleCount)
+      const programs2 = programGen(programCount, moduleCount)
+
+      database.get('Program').changes()
+        .skip(1)
+        .subscribe((r) => {
+          // 第一次的更新推送就输出了 2次 upsert 的执行结果
+          expect(r.length).to.equal(programCount * 2)
+          done()
+          // 这里会导致没办法 afterEach hook, 故暂时先删除
+        })
+
+      database.transaction()
+        .concatMap(([ db, tx ]) =>
+          db.upsert('Program', programs1)
+            .concatMap(() => db.upsert('Program', programs2))
+            .concatMap(() => tx.commit())
+        )
+        .subscribe()
+    })
+
+    it('should able to create a transaction scope for multi query [2]', function* () {
+      const posts1 = postGen(10, 'goog')
+      const posts2 = postGen(10, 'facebook')
+
+      const ret = yield database.transaction()
+        .concatMap(([ db, tx ]) => {
+          return db.upsert('Post', posts1)
+            .concatMap(() => db.upsert('Post', posts2))
+            .concatMap(() => tx.commit())
+        })
+
+      checkExecutorResult(ret, 20)
+    })
+
+    it('should able to create a transaction scope for multi query [3]', function* () {
+      const posts1 = postGen(10, 'goog')
+      const posts2 = postGen(10, 'facebook')
+
+      const ret = yield database.transaction()
+        .concatMap(([ db, tx ]) => {
+          return db.insert('Post', posts1)
+            .concatMap(() => db.insert('Post', posts2))
+            .concatMap(() => tx.commit())
+        })
+
+      checkExecutorResult(ret, 20)
+    })
+
+    it('should able to create a transaction scope for multi query [4]', function* () {
+      const posts1 = postGen(10, 'goog')
+      const posts2 = postGen(10, 'facebook')
+
+      yield database.insert('Post', posts1.concat(posts2))
+
+      const ret = yield database.transaction()
+        .concatMap(([ db, tx ]) => {
+          return db.delete('Post', { where: { _id: { $in: posts1.map(p => p._id) } } })
+            .concatMap(() => db.delete('Post', { where: { _id: { $in: posts2.map(p => p._id) } } }))
+            .concatMap(() => tx.commit())
+        })
+
+      checkExecutorResult(ret, 0, 2)
+    })
+
+    it('should able to create a transaction scope for multi query [5]', function* () {
+      const posts1 = postGen(10, 'goog')
+      const posts2 = postGen(10, 'facebook')
+
+      yield database.insert('Post', posts1.concat(posts2))
+
+      const ret = yield database.transaction()
+        .concatMap(([ db, tx ]) => {
+          return db.remove('Post', { where: { _id: { $in: posts1.map(p => p._id) } } })
+            .concatMap(() => db.remove('Post', { where: { _id: { $in: posts2.map(p => p._id) } } }))
+            .concatMap(() => tx.commit())
+        })
+
+      checkExecutorResult(ret, 0, 2)
+    })
+
+    it('should able to create a transaction scope for multi query [6]', function* () {
+      const programs = programGen(10, 10)
+
+      yield database.upsert('Program', programs)
+
+      const ret = yield database.transaction()
+        .concatMap(([ db, tx ]) => {
+          return db.remove('Program')
+            .concatMap(() => tx.commit())
+        })
+
+      checkExecutorResult(ret, 0, 10 + 10 + 1)
+    })
+
+    it('should be able to cancel the side-effects if error was thrown', function* () {
+      const [ program ] = programGen(1, 1)
+      const ownerId = program.ownerId
+
+      delete program.ownerId
+      delete program.owner
+      delete program.modules
+
+      try {
+        yield database.transaction()
+          .concatMap(([ db, tx ]) => {
+            return db.upsert('Program', program).concatMap(() => tx.commit())
+          })
+        throw new Error('error code path')
+      } catch (e) {
+        expect(e.message).to.not.equal('error code path')
+
+        const ret = yield database.upsert('Program', { ...program, ownerId })
+        checkExecutorResult(ret, 1)
+      }
+    })
+
+    it('should be able to abort the transaction', function* () {
+      const programCount = 10
+      const moduleCount = 20
+
+      const programs1 = programGen(programCount, moduleCount)
+      const programs2 = programGen(programCount, moduleCount)
+
+      const ret = yield database.transaction()
+        .concatMap(([ db, tx ]) => {
+          return db.upsert('Program', programs1)
+            .concatMap(() => db.upsert('Program', programs2))
+            .concatMap(() => {
+              tx.abort()
+              return tx.commit()
+            })
+        })
+
+      checkExecutorResult(ret)
+    })
+
+    it('should throw if call attachTx directly', () => {
+      try {
+        database.attachTx({ next: () => console.info(1) })
+        throw new Error('error code path')
+      } catch (e) {
+        expect(e.message).to.equal(UnexpectedTransactionUse().message)
+      }
     })
 
   })

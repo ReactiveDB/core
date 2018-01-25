@@ -1,4 +1,5 @@
 import { Observable } from 'rxjs/Observable'
+import { PartialObserver } from 'rxjs/Observer'
 import { RDBType, Relationship, LeafType, StatementType, JoinMode, DataStoreType } from './enum'
 
 export type DeepPartial<T> = {
@@ -174,3 +175,16 @@ export type Predicate<T> = {
 }
 
 export { StatementType, JoinMode, LeafType, Relationship, DataStoreType, RDBType }
+
+export type TransactionDescriptor<T> = {
+  [P in keyof T]: PropertyDescriptor
+}
+
+export type TransactionHandler = {
+  commit: () => Observable<ExecutorResult>
+  abort: () => void
+}
+
+export type Transaction<T> = [T, TransactionHandler]
+
+export type TransactionEffects<T = any> = PartialObserver<T> | { next: (x: T) => void, error?: (e: any) => void, complete?: () => void }
