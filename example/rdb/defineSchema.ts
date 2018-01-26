@@ -1,4 +1,4 @@
-import { RDBType, SchemaDef, Association } from 'reactivedb'
+import { RDBType, SchemaDef, Relationship } from 'reactivedb'
 import Database from './Database'
 
 interface BasicSchema {
@@ -71,7 +71,7 @@ const basicSchema: SchemaDef<BasicSchema> = {
     type: RDBType.OBJECT
   },
   demo: {
-    type: Association.oneToOne,
+    type: Relationship.oneToOne,
     virtual: {
       name: 'Demo',
       where: demoTable => ({
@@ -93,7 +93,7 @@ const demoSchema: SchemaDef<DemoSchema> = {
     type: RDBType.LITERAL_ARRAY
   },
   basics: {
-    type: Association.oneToMany,
+    type: Relationship.oneToMany,
     virtual: {
       name: 'Basic',
       where: basicTable => ({
@@ -102,7 +102,7 @@ const demoSchema: SchemaDef<DemoSchema> = {
     }
   },
   other: {
-    type: Association.oneToOne,
+    type: Relationship.oneToOne,
     virtual: {
       name: 'Other',
       where: otherTable => ({
@@ -130,7 +130,7 @@ const otherSchema: SchemaDef<OtherSchema> = {
     type: RDBType.STRING
   },
   basic: {
-    type: Association.oneToOne,
+    type: Relationship.oneToOne,
     virtual: {
       name: 'Basic',
       where: basicTable => ({
@@ -156,13 +156,5 @@ Database.defineSchema('Basic', basicSchema)
 Database.defineSchema('Demo', demoSchema)
 Database.defineSchema('Other', otherSchema)
 
-Database.defineHook('Demo', {
-  destroy: (db, entity) => {
-    const basicTable = db.getSchema().table('Demo')
-    return db.delete()
-      .from(basicTable)
-      .where(basicTable['_id'].in(entity.basicIds))
-  }
-})
 
 Database.connect()

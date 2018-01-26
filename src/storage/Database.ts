@@ -12,9 +12,13 @@ import { dispose, contextTableName, fieldIdentifier, hiddenColName } from './sym
 import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, identity, warn } from '../utils'
 import { createPredicate, createPkClause, mergeTransactionResult, predicatableQuery, lfFactory } from './helper'
 import { Relationship, RDBType, DataStoreType, LeafType, StatementType, JoinMode } from '../interface/enum'
-import { Record, Field, JoinInfo, Query, Clause, Predicate } from '../interface'
 import { SchemaDef, ColumnDef, ParsedSchema, Association, ScopedHandler } from '../interface'
 import { ColumnLeaf, NavigatorLeaf, ExecutorResult, UpsertContext, SelectContext } from '../interface'
+import { Record, Field, JoinInfo, Query, Clause, Predicate, Transaction, TransactionDescriptor, TransactionEffects } from '../interface'
+
+const transactionErrorHandler = {
+  error: () => warn(`Execute failed, transaction is already marked for rollback.`)
+}
 
 export class Database {
 
@@ -24,7 +28,8 @@ export class Database {
     return tableNames.map((name) => db.getSchema().table(name))
   }
 
-  public database$: ConnectableObservable<lf.Database>
+  public readonly database$: ConnectableObservable<lf.Database>
+  public readonly inTransaction: boolean = false
 
   private schemaDefs = new Map<string, SchemaDef<any>>()
   private schemas = new Map<string, ParsedSchema>()
@@ -149,8 +154,14 @@ export class Database {
 
         const { contextIds, queries } = Mutation.aggregate(db, muts, [])
         contextIds.forEach(id => this.storedIds.add(id))
-        return this.executor(db, queries)
-          .do({ error: () => contextIds.forEach(id => this.storedIds.delete(id)) })
+        const onError = { error: () => contextIds.forEach(id => this.storedIds.delete(id)) }
+
+        if (this.inTransaction) {
+          this.attachTx(onError)
+          return this.executor(db, queries)
+        }
+
+        return this.executor(db, queries).do(onError)
       })
   }
 
@@ -208,7 +219,7 @@ export class Database {
   }
 
   delete<T>(tableName: string, clause: Predicate<T> = {}): Observable<ExecutorResult> {
-    const [pk, err] = tryCatch<string>(this.findPrimaryKey)(tableName)
+    const [ pk, err ] = tryCatch<string>(this.findPrimaryKey)(tableName)
     if (err) {
       return Observable.throw(err)
     }
@@ -225,13 +236,21 @@ export class Database {
           .concatMap((scopedIds) => {
             const query = predicatableQuery(db, table, provider.getPredicate(), StatementType.Delete)
 
-            scopedIds.forEach((entity: any) =>
+            scopedIds.forEach((entity: object) =>
               this.storedIds.delete(fieldIdentifier(tableName, entity[pk!])))
+            const onError = {
+              error: () => {
+                scopedIds.forEach((entity: object) =>
+                  this.storedIds.add(fieldIdentifier(tableName, entity[pk!])))
+              }
+            }
 
-            return this.executor(db, [query]).do({ error: () => {
-              scopedIds.forEach((entity: any) =>
-                this.storedIds.add(fieldIdentifier(tableName, entity[pk!])))
-            }})
+            if (this.inTransaction) {
+              this.attachTx(onError)
+              return this.executor(db, [query])
+            }
+
+            return this.executor(db, [query]).do(onError)
           })
       })
   }
@@ -252,8 +271,14 @@ export class Database {
       const { contextIds, queries } = Mutation.aggregate(db, insert, update)
       if (queries.length > 0) {
         contextIds.forEach(id => this.storedIds.add(id))
-        return this.executor(db, queries)
-          .do({ error: () => contextIds.forEach(id => this.storedIds.delete(id)) })
+        const onError = { error: () => contextIds.forEach(id => this.storedIds.delete(id)) }
+
+        if (this.inTransaction) {
+          this.attachTx(onError)
+          return this.executor(db, queries)
+        }
+
+        return this.executor(db, queries).do(onError)
       } else {
         return Observable.of({ result: false, insert: 0, update: 0, delete: 0, select: 0 })
       }
@@ -282,18 +307,31 @@ export class Database {
             removedIds.push(fieldIdentifier(tableName, entity[schema!.pk]))
           })
 
+          const onError = {
+            error: () => removedIds.forEach((id: string) => this.storedIds.add(id))
+          }
+
           if (disposeHandler) {
             const scope = this.createScopedHandler<T>(db, queries, removedIds)
             return disposeHandler(rootEntities, scope)
               .do(() => removedIds.forEach((id: string) => this.storedIds.delete(id)))
-              .concatMap(() => this.executor(db, queries))
+              .concatMap(() => {
+                if (this.inTransaction) {
+                  this.attachTx(onError)
+                  return this.executor(db, queries)
+                }
+                return this.executor(db, queries).do(onError)
+              })
           } else {
             removedIds.forEach((id: string) => this.storedIds.delete(id))
-            return this.executor(db, queries)
+
+            if (this.inTransaction) {
+              this.attachTx(onError)
+              return this.executor(db, queries)
+            }
+
+            return this.executor(db, queries).do(onError)
           }
-        })
-        .do({ error: () =>
-          removedIds.forEach((id: string) => this.storedIds.add(id))
         })
     })
   }
@@ -315,6 +353,81 @@ export class Database {
           this.schemaBuilder = null
           this.subscription.unsubscribe()
         })
+    })
+  }
+
+  attachTx(_: TransactionEffects) {
+    throw Exception.UnexpectedTransactionUse()
+  }
+
+  executor(db: lf.Database, queries: lf.query.Builder[]) {
+    const tx = db.createTransaction()
+
+    return Observable.fromPromise(tx.exec(queries))
+      .do(transactionErrorHandler)
+      .map((ret) => {
+        return {
+          result: true,
+          ...mergeTransactionResult(queries, ret)
+        }
+      })
+  }
+
+  transaction(): Observable<Transaction<Database>> {
+    type ProxyProperty = Pick<Database, 'attachTx' | 'executor' | 'inTransaction'>
+
+    return this.database$.map(db => {
+      const tx = db.createTransaction()
+      const transactionQueries: lf.query.Builder[] = []
+      const effects: TransactionEffects[] = []
+
+      const transactionContext: TransactionDescriptor<ProxyProperty> = {
+        attachTx: {
+          get() {
+            return (handler: TransactionEffects) => {
+              effects.push(handler)
+            }
+          }
+        },
+        executor: {
+          get() {
+            return (_: lf.Database, queries: lf.query.Builder[]) => {
+              transactionQueries.push(...queries)
+              return Observable.of(null)
+            }
+          }
+        },
+        inTransaction: {
+          get() {
+            return true
+          }
+        }
+      }
+
+      const customTx = {
+        commit: () => {
+          return effects.reduce((acc, curr) => {
+            return acc.do(curr)
+          }, Observable.from(tx.exec(transactionQueries)))
+            .map((r) => {
+              return {
+                result: true,
+                ...mergeTransactionResult(transactionQueries, r)
+              }
+            })
+        },
+        abort: () => {
+          effects.length = 0
+          transactionQueries.length = 0
+        }
+      }
+
+      const ret: Transaction<Database> = [
+        Object.create(this, transactionContext),
+        customTx
+      ]
+
+      return ret
     })
   }
 
@@ -743,22 +856,6 @@ export class Database {
 
       return [get, remove]
     }
-  }
-
-  private executor(db: lf.Database, queries: lf.query.Builder[]) {
-    const tx = db.createTransaction()
-    const handler = {
-      error: () => warn(`Execute failed, transaction is already marked for rollback.`)
-    }
-
-    return Observable.fromPromise(tx.exec(queries))
-      .do(handler)
-      .map((ret) => {
-        return {
-          result: true,
-          ...mergeTransactionResult(queries, ret)
-        }
-      })
   }
 
 }
