@@ -1,4 +1,6 @@
 import { Observable } from 'rxjs/Observable'
+import { OperatorFunction } from 'rxjs/interfaces'
+import { map } from 'rxjs/operators/map'
 import { Query } from '../../interface'
 import { mapFn } from './mapFn'
 
@@ -13,13 +15,9 @@ export class ProxySelector<T> {
     public query: Query<T>,
     public tableName: string
   ) {
-    this.request$ = request$.map((r: T | T[]) => {
-      if (Array.isArray(r)) {
-        return r
-      } else {
-        return [ r ]
-      }
-    })
+    this.request$ = request$.pipe(
+      map(r => Array.isArray(r) ? r : [ r ])
+    )
   }
 
   values() {
@@ -30,7 +28,7 @@ export class ProxySelector<T> {
     return this.mapFn(this.request$)
   }
 
-  map<K>(fn: (stream$: Observable<T[]>) => Observable<K[]>) {
+  map<K>(fn: OperatorFunction<T[], K[]>) {
     this.mapFn = fn
     return this as any as ProxySelector<K>
   }

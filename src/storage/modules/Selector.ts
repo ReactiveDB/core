@@ -1,5 +1,14 @@
 import { Observer } from 'rxjs/Observer'
 import { Observable } from 'rxjs/Observable'
+import { OperatorFunction } from 'rxjs/interfaces'
+import { combineAll } from 'rxjs/operators/combineAll'
+import { debounceTime } from 'rxjs/operators/debounceTime'
+import { map } from 'rxjs/operators/map'
+import { mergeMap } from 'rxjs/operators/mergeMap'
+import { publishReplay } from 'rxjs/operators/publishReplay'
+import { reduce } from 'rxjs/operators/reduce'
+import { refCount } from 'rxjs/operators/refCount'
+import { switchMap } from 'rxjs/operators/switchMap'
 import { async } from 'rxjs/scheduler/async'
 import * as lf from 'lovefield'
 import * as Exception from '../../exception'
@@ -38,19 +47,21 @@ export class Selector <T> {
     const fakeQuery = { toSql: identity }
     // 初始化一个空的 QuerySelector，然后在初始化以后替换它上面的属性和方法
     const dist = new Selector<U>(originalToken.db, fakeQuery as any, { } as any)
-    dist.change$ = Observable.from(metaDatas)
-      .map(metas => metas.mapFn(metas.change$))
-      .combineAll<any, any>()
-      .map((r: U[][]) => r.reduce((acc, val) => acc.concat(val)))
-      .debounceTime(0, async)
-      .publishReplay(1)
-      .refCount()
+    dist.change$ = Observable.from(metaDatas).pipe(
+      map(metas => metas.mapFn(metas.change$)),
+      combineAll<Observable<U[]>, U[][]>(),
+      map(r => r.reduce((acc, val) => acc.concat(val))),
+      debounceTime(0, async),
+      publishReplay(1),
+      refCount()
+    )
     dist.values = () => {
       assert(!dist.consumed, Exception.TokenConsumed())
       dist.consumed = true
-      return Observable.from(metaDatas)
-        .flatMap(metaData => metaData.values())
-        .reduce((acc: U[], val: U[]) => acc.concat(val))
+      return Observable.from(metaDatas).pipe(
+        mergeMap(metaData => metaData.values()),
+        reduce((acc, val) => acc.concat(val))
+      )
     }
     dist.toString = () => {
       const querys = metaDatas.map(m => m.toString())
@@ -100,10 +111,11 @@ export class Selector <T> {
       }) as Observable<T[]>
 
     const changesOnQuery = limit || skip
-      ? this.buildPrefetchingObserve()
-        .switchMap((pks) =>
+      ? this.buildPrefetchingObserve().pipe(
+        switchMap((pks) =>
           observeOn(this.getQuery(this.inPKs(pks)))
         )
+      )
       : observeOn(this.getQuery())
 
     return lfIssueFix(changesOnQuery)
@@ -222,7 +234,7 @@ export class Selector <T> {
     return this.mapFn(this.change$)
   }
 
-  map<K>(fn: (stream$: Observable<T[]>) => Observable<K[]>) {
+  map<K>(fn: OperatorFunction<T[], K[]>) {
     this.mapFn = fn
     return this as any as Selector<K>
   }

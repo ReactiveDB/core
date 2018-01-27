@@ -1,10 +1,3 @@
-import 'rxjs/add/operator/combineAll'
-import 'rxjs/add/operator/do'
-import 'rxjs/add/operator/map'
-import 'rxjs/add/operator/publishReplay'
-import 'rxjs/add/operator/switchMap'
-import 'rxjs/add/operator/take'
-
 export { QueryToken, SelectorMeta } from '../storage/modules/QueryToken'
 export { ProxySelector } from '../storage/modules/ProxySelector'
 export * from '../interface'
