@@ -2,6 +2,9 @@ import { Observable } from 'rxjs/Observable'
 import { ErrorObservable } from 'rxjs/observable/ErrorObservable'
 import { Subscription } from 'rxjs/Subscription'
 import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable'
+import { concatMap } from 'rxjs/operators/concatMap'
+import { map } from 'rxjs/operators/map'
+import { tap } from 'rxjs/operators/tap'
 import * as lf from 'lovefield'
 import * as Exception from '../exception'
 import * as typeDefinition from './helper/definition'
@@ -91,27 +94,28 @@ export class Database {
   }
 
   dump() {
-    return this.database$.concatMap(db => db.export())
+    const dump = (db: lf.Database) => db.export()
+    return this.database$.pipe(concatMap(dump))
   }
 
   load(data: any) {
     assert(!this.connected, Exception.DatabaseIsNotEmpty())
 
-    return this.database$
-      .concatMap(db => {
+    const load = (db: lf.Database) => {
+      forEach(data.tables, (entities: any[], name: string) => {
+        const schema = this.findSchema(name)
+        entities.forEach((entity: any) =>
+          this.storedIds.add(fieldIdentifier(name, entity[schema.pk])))
+      })
+      return db.import(data).catch(() => {
         forEach(data.tables, (entities: any[], name: string) => {
           const schema = this.findSchema(name)
           entities.forEach((entity: any) =>
-            this.storedIds.add(fieldIdentifier(name, entity[schema.pk])))
-        })
-        return db.import(data).catch(() => {
-          forEach(data.tables, (entities: any[], name: string) => {
-            const schema = this.findSchema(name)
-            entities.forEach((entity: any) =>
-              this.storedIds.delete(fieldIdentifier(name, entity[schema.pk])))
-          })
+            this.storedIds.delete(fieldIdentifier(name, entity[schema.pk])))
         })
       })
+    }
+    return this.database$.pipe(concatMap(load))
   }
 
   insert<T>(tableName: string, raw: T[]): Observable<ExecutorResult>
@@ -121,52 +125,54 @@ export class Database {
   insert<T>(tableName: string, raw: T | T[]): Observable<ExecutorResult>
 
   insert<T>(tableName: string, raw: T | T[]): Observable<ExecutorResult> {
-    return this.database$
-      .concatMap(db => {
-        const schema = this.findSchema(tableName)
-        const pk = schema.pk
-        const columnMapper = schema.mapper
-        const [ table ] = Database.getTables(db, tableName)
-        const muts: Mutation[] = []
-        const entities = clone(raw)
+    const insert = (db: lf.Database) => {
+      const schema = this.findSchema(tableName)
+      const pk = schema.pk
+      const columnMapper = schema.mapper
+      const [ table ] = Database.getTables(db, tableName)
+      const muts: Mutation[] = []
+      const entities = clone(raw)
 
-        const iterator = Array.isArray(entities) ? entities : [entities]
+      const iterator = Array.isArray(entities) ? entities : [entities]
 
-        iterator.forEach((entity: any) => {
-          const mut = new Mutation(db, table)
-          const hiddenPayload = Object.create(null)
+      iterator.forEach((entity: any) => {
+        const mut = new Mutation(db, table)
+        const hiddenPayload = Object.create(null)
 
-          columnMapper.forEach((mapper, key) => {
-            // cannot create a hidden column for primary key
-            if (!hasOwn(entity, key) || key === pk) {
-              return
-            }
+        columnMapper.forEach((mapper, key) => {
+          // cannot create a hidden column for primary key
+          if (!hasOwn(entity, key) || key === pk) {
+            return
+          }
 
-            const val = entity[key]
-            hiddenPayload[key] = mapper(val)
-            hiddenPayload[hiddenColName(key)] = val
-          })
-
-          mut.patch({ ...entity, ...hiddenPayload })
-          mut.withId(pk, entity[pk])
-          muts.push(mut)
+          const val = entity[key]
+          hiddenPayload[key] = mapper(val)
+          hiddenPayload[hiddenColName(key)] = val
         })
 
-        const { contextIds, queries } = Mutation.aggregate(db, muts, [])
-        contextIds.forEach(id => this.storedIds.add(id))
-        const onError = { error: () => contextIds.forEach(id => this.storedIds.delete(id)) }
-
-        if (this.inTransaction) {
-          this.attachTx(onError)
-          return this.executor(db, queries)
-        }
-
-        return this.executor(db, queries).do(onError)
+        mut.patch({ ...entity, ...hiddenPayload })
+        mut.withId(pk, entity[pk])
+        muts.push(mut)
       })
+
+      const { contextIds, queries } = Mutation.aggregate(db, muts, [])
+      contextIds.forEach(id => this.storedIds.add(id))
+      const onError = { error: () => contextIds.forEach(id => this.storedIds.delete(id)) }
+
+      if (this.inTransaction) {
+        this.attachTx(onError)
+        return this.executor(db, queries)
+      }
+
+      return this.executor(db, queries).pipe(tap(onError))
+    }
+    return this.database$.pipe(concatMap(insert))
   }
 
   get<T>(tableName: string, query: Query<T> = {}, mode: JoinMode = JoinMode.imlicit): QueryToken<T> {
-    const selector$ = this.buildSelector<T>(tableName, query, mode)
+    const selector$ = this.database$.pipe(
+      map(db => this.buildSelector(db, tableName, query, mode))
+    )
     return new QueryToken<T>(selector$)
   }
 
@@ -181,41 +187,41 @@ export class Database {
       return Observable.throw(err)
     }
 
-    return this.database$
-      .concatMap<any, any>(db => {
-        const entity = clone(raw)
-        const [ table ] = Database.getTables(db, tableName)
-        const columnMapper = schema!.mapper
-        const hiddenPayload = Object.create(null)
+    const update = (db: lf.Database) => {
+      const entity = clone(raw)
+      const [ table ] = Database.getTables(db, tableName)
+      const columnMapper = schema!.mapper
+      const hiddenPayload = Object.create(null)
 
-        columnMapper.forEach((mapper, key) => {
-          // cannot create a hidden column for primary key
-          if (!hasOwn(entity, key) || key === schema!.pk) {
-            return
-          }
+      columnMapper.forEach((mapper, key) => {
+        // cannot create a hidden column for primary key
+        if (!hasOwn(entity, key) || key === schema!.pk) {
+          return
+        }
 
-          const val = (entity as any)[key]
-          hiddenPayload[key] = mapper(val)
-          hiddenPayload[hiddenColName(key)] = val
-        })
-
-        const mut = { ...(entity as any), ...hiddenPayload }
-        const predicate = createPredicate(table, clause)
-        const query = predicatableQuery(db, table, predicate!, StatementType.Update)
-
-        forEach(mut, (val, key) => {
-          const column = table[key]
-          if (key === schema!.pk) {
-            warn(`Primary key is not modifiable.`)
-          } else if (!column) {
-            warn(`Column: ${key} is not existent on table:${tableName}`)
-          } else {
-            query.set(column, val)
-          }
-        })
-
-        return this.executor(db, [query])
+        const val = (entity as any)[key]
+        hiddenPayload[key] = mapper(val)
+        hiddenPayload[hiddenColName(key)] = val
       })
+
+      const mut = { ...(entity as any), ...hiddenPayload }
+      const predicate = createPredicate(table, clause)
+      const query = predicatableQuery(db, table, predicate!, StatementType.Update)
+
+      forEach(mut, (val, key) => {
+        const column = table[key]
+        if (key === schema!.pk) {
+          warn(`Primary key is not modifiable.`)
+        } else if (!column) {
+          warn(`Column: ${key} is not existent on table:${tableName}`)
+        } else {
+          query.set(column, val)
+        }
+      })
+
+      return this.executor(db, [query])
+    }
+    return this.database$.pipe(concatMap(update))
   }
 
   delete<T>(tableName: string, clause: Predicate<T> = {}): Observable<ExecutorResult> {
@@ -224,35 +230,38 @@ export class Database {
       return Observable.throw(err)
     }
 
-    return this.database$
-      .concatMap(db => {
-        const [ table ] = Database.getTables(db, tableName)
-        const column = table[pk!]
-        const provider = new PredicateProvider(table, clause)
-        const prefetch =
-          predicatableQuery(db, table, provider.getPredicate(), StatementType.Select, column)
+    const deletion = (db: lf.Database): Observable<ExecutorResult> => {
+      const [ table ] = Database.getTables(db, tableName)
+      const column = table[pk!]
+      const provider = new PredicateProvider(table, clause)
+      const prefetch =
+        predicatableQuery(db, table, provider.getPredicate(), StatementType.Select, column)
+      const deleteByScopedIds = (scopedIds: Object[]) => {
+        const query = predicatableQuery(db, table, provider.getPredicate(), StatementType.Delete)
 
-        return Observable.fromPromise(prefetch.exec())
-          .concatMap((scopedIds) => {
-            const query = predicatableQuery(db, table, provider.getPredicate(), StatementType.Delete)
+        scopedIds.forEach((entity) =>
+          this.storedIds.delete(fieldIdentifier(tableName, entity[pk!])))
 
+        const onError = {
+          error: () => {
             scopedIds.forEach((entity: object) =>
-              this.storedIds.delete(fieldIdentifier(tableName, entity[pk!])))
-            const onError = {
-              error: () => {
-                scopedIds.forEach((entity: object) =>
-                  this.storedIds.add(fieldIdentifier(tableName, entity[pk!])))
-              }
-            }
+              this.storedIds.add(fieldIdentifier(tableName, entity[pk!])))
+          }
+        }
 
-            if (this.inTransaction) {
-              this.attachTx(onError)
-              return this.executor(db, [query])
-            }
+        if (this.inTransaction) {
+          this.attachTx(onError)
+          return this.executor(db, [query])
+        }
 
-            return this.executor(db, [query]).do(onError)
-          })
-      })
+        return this.executor(db, [query]).pipe(tap(onError))
+      }
+
+      return Observable.fromPromise(prefetch.exec())
+        .pipe(concatMap(deleteByScopedIds))
+    }
+
+    return this.database$.pipe(concatMap(deletion))
   }
 
   upsert<T>(tableName: string, raw: T): Observable<ExecutorResult>
@@ -262,7 +271,7 @@ export class Database {
   upsert<T>(tableName: string, raw: T | T[]): Observable<ExecutorResult>
 
   upsert<T>(tableName: string, raw: T | T[]): Observable<ExecutorResult> {
-    return this.database$.concatMap(db => {
+    const upsert = (db: lf.Database) => {
       const sharing = new Map<any, Mutation>()
       const insert: Mutation[] = []
       const update: Mutation[] = []
@@ -278,11 +287,12 @@ export class Database {
           return this.executor(db, queries)
         }
 
-        return this.executor(db, queries).do(onError)
+        return this.executor(db, queries).pipe(tap(onError))
       } else {
         return Observable.of({ result: false, insert: 0, update: 0, delete: 0, select: 0 })
       }
-    })
+    }
+    return this.database$.pipe(concatMap(upsert))
   }
 
   remove<T>(tableName: string, clause: Clause<T> = {}): Observable<ExecutorResult> {
@@ -292,7 +302,7 @@ export class Database {
     }
     const disposeHandler = schema!.dispose
 
-    return this.database$.concatMap((db) => {
+    const remove = (db: lf.Database) => {
       const [ table ] = Database.getTables(db, tableName)
       const predicate = createPredicate(table, clause.where)
 
@@ -300,40 +310,44 @@ export class Database {
       const removedIds: any = []
       queries.push(predicatableQuery(db, table, predicate!, StatementType.Delete))
 
-      const prefetch = predicatableQuery(db, table, predicate!, StatementType.Select)
-      return Observable.fromPromise(prefetch.exec())
-        .concatMap((rootEntities) => {
-          rootEntities.forEach(entity => {
-            removedIds.push(fieldIdentifier(tableName, entity[schema!.pk]))
-          })
-
-          const onError = {
-            error: () => removedIds.forEach((id: string) => this.storedIds.add(id))
-          }
-
-          if (disposeHandler) {
-            const scope = this.createScopedHandler<T>(db, queries, removedIds)
-            return disposeHandler(rootEntities, scope)
-              .do(() => removedIds.forEach((id: string) => this.storedIds.delete(id)))
-              .concatMap(() => {
-                if (this.inTransaction) {
-                  this.attachTx(onError)
-                  return this.executor(db, queries)
-                }
-                return this.executor(db, queries).do(onError)
-              })
-          } else {
-            removedIds.forEach((id: string) => this.storedIds.delete(id))
-
-            if (this.inTransaction) {
-              this.attachTx(onError)
-              return this.executor(db, queries)
-            }
-
-            return this.executor(db, queries).do(onError)
-          }
+      const removeByRootEntities = (rootEntities: Object[]) => {
+        rootEntities.forEach(entity => {
+          removedIds.push(fieldIdentifier(tableName, entity[schema!.pk]))
         })
-    })
+
+        const onError = {
+          error: () => removedIds.forEach((id: string) => this.storedIds.add(id))
+        }
+
+        if (disposeHandler) {
+          const scope = this.createScopedHandler<T>(db, queries, removedIds)
+          return disposeHandler(rootEntities, scope).pipe(
+            tap(() => removedIds.forEach((id: string) => this.storedIds.delete(id))),
+            concatMap(() => {
+              if (this.inTransaction) {
+                this.attachTx(onError)
+                return this.executor(db, queries)
+              }
+              return this.executor(db, queries).pipe(tap(onError))
+            })
+          )
+        } else {
+          removedIds.forEach((id: string) => this.storedIds.delete(id))
+          if (this.inTransaction) {
+            this.attachTx(onError)
+            return this.executor(db, queries)
+          }
+          return this.executor(db, queries).pipe(tap(onError))
+        }
+      }
+
+      const prefetch = predicatableQuery(db, table, predicate!, StatementType.Select)
+      return Observable.fromPromise(prefetch.exec()).pipe(
+        concatMap(removeByRootEntities)
+      )
+    }
+
+    return this.database$.pipe(concatMap(remove))
   }
 
   dispose(): ErrorObservable | Observable<ExecutorResult> {
@@ -341,19 +355,20 @@ export class Database {
       return Observable.throw(Exception.NotConnected())
     }
 
-    const cleanup = this.database$.map(db =>
-      db.getSchema().tables().map(t => db.delete().from(t)))
-
-    return this.database$.concatMap(db => {
-      return cleanup.concatMap(queries => this.executor(db, queries))
-        .do(() => {
+    const cleanUp = (db: lf.Database) => {
+      const deletions = db.getSchema().tables().map(t => db.delete().from(t))
+      return this.executor(db, deletions).pipe(
+        tap(() => {
           db.close()
           this.schemas.clear()
           this.storedIds.clear()
           this.schemaBuilder = null
           this.subscription.unsubscribe()
         })
-    })
+      )
+    }
+
+    return this.database$.pipe(concatMap(cleanUp))
   }
 
   attachTx(_: TransactionEffects) {
@@ -363,20 +378,21 @@ export class Database {
   executor(db: lf.Database, queries: lf.query.Builder[]) {
     const tx = db.createTransaction()
 
-    return Observable.fromPromise(tx.exec(queries))
-      .do(transactionErrorHandler)
-      .map((ret) => {
+    return Observable.fromPromise(tx.exec(queries)).pipe(
+      tap(transactionErrorHandler),
+      map((ret) => {
         return {
           result: true,
           ...mergeTransactionResult(queries, ret)
         }
       })
+    )
   }
 
   transaction(): Observable<Transaction<Database>> {
     type ProxyProperty = Pick<Database, 'attachTx' | 'executor' | 'inTransaction'>
 
-    return this.database$.map(db => {
+    return this.database$.pipe(map(db => {
       const tx = db.createTransaction()
       const transactionQueries: lf.query.Builder[] = []
       const effects: TransactionEffects[] = []
@@ -407,14 +423,14 @@ export class Database {
       const customTx = {
         commit: () => {
           return effects.reduce((acc, curr) => {
-            return acc.do(curr)
-          }, Observable.from(tx.exec(transactionQueries)))
-            .map((r) => {
+            return acc.pipe(tap(curr))
+          }, Observable.from(tx.exec(transactionQueries))).pipe(
+            map((r) => {
               return {
                 result: true,
                 ...mergeTransactionResult(transactionQueries, r)
               }
-            })
+            }))
         },
         abort: () => {
           effects.length = 0
@@ -428,7 +444,7 @@ export class Database {
       ]
 
       return ret
-    })
+    }))
   }
 
   private buildTables() {
@@ -518,45 +534,44 @@ export class Database {
   }
 
   private buildSelector<T>(
+    db: lf.Database,
     tableName: string,
     clause: Query<T>,
     mode: JoinMode
   ) {
-    return this.database$.map((db) => {
-      const schema = this.findSchema(tableName)
-      const pk = schema.pk
-      const containFields = !!clause.fields
+    const schema = this.findSchema(tableName)
+    const pk = schema.pk
+    const containFields = !!clause.fields
 
-      const containKey = containFields ? contains(pk, clause.fields!) : true
-      const fields: Set<Field> = containFields ? new Set(clause.fields) : new Set(schema.columns.keys())
-      const { table, columns, joinInfo, definition } =
-        this.traverseQueryFields(db, tableName, fields, containKey, !containFields, [], {}, mode)
-      const query =
-        predicatableQuery(db, table!, null, StatementType.Select, ...columns)
+    const containKey = containFields ? contains(pk, clause.fields!) : true
+    const fields: Set<Field> = containFields ? new Set(clause.fields) : new Set(schema.columns.keys())
+    const { table, columns, joinInfo, definition } =
+      this.traverseQueryFields(db, tableName, fields, containKey, !containFields, [], {}, mode)
+    const query =
+      predicatableQuery(db, table!, null, StatementType.Select, ...columns)
 
-      joinInfo.forEach((info: JoinInfo) =>
-        query.leftOuterJoin(info.table, info.predicate))
+    joinInfo.forEach((info: JoinInfo) =>
+      query.leftOuterJoin(info.table, info.predicate))
 
-      const orderDesc = (clause.orderBy || []).map(desc => {
-        return {
-          column: table![desc.fieldName],
-          orderBy: !desc.orderBy ? null : lf.Order[desc.orderBy]
-        }
-      })
-
-      const matcher = {
-        pk: {
-          name: pk,
-          queried: containKey
-        },
-        definition,
-        mainTable: table!
+    const orderDesc = (clause.orderBy || []).map(desc => {
+      return {
+        column: table![desc.fieldName],
+        orderBy: !desc.orderBy ? null : lf.Order[desc.orderBy]
       }
-      const { limit, skip } = clause
-      const provider = new PredicateProvider(table!, clause.where)
-
-      return new Selector<T>(db, query, matcher, provider, limit, skip, orderDesc)
     })
+
+    const matcher = {
+      pk: {
+        name: pk,
+        queried: containKey
+      },
+      definition,
+      mainTable: table!
+    }
+    const { limit, skip } = clause
+    const provider = new PredicateProvider(table!, clause.where)
+
+    return new Selector<T>(db, query, matcher, provider, limit, skip, orderDesc)
   }
 
   private createColumn(
