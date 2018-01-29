@@ -76,7 +76,7 @@ export class QueryToken<T> {
       combineAll<Observable<Selector<T>>, Selector<T>[]>(),
       map((r) => {
         const first = r.shift()
-        return first!.concat(...r)
+        return first!.combine(...r)
       })
     )
     return new QueryToken<T>(newSelector$)

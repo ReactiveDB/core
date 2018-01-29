@@ -43,7 +43,11 @@ export class MockSelector<T> {
     return this.mapFn(this.change$.take(1))
   }
 
-  concat = this.combine
+  concat(... metas: MockSelector<T>[]) {
+    const dist = this.combine(...metas)
+    dist['__test_label_selector_kind__'] = 'by concat'
+    return dist
+  }
 
   combine(... metas: MockSelector<T>[]) {
     metas.unshift(this)
@@ -60,6 +64,7 @@ export class MockSelector<T> {
         .combineAll()
         .map((r: T[][]) => r.reduce((acc, val) => acc.concat(val)))
     }
+    dist['__test_label_selector_kind__'] = 'by combine'
     return dist
   }
 
