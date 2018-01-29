@@ -101,6 +101,9 @@ export default describe('QueryToken Testcase', () => {
         mockSelector2 = new MockSelector(generateMockTestdata(tasks2))
         queryToken2 = new QueryToken(Observable.of(mockSelector2) as any)
         combined = queryToken.combine(queryToken2)
+        combined.selector$.subscribe((mock) => {
+          expect(mock['__test_label_selector_kind__']).to.equal('by combine')
+        })
       })
 
       it('should get a new QueryToken', () => {
@@ -169,6 +172,9 @@ export default describe('QueryToken Testcase', () => {
         mockSelector2 = new MockSelector(generateMockTestdata(tasks2))
         queryToken2 = new QueryToken(Observable.of(mockSelector2) as any)
         concated = queryToken.concat(queryToken2)
+        concated.selector$.subscribe((mock) => {
+          expect(mock['__test_label_selector_kind__']).to.equal('by concat')
+        })
       })
 
       it('should get new QueryToken', () => {
