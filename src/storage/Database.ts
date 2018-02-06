@@ -40,7 +40,7 @@ export class Database {
 
   private findSchema = (name: string): ParsedSchema => {
     const schema = this.schemas.get(name)
-    assert(schema, Exception.NonExistentTable(name))
+    assert(schema, () => Exception.NonExistentTable(name))
     return schema!
   }
 
@@ -50,11 +50,11 @@ export class Database {
    */
   defineSchema<T>(tableName: string, schema: SchemaDef<T>) {
     const advanced = !this.schemaDefs.has(tableName) && !this.connected
-    assert(advanced, Exception.UnmodifiableTable())
+    assert(advanced, () => Exception.UnmodifiableTable())
 
     const hasPK = Object.keys(schema)
       .some((key: string) => schema[key].primaryKey === true)
-    assert(hasPK, Exception.PrimaryKeyNotProvided())
+    assert(hasPK, () => Exception.PrimaryKeyNotProvided())
 
     this.schemaDefs.set(tableName, schema)
     return this
@@ -90,7 +90,7 @@ export class Database {
   }
 
   load(data: any) {
-    assert(!this.connected, Exception.DatabaseIsNotEmpty())
+    assert(!this.connected, () => Exception.DatabaseIsNotEmpty())
 
     return this.database$
       .concatMap(db => {
@@ -356,7 +356,7 @@ export class Database {
         columns.set(key, def.type as RDBType)
 
         if (def.primaryKey) {
-          assert(!primaryKey[0], Exception.PrimaryKeyConflict())
+          assert(!primaryKey[0], () => Exception.PrimaryKeyConflict())
           primaryKey.push(key)
         }
 
@@ -519,7 +519,7 @@ export class Database {
 
     const onlyNavigator = Array.from(fieldsValue.keys())
       .every(key => contains(key, navigators))
-    assert(!onlyNavigator, Exception.InvalidQuery())
+    assert(!onlyNavigator, () => Exception.InvalidQuery())
 
     if (!hasKey) {
       // 保证主键一定比关联字段更早的被遍历到
@@ -539,7 +539,7 @@ export class Database {
       }
 
       columns.push(...ret.columns)
-      assert(!rootDefinition[key], Exception.AliasConflict(key, tableName))
+      assert(!rootDefinition[key], () => Exception.AliasConflict(key, tableName))
 
       if ((defs as ColumnDef).column) {
         rootDefinition[key] = defs
@@ -631,7 +631,7 @@ export class Database {
     const schema = this.findSchema(tableName)
     const pk = schema.pk
     const pkVal = compoundEntites[pk]
-    assert(pkVal !== undefined, Exception.PrimaryKeyNotProvided())
+    assert(pkVal !== undefined, () => Exception.PrimaryKeyNotProvided())
 
     const [ table ] = Database.getTables(db, tableName)
     const identifier = fieldIdentifier(tableName, pkVal)

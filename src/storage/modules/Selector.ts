@@ -19,7 +19,7 @@ export class Selector <T> {
     const [ minSkip ] = skipsAndLimits
     const maxLimit = skipsAndLimits.reduce((acc, current) => {
       const nextSkip = acc.skip! + acc.limit!
-      assert(current.skip === nextSkip, Exception.TokenConcatFailed(`
+      assert(current.skip === nextSkip, () => Exception.TokenConcatFailed(`
         skip should be serial,
         expect: ${JSON.stringify(acc, null, 2)}
         actual: ${nextSkip}
@@ -46,7 +46,7 @@ export class Selector <T> {
       .publishReplay(1)
       .refCount()
     dist.values = () => {
-      assert(!dist.consumed, Exception.TokenConsumed())
+      assert(!dist.consumed, () => Exception.TokenConsumed())
       dist.consumed = true
       return Observable.from(metaDatas)
         .flatMap(metaData => metaData.values())
@@ -213,7 +213,7 @@ export class Selector <T> {
         )
       )
     )
-    assert(equal, Exception.TokenConcatFailed())
+    assert(equal, () => Exception.TokenConcatFailed())
 
     return Selector.concatFactory(this, ...selectors)
   }

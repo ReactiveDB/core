@@ -67,7 +67,7 @@ export class Mutation {
   }
 
   private toUpdater() {
-    assert(this.meta, Exception.PrimaryKeyNotProvided())
+    assert(this.meta, () => Exception.PrimaryKeyNotProvided())
 
     const query = this.db.update(this.table)
     query.where(this.table[this.meta.key].eq(this.meta.val))
@@ -85,7 +85,7 @@ export class Mutation {
   }
 
   private toRow() {
-    assert(this.meta, Exception.PrimaryKeyNotProvided())
+    assert(this.meta, () => Exception.PrimaryKeyNotProvided())
 
     return {
       table: this.table,
