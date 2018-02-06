@@ -1,7 +1,9 @@
-export function assert(condition: any, error: Error | string) {
+export function assert(condition: any, produceError: () => Error | string) {
   if (condition) {
     return
   }
+
+  const error = produceError()
 
   if (error instanceof Error) {
     throw error
