@@ -1,5 +1,5 @@
 import { identity } from '../../utils'
-import * as Exception from '../../exception'
+import { Exception, dbErrMsg } from '../../exception'
 
 const nestJS = require('nesthydrationjs')()
 
@@ -12,6 +12,6 @@ export function graph<T>(rows: any[], definition: Object) {
     const result = nestJS.nest(rows, [definition])
     return result as T[]
   } catch (e) {
-    throw Exception.GraphFailed(e)
+    throw new Exception(dbErrMsg.GraphFailed(e))
   }
 }

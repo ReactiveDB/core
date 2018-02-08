@@ -10,7 +10,7 @@ import { TestFixture2 } from '../../schemas/Test'
 import { scenarioGen, programGen, postGen, taskGen, subtaskGen } from '../../utils/generators'
 import { RDBType, DataStoreType, Database, clone, forEach, JoinMode } from '../../index'
 import { TaskSchema, ProjectSchema, PostSchema, ModuleSchema, ProgramSchema, SubtaskSchema } from '../../index'
-import { InvalidQuery, NonExistentTable, InvalidType, PrimaryKeyNotProvided, NotConnected, Selector, UnexpectedTransactionUse } from '../../index'
+import { Selector, dbErrMsg } from '../../index'
 
 use(SinonChai)
 
@@ -87,12 +87,11 @@ export default describe('Database Testcase: ', () => {
       const testDb = new Database()
       TestFixture2(testDb)
 
-      const standardErr = InvalidType()
       try {
         testDb.connect()
         throw new Error('error path reached')
       } catch (err) {
-        expect(err.message).to.equal(standardErr.message)
+        expect(err.message).to.equal(dbErrMsg.InvalidType())
       }
     })
 
@@ -105,7 +104,7 @@ export default describe('Database Testcase: ', () => {
         yield database.dispose()
         throw new Error('error code path')
       } catch (e) {
-        expect(e.message).to.equal(NotConnected().message)
+        expect(e.message).to.equal(dbErrMsg.NotConnected())
       }
     })
 
@@ -186,7 +185,7 @@ export default describe('Database Testcase: ', () => {
         yield database.insert(FoolishTable, {})
         throw new Error('error code path')
       } catch (e) {
-        expect(e.message).to.equal(NonExistentTable(FoolishTable).message)
+        expect(e.message).to.equal(dbErrMsg.NonExistentTable(FoolishTable))
       }
     })
 
@@ -375,8 +374,7 @@ export default describe('Database Testcase: ', () => {
         yield database.get(FoolishTable).values()
         throw new Error('error path reached')
       } catch (e) {
-        const standardErr = NonExistentTable(FoolishTable)
-        expect(e.message).equals(standardErr.message)
+        expect(e.message).equals(dbErrMsg.NonExistentTable(FoolishTable))
       }
     })
 
@@ -549,8 +547,7 @@ export default describe('Database Testcase: ', () => {
 
           throw new Error('error path reached')
         } catch (err) {
-          const standardErr = InvalidQuery()
-          expect(err.message).to.equal(standardErr.message)
+          expect(err.message).to.equal(dbErrMsg.InvalidQuery())
         }
       })
 
@@ -738,8 +735,7 @@ export default describe('Database Testcase: ', () => {
         }, patch)
         throw new Error('error code path')
       } catch (e) {
-        const standardErr = InvalidType(['Object', 'Array'])
-        expect(e.message).to.equal(standardErr.message)
+        expect(e.message).to.equal(dbErrMsg.InvalidType(['Object', 'Array']))
       }
     })
 
@@ -777,8 +773,7 @@ export default describe('Database Testcase: ', () => {
         yield database.update(FoolishTable, {}, {})
         throw new Error('error path reached')
       } catch (e) {
-        const standardErr = NonExistentTable(FoolishTable)
-        expect(e.message).equals(standardErr.message)
+        expect(e.message).equals(dbErrMsg.NonExistentTable(FoolishTable))
       }
     })
 
@@ -839,7 +834,7 @@ export default describe('Database Testcase: ', () => {
         yield database.delete(FoolishTable)
         throw new Error('error code path')
       } catch (e) {
-        expect(e.message).to.equal(NonExistentTable(FoolishTable).message)
+        expect(e.message).to.equal(dbErrMsg.NonExistentTable(FoolishTable))
       }
     })
 
@@ -1067,7 +1062,6 @@ export default describe('Database Testcase: ', () => {
 
     it('should throw since entry does not contain PK property', function* () {
       const post = postGen(1, null).pop()
-      const standardErr = PrimaryKeyNotProvided()
 
       delete post._id
 
@@ -1075,7 +1069,7 @@ export default describe('Database Testcase: ', () => {
         yield database.upsert<PostSchema>('Post', {} as any)
         throw 1
       } catch (e) {
-        expect(standardErr.message).to.equal(standardErr.message)
+        expect(e.message).to.equal(dbErrMsg.PrimaryKeyNotProvided())
       }
     })
 
@@ -1084,7 +1078,7 @@ export default describe('Database Testcase: ', () => {
         yield database.upsert(FoolishTable, {})
         throw new Error('error code path')
       } catch (e) {
-        expect(e.message).to.equal(NonExistentTable(FoolishTable).message)
+        expect(e.message).to.equal(dbErrMsg.NonExistentTable(FoolishTable))
       }
     })
 
@@ -1206,7 +1200,7 @@ export default describe('Database Testcase: ', () => {
         yield database.remove(tableName)
         throw new Error('error code path')
       } catch (e) {
-        expect(e.message).to.equal(NonExistentTable(tableName).message)
+        expect(e.message).to.equal(dbErrMsg.NonExistentTable(tableName))
       }
     })
 
@@ -1441,7 +1435,7 @@ export default describe('Database Testcase: ', () => {
         database.attachTx({ next: () => console.info(1) })
         throw new Error('error code path')
       } catch (e) {
-        expect(e.message).to.equal(UnexpectedTransactionUse().message)
+        expect(e.message).to.equal(dbErrMsg.UnexpectedTransactionUse())
       }
     })
 

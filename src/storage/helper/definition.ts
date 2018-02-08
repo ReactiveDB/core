@@ -2,7 +2,7 @@ import { forEach } from '../../utils'
 import { RDBType, ColumnDef } from '../../interface'
 import { LiteralArray } from './graph'
 import { Relationship } from '../../interface'
-import * as Exception from '../../exception'
+import { Exception, dbErrMsg } from '../../exception'
 
 export function revise(relation: Relationship, def: Object) {
   switch (relation) {
@@ -17,9 +17,9 @@ export function revise(relation: Relationship, def: Object) {
       def = [def]
       break
     case Relationship.manyToMany:
-      throw Exception.NotImplemented()
+      throw new Exception(dbErrMsg.NotImplemented())
     default:
-      throw Exception.UnexpectedRelationship()
+      throw new Exception(dbErrMsg.UnexpectedRelationship())
   }
 
   return def

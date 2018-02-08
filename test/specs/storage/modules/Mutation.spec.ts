@@ -3,7 +3,7 @@ import { expect, use } from 'chai'
 import * as sinon from 'sinon'
 import * as SinonChai from 'sinon-chai'
 import { Mutation } from '../../../../src/storage/modules'
-import { PrimaryKeyNotProvided } from '../../../index'
+import { dbErrMsg } from '../../../index'
 import { fieldIdentifier } from '../../../../src/storage/symbols'
 import { MockDatabase, MockDatabaseTable, MockUpdate, MockInsert } from '../../../utils/mocks'
 
@@ -143,7 +143,7 @@ export default describe('Mutation Testcase: ', () => {
       })
 
       it('should throw when try to aggregate an unspecified mutation.', () => {
-        const standardErr = PrimaryKeyNotProvided()
+        const standardErr = dbErrMsg.PrimaryKeyNotProvided()
 
         const mut1 = [new Mutation(database, table, fixture[0])]
         const mut2 = [new Mutation(database, table, fixture[1])]
@@ -151,8 +151,8 @@ export default describe('Mutation Testcase: ', () => {
         const check1 = () => Mutation.aggregate(database, mut1, [])
         const check2 = () => Mutation.aggregate(database, [], mut2)
 
-        expect(check1).throw(standardErr.message)
-        expect(check2).throw(standardErr.message)
+        expect(check1).throw(standardErr)
+        expect(check2).throw(standardErr)
       })
 
       it('should skip the `toUpdater` once params is empty', () => {

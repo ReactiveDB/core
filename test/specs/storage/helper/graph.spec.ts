@@ -1,7 +1,7 @@
 import { beforeEach, it, describe } from 'tman'
 import { expect } from 'chai'
 import { graph } from '../../../../src/storage/helper'
-import { GraphFailed } from '../../../index'
+import { dbErrMsg } from '../../../index'
 
 export default describe('Helper - Graph Testcase: ', () => {
 
@@ -62,9 +62,8 @@ export default describe('Helper - Graph Testcase: ', () => {
   it('should throw when definition is unsuitable', () => {
     const check = () => graph(data, { baz: {} })
     const err = new Error('invalid structPropToColumnMap format - property \'baz\' can not be an empty object')
-    const standardErr = GraphFailed(err)
 
-    expect(check).to.throw(standardErr.message)
+    expect(check).to.throw(dbErrMsg.GraphFailed(err))
   })
 
 })

@@ -6,9 +6,7 @@ import {
   Database,
   Relationship,
   DataStoreType,
-  PrimaryKeyNotProvided,
-  DatabaseIsNotEmpty,
-  UnmodifiableTable
+  dbErrMsg
 } from '../../index'
 
 export default describe('Database Method before Connect', () => {
@@ -32,8 +30,7 @@ export default describe('Database Method before Connect', () => {
       const define = () => {
         database.defineSchema(tablename, metaData)
       }
-      const err = PrimaryKeyNotProvided()
-      expect(define).to.throw(err.message)
+      expect(define).to.throw(dbErrMsg.PrimaryKeyNotProvided())
     })
 
     it('should throw when user try to re-define a table', () => {
@@ -47,8 +44,7 @@ export default describe('Database Method before Connect', () => {
         database.defineSchema(tablename, metaData)
         database.defineSchema(tablename, metaData)
       }
-      const err = UnmodifiableTable()
-      expect(define).to.throw(err.message)
+      expect(define).to.throw(dbErrMsg.UnmodifiableTable())
     })
 
     it('should store in Database', () => {
@@ -91,9 +87,8 @@ export default describe('Database Method before Connect', () => {
         db.defineSchema(tablename, metaData)
       }
 
-      const err = UnmodifiableTable()
       expect(db).is.not.null
-      expect(define).to.throw(err.message)
+      expect(define).to.throw(dbErrMsg.UnmodifiableTable())
     })
   })
 
@@ -148,7 +143,7 @@ export default describe('Database Method before Connect', () => {
         db.load(fixture)
       }
 
-      expect(check).to.throw(DatabaseIsNotEmpty().message)
+      expect(check).to.throw(dbErrMsg.DatabaseIsNotEmpty())
     })
 
   })

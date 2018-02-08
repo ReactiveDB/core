@@ -6,7 +6,7 @@ import { concatMap } from 'rxjs/operators/concatMap'
 import { map } from 'rxjs/operators/map'
 import { tap } from 'rxjs/operators/tap'
 import * as lf from 'lovefield'
-import * as Exception from '../exception'
+import { dbErrMsg, Exception } from '../exception'
 import * as typeDefinition from './helper/definition'
 import Version from '../version'
 import { Traversable } from '../shared'
@@ -48,7 +48,7 @@ export class Database {
 
   private findSchema = (name: string): ParsedSchema => {
     const schema = this.schemas.get(name)
-    assert(schema, Exception.NonExistentTable(name))
+    assert(schema, dbErrMsg.NonExistentTable(name))
     return schema!
   }
 
@@ -58,11 +58,11 @@ export class Database {
    */
   defineSchema<T>(tableName: string, schema: SchemaDef<T>) {
     const advanced = !this.schemaDefs.has(tableName) && !this.connected
-    assert(advanced, Exception.UnmodifiableTable())
+    assert(advanced, dbErrMsg.UnmodifiableTable())
 
     const hasPK = Object.keys(schema)
       .some((key: string) => schema[key].primaryKey === true)
-    assert(hasPK, Exception.PrimaryKeyNotProvided())
+    assert(hasPK, dbErrMsg.PrimaryKeyNotProvided())
 
     this.schemaDefs.set(tableName, schema)
     return this
@@ -99,7 +99,7 @@ export class Database {
   }
 
   load(data: any) {
-    assert(!this.connected, Exception.DatabaseIsNotEmpty())
+    assert(!this.connected, dbErrMsg.DatabaseIsNotEmpty())
 
     const load = (db: lf.Database) => {
       forEach(data.tables, (entities: any[], name: string) => {
@@ -179,7 +179,7 @@ export class Database {
   update<T>(tableName: string, clause: Predicate<T>, raw: Partial<T>): Observable<ExecutorResult> {
     const type = getType(raw)
     if (type !== 'Object') {
-      return Observable.throw(Exception.InvalidType(['Object', type]))
+      return Observable.throw(new Exception(dbErrMsg.InvalidType(['Object', type])))
     }
 
     const [ schema, err ] = tryCatch<ParsedSchema>(this.findSchema)(tableName)
@@ -352,7 +352,7 @@ export class Database {
 
   dispose(): ErrorObservable | Observable<ExecutorResult> {
     if (!this.connected) {
-      return Observable.throw(Exception.NotConnected())
+      return Observable.throw(new Exception(dbErrMsg.NotConnected()))
     }
 
     const cleanUp = (db: lf.Database) => {
@@ -372,7 +372,7 @@ export class Database {
   }
 
   attachTx(_: TransactionEffects) {
-    throw Exception.UnexpectedTransactionUse()
+    throw new Exception(dbErrMsg.UnexpectedTransactionUse())
   }
 
   executor(db: lf.Database, queries: lf.query.Builder[]) {
@@ -485,7 +485,7 @@ export class Database {
         columns.set(key, def.type as RDBType)
 
         if (def.primaryKey) {
-          assert(!primaryKey[0], Exception.PrimaryKeyConflict())
+          assert(!primaryKey[0], dbErrMsg.PrimaryKeyConflict())
           primaryKey.push(key)
         }
 
@@ -609,7 +609,7 @@ export class Database {
       case RDBType.STRING:
         return tableBuilder.addColumn(columnName, lf.Type.STRING)
       default:
-        throw Exception.InvalidType()
+        throw new Exception(dbErrMsg.InvalidType())
     }
   }
 
@@ -647,7 +647,7 @@ export class Database {
 
     const onlyNavigator = Array.from(fieldsValue.keys())
       .every(key => contains(key, navigators))
-    assert(!onlyNavigator, Exception.InvalidQuery())
+    assert(!onlyNavigator, dbErrMsg.InvalidQuery())
 
     if (!hasKey) {
       // 保证主键一定比关联字段更早的被遍历到
@@ -667,7 +667,7 @@ export class Database {
       }
 
       columns.push(...ret.columns)
-      assert(!rootDefinition[key], Exception.AliasConflict(key, tableName))
+      assert(!rootDefinition[key], dbErrMsg.AliasConflict(key, tableName))
 
       if ((defs as ColumnDef).column) {
         rootDefinition[key] = defs
@@ -759,7 +759,7 @@ export class Database {
     const schema = this.findSchema(tableName)
     const pk = schema.pk
     const pkVal = compoundEntites[pk]
-    assert(pkVal !== undefined, Exception.PrimaryKeyNotProvided())
+    assert(pkVal !== undefined, dbErrMsg.PrimaryKeyNotProvided())
 
     const [ table ] = Database.getTables(db, tableName)
     const identifier = fieldIdentifier(tableName, pkVal)

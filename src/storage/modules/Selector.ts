@@ -11,7 +11,7 @@ import { refCount } from 'rxjs/operators/refCount'
 import { switchMap } from 'rxjs/operators/switchMap'
 import { async } from 'rxjs/scheduler/async'
 import * as lf from 'lovefield'
-import * as Exception from '../../exception'
+import { tokenErrMsg } from '../../exception'
 import { predicatableQuery, graph } from '../helper'
 import { identity, forEach, assert, warn } from '../../utils'
 import { PredicateProvider } from './PredicateProvider'
@@ -28,7 +28,7 @@ export class Selector <T> {
     const [ minSkip ] = skipsAndLimits
     const maxLimit = skipsAndLimits.reduce((acc, current) => {
       const nextSkip = acc.skip! + acc.limit!
-      assert(current.skip === nextSkip, Exception.TokenConcatFailed(`
+      assert(current.skip === nextSkip, tokenErrMsg.TokenConcatFailed(`
         skip should be serial,
         expect: ${JSON.stringify(acc, null, 2)}
         actual: ${nextSkip}
@@ -56,7 +56,7 @@ export class Selector <T> {
       refCount()
     )
     dist.values = () => {
-      assert(!dist.consumed, Exception.TokenConsumed())
+      assert(!dist.consumed, tokenErrMsg.TokenConsumed())
       dist.consumed = true
       return Observable.from(metaDatas).pipe(
         mergeMap(metaData => metaData.values()),
@@ -225,7 +225,7 @@ export class Selector <T> {
         )
       )
     )
-    assert(equal, Exception.TokenConcatFailed())
+    assert(equal, tokenErrMsg.TokenConcatFailed())
 
     return Selector.concatFactory(this, ...selectors)
   }

@@ -3,7 +3,7 @@ import { expect } from 'chai'
 import { Observable } from 'rxjs/Observable'
 import { MockSelector } from '../../../utils/mocks'
 import { taskGen } from '../../../utils/generators'
-import { QueryToken, TaskSchema, clone, TokenConsumed } from '../../../index'
+import { QueryToken, TaskSchema, clone, tokenErrMsg } from '../../../index'
 
 export default describe('QueryToken Testcase', () => {
 
@@ -48,7 +48,7 @@ export default describe('QueryToken Testcase', () => {
       it('should throw when reconsumed', function* () {
         yield queryToken.values()
         const fn = () => queryToken.values()
-        expect(fn).to.throw(TokenConsumed().message)
+        expect(fn).to.throw(tokenErrMsg.TokenConsumed())
       })
     })
 
@@ -79,7 +79,7 @@ export default describe('QueryToken Testcase', () => {
 
         const fn = () => queryToken.changes().take(1)
 
-        expect(fn).to.throw(TokenConsumed().message)
+        expect(fn).to.throw(tokenErrMsg.TokenConsumed())
       })
     })
 
@@ -149,7 +149,7 @@ export default describe('QueryToken Testcase', () => {
 
         const fn1 = () => combined.values()
 
-        expect(fn1).to.throw(TokenConsumed().message)
+        expect(fn1).to.throw(tokenErrMsg.TokenConsumed())
       })
 
       it('should throw when reconsumed changes', function* () {
@@ -157,7 +157,7 @@ export default describe('QueryToken Testcase', () => {
 
         const fn1 = () => combined.changes()
 
-        expect(fn1).to.throw(TokenConsumed().message)
+        expect(fn1).to.throw(tokenErrMsg.TokenConsumed())
       })
     })
 
@@ -220,7 +220,7 @@ export default describe('QueryToken Testcase', () => {
 
         const fn1 = () => concated.values()
 
-        expect(fn1).to.throw(TokenConsumed().message)
+        expect(fn1).to.throw(tokenErrMsg.TokenConsumed())
       })
 
       it('should throw when reconsumed changes', function* () {
@@ -228,7 +228,7 @@ export default describe('QueryToken Testcase', () => {
 
         const fn1 = () => concated.changes()
 
-        expect(fn1).to.throw(TokenConsumed().message)
+        expect(fn1).to.throw(tokenErrMsg.TokenConsumed())
       })
     })
 

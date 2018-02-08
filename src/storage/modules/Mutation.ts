@@ -2,7 +2,7 @@ import * as lf from 'lovefield'
 
 import { forEach, assert, warn } from '../../utils'
 import { fieldIdentifier } from '../symbols'
-import * as Exception from '../../exception'
+import { dbErrMsg } from '../../exception'
 
 export class Mutation {
 
@@ -67,7 +67,7 @@ export class Mutation {
   }
 
   private toUpdater() {
-    assert(this.meta, Exception.PrimaryKeyNotProvided())
+    assert(this.meta, dbErrMsg.PrimaryKeyNotProvided())
 
     const query = this.db.update(this.table)
     query.where(this.table[this.meta.key].eq(this.meta.val))
@@ -85,7 +85,7 @@ export class Mutation {
   }
 
   private toRow() {
-    assert(this.meta, Exception.PrimaryKeyNotProvided())
+    assert(this.meta, dbErrMsg.PrimaryKeyNotProvided())
 
     return {
       table: this.table,

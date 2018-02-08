@@ -1,6 +1,6 @@
 import { describe, it } from 'tman'
 import { expect } from 'chai'
-import { definition, Relationship, RDBType, NotImplemented, UnexpectedRelationship } from '../../../index'
+import { definition, Relationship, RDBType, dbErrMsg } from '../../../index'
 
 export default describe('Helper - definition Testcase: ', () => {
 
@@ -62,7 +62,7 @@ export default describe('Helper - definition Testcase: ', () => {
 
       const check = () => definition.revise(Relationship.manyToMany, fixture)
 
-      expect(check).to.throw(NotImplemented().message)
+      expect(check).to.throw(dbErrMsg.NotImplemented())
     })
 
     it('should throw if a incorrect relationship was deteched', () => {
@@ -74,7 +74,7 @@ export default describe('Helper - definition Testcase: ', () => {
       }
       const check = () => definition.revise(123 as any, fixture)
 
-      expect(check).to.throw(UnexpectedRelationship().message)
+      expect(check).to.throw(dbErrMsg.UnexpectedRelationship())
     })
 
   })

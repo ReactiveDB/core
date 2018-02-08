@@ -10,7 +10,7 @@ import {
   lfFactory,
   ShapeMatcher,
   PredicateProvider,
-  TokenConcatFailed
+  tokenErrMsg
 } from '../../../index'
 
 use(SinonChai)
@@ -1126,9 +1126,8 @@ export default describe('Selector test', () => {
       )
 
       const fn = () => selector6.concat(selector7)
-      const error = TokenConcatFailed()
 
-      expect(fn).to.throw(error.message)
+      expect(fn).to.throw(tokenErrMsg.TokenConcatFailed())
     })
 
     it('concat two selector with one of the them not having a predicateProvider should throw with correct error message', () => {
@@ -1158,13 +1157,13 @@ export default describe('Selector test', () => {
         20, 20
       )
 
-      const error = TokenConcatFailed()
+      const error = tokenErrMsg.TokenConcatFailed()
 
       const fn = () => selector6.concat(selector7)
-      expect(fn).to.throw(error.message)
+      expect(fn).to.throw(error)
 
       const fn_1 = () => selector6_1.concat(selector7_1)
-      expect(fn_1).to.throw(error.message)
+      expect(fn_1).to.throw(error)
     })
 
     it('concat two selector select not match should throw', () => {
@@ -1182,9 +1181,8 @@ export default describe('Selector test', () => {
       )
 
       const fn = () => selector6.concat(selector7)
-      const error = TokenConcatFailed()
 
-      expect(fn).to.throw(error.message)
+      expect(fn).to.throw(tokenErrMsg.TokenConcatFailed())
     })
 
     it('concat two selector skip not serial should throw', () => {

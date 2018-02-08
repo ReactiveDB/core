@@ -1,11 +1,7 @@
-export function assert(condition: any, error: Error | string) {
-  if (condition) {
-    return
-  }
+import { ReactiveDBException } from '../exception/Exception'
 
-  if (error instanceof Error) {
-    throw error
-  } else if (typeof error === 'string') {
-    throw new Error(error)
+export function assert(condition: any, message: string) {
+  if (!condition) {
+    throw new ReactiveDBException(message)
   }
 }
