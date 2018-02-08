@@ -1,1 +1,1 @@
-export default '0.10.2'
+export default '0.10.3-alpha.1-lazyassert'
