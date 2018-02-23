@@ -1,6 +1,9 @@
 import { Observable } from 'rxjs/Observable'
 import { ErrorObservable } from 'rxjs/observable/ErrorObservable'
 import { Subscription } from 'rxjs/Subscription'
+import { from } from 'rxjs/observable/from'
+import { fromPromise } from 'rxjs/observable/fromPromise'
+import { of as just } from 'rxjs/observable/of'
 import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable'
 import { concatMap } from 'rxjs/operators/concatMap'
 import { map } from 'rxjs/operators/map'
@@ -40,7 +43,7 @@ export class Database {
   private connected = false
   // note thin cache will be unreliable in some eage case
   private storedIds = new Set<string>()
-  private subscription: Subscription
+  private subscription: Subscription | null = null
 
   private findPrimaryKey = (name: string) => {
     return this.findSchema(name)!.pk
@@ -257,7 +260,7 @@ export class Database {
         return this.executor(db, [query]).pipe(tap(onError))
       }
 
-      return Observable.fromPromise(prefetch.exec())
+      return fromPromise(prefetch.exec())
         .pipe(concatMap(deleteByScopedIds))
     }
 
@@ -289,7 +292,7 @@ export class Database {
 
         return this.executor(db, queries).pipe(tap(onError))
       } else {
-        return Observable.of({ result: false, insert: 0, update: 0, delete: 0, select: 0 })
+        return just({ result: false, insert: 0, update: 0, delete: 0, select: 0 })
       }
     }
     return this.database$.pipe(concatMap(upsert))
@@ -342,7 +345,7 @@ export class Database {
       }
 
       const prefetch = predicatableQuery(db, table, predicate!, StatementType.Select)
-      return Observable.fromPromise(prefetch.exec()).pipe(
+      return fromPromise(prefetch.exec()).pipe(
         concatMap(removeByRootEntities)
       )
     }
@@ -363,7 +366,7 @@ export class Database {
           this.schemas.clear()
           this.storedIds.clear()
           this.schemaBuilder = null
-          this.subscription.unsubscribe()
+          this.subscription!.unsubscribe()
         })
       )
     }
@@ -378,7 +381,7 @@ export class Database {
   executor(db: lf.Database, queries: lf.query.Builder[]) {
     const tx = db.createTransaction()
 
-    return Observable.fromPromise(tx.exec(queries)).pipe(
+    return fromPromise(tx.exec(queries)).pipe(
       tap(transactionErrorHandler),
       map((ret) => {
         return {
@@ -409,7 +412,7 @@ export class Database {
           get() {
             return (_: lf.Database, queries: lf.query.Builder[]) => {
               transactionQueries.push(...queries)
-              return Observable.of(null)
+              return just(null)
             }
           }
         },
@@ -424,7 +427,7 @@ export class Database {
         commit: () => {
           return effects.reduce((acc, curr) => {
             return acc.pipe(tap(curr))
-          }, Observable.from(tx.exec(transactionQueries))).pipe(
+          }, from(tx.exec(transactionQueries))).pipe(
             map((r) => {
               return {
                 result: true,
@@ -866,7 +869,7 @@ export class Database {
         }
         const query = predicatableQuery(db, table, predicate!, StatementType.Select)
 
-        return Observable.fromPromise<T[]>(query.exec() as any)
+        return fromPromise<T[]>(query.exec() as any)
       }
 
       return [get, remove]

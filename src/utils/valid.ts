@@ -1,4 +1,5 @@
 import { Observable } from 'rxjs/Observable'
+import { empty } from 'rxjs/observable/empty'
 import { skip } from 'rxjs/operators/skip'
 import { ErrorObservable } from 'rxjs/observable/ErrorObservable'
 
@@ -8,5 +9,5 @@ export function valid<T>(condition: any, error: Error): ErrorObservable | Observ
     return Observable.throw(error)
   }
 
-  return Observable.empty<T>().pipe(skip(1))
+  return empty<T>().pipe(skip(1))
 }

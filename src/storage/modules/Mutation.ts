@@ -7,7 +7,7 @@ import * as Exception from '../../exception'
 export class Mutation {
 
   private params: Object
-  private meta: {
+  private meta!: {
     key: string,
     val: any
   }

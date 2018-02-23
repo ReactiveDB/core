@@ -1,6 +1,8 @@
 import { Observer } from 'rxjs/Observer'
 import { Observable } from 'rxjs/Observable'
 import { OperatorFunction } from 'rxjs/interfaces'
+import { from } from 'rxjs/observable/from'
+import { fromPromise } from 'rxjs/observable/fromPromise'
 import { combineAll } from 'rxjs/operators/combineAll'
 import { debounceTime } from 'rxjs/operators/debounceTime'
 import { map } from 'rxjs/operators/map'
@@ -47,7 +49,7 @@ export class Selector <T> {
     const fakeQuery = { toSql: identity }
     // 初始化一个空的 QuerySelector，然后在初始化以后替换它上面的属性和方法
     const dist = new Selector<U>(originalToken.db, fakeQuery as any, { } as any)
-    dist.change$ = Observable.from(metaDatas).pipe(
+    dist.change$ = from(metaDatas).pipe(
       map(metas => metas.mapFn(metas.change$)),
       combineAll<Observable<U[]>, U[][]>(),
       map(r => r.reduce((acc, val) => acc.concat(val))),
@@ -58,7 +60,7 @@ export class Selector <T> {
     dist.values = () => {
       assert(!dist.consumed, Exception.TokenConsumed())
       dist.consumed = true
-      return Observable.from(metaDatas).pipe(
+      return from(metaDatas).pipe(
         mergeMap(metaData => metaData.values()),
         reduce((acc, val) => acc.concat(val))
       )
@@ -201,9 +203,9 @@ export class Selector <T> {
       const p = this.rangeQuery.exec()
         .then(r => r.map(v => v[this.shape.pk.name]))
         .then(pks => this.getValue(this.getQuery(this.inPKs(pks))))
-      return this.mapFn(Observable.fromPromise(p))
+      return this.mapFn(fromPromise(p))
     } else {
-      return this.mapFn(Observable.fromPromise(this.getValue(this.getQuery()) as Promise<T[]>))
+      return this.mapFn(fromPromise(this.getValue(this.getQuery()) as Promise<T[]>))
     }
   }
 

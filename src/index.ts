@@ -1,4 +1,3 @@
-import './operators'
 import './global'
 import 'tslib'
 

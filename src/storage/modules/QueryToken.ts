@@ -1,5 +1,6 @@
 import { Observable } from 'rxjs/Observable'
 import { OperatorFunction } from 'rxjs/interfaces'
+import { from } from 'rxjs/observable/from'
 import { combineAll } from 'rxjs/operators/combineAll'
 import { map } from 'rxjs/operators/map'
 import { publishReplay } from 'rxjs/operators/publishReplay'
@@ -58,7 +59,7 @@ export class QueryToken<T> {
 
   concat(...tokens: QueryToken<T>[]) {
     tokens.unshift(this)
-    const newSelector$ = Observable.from(tokens).pipe(
+    const newSelector$ = from(tokens).pipe(
       map(token => token.selector$.pipe(skipWhileProxySelector)),
       combineAll<Observable<Selector<T>>, Selector<T>[]>(),
       map((r) => {
@@ -71,7 +72,7 @@ export class QueryToken<T> {
 
   combine(...tokens: QueryToken<any>[]) {
     tokens.unshift(this)
-    const newSelector$ = Observable.from(tokens).pipe(
+    const newSelector$ = from(tokens).pipe(
       map(token => token.selector$.pipe(skipWhileProxySelector)),
       combineAll<Observable<Selector<T>>, Selector<T>[]>(),
       map((r) => {
