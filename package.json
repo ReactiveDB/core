@@ -71,7 +71,7 @@
     "css-loader": "^0.28.10",
     "extract-text-webpack-plugin": "^3.0.2",
     "happypack": "^4.0.1",
-    "html-webpack-plugin": "^2.30.1",
+    "html-webpack-plugin": "^3.0.0",
     "madge": "^3.0.1",
     "moment": "^2.20.1",
     "node-watch": "^0.5.7",
