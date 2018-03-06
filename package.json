@@ -82,7 +82,7 @@
     "shelljs": "^0.8.1",
     "shx": "^0.2.2",
     "sinon": "^4.4.2",
-    "sinon-chai": "^2.14.0",
+    "sinon-chai": "^3.0.0",
     "source-map-loader": "^0.2.3",
     "style-loader": "^0.20.2",
     "tman": "^1.7.4",
