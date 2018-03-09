@@ -3,10 +3,6 @@ const path = require('path')
 const os = require('os')
 const ExtractTextPlugin = require('extract-text-webpack-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
-const HappyPack = require('happypack')
-const { CheckerPlugin } = require('awesome-typescript-loader')
-
-const happyThreadPool = HappyPack.ThreadPool({ size: os.cpus().length })
 
 // Webpack Config
 module.exports = {
@@ -51,11 +47,9 @@ module.exports = {
   },
 
   plugins: [
-    new CheckerPlugin(),
     new webpack.LoaderOptionsPlugin({
       debug: true
     }),
-    new webpack.optimize.CommonsChunkPlugin({ name: ['main', 'vendor'], minChunks: Infinity }),
     new ExtractTextPlugin({ filename: 'style.css' }),
     new webpack.HotModuleReplacementPlugin(),
     new webpack.NoEmitOnErrorsPlugin(),
@@ -69,24 +63,9 @@ module.exports = {
         NODE_ENV: JSON.stringify('development')
       }
     }),
-    new HappyPack({
-      id: 'css',
-      loaders: [ 'style-loader', 'css-loader' ],
-      threadPool: happyThreadPool
-    }),
-
-    new HappyPack({
-      id: 'sourceMap',
-      loaders: [ 'source-map-loader' ],
-      threadPool: happyThreadPool
-    }),
-
-    new HappyPack({
-      id: 'raw',
-      loaders: ['raw-loader'],
-      threadPool: happyThreadPool
-    })
   ],
+
+  mode: 'development',
 
   module: {
     noParse: [/tman\/browser\/tman\.js/, /sinon\/pkg\/sinon\.js/],
@@ -100,16 +79,16 @@ module.exports = {
       {
         test: /\.js$/,
         enforce: 'pre',
-        loader: 'happypack/loader?id=sourceMap',
+        loaders: [ 'source-map-loader' ],
         include: /rxjs/
       },
       {
         test: /\.ts$/,
-        use: 'awesome-typescript-loader',
+        use: 'ts-loader',
         exclude: /node_modules/
       },
-      { test: /\.css$/, use: 'happypack/loader?id=css' },
-      { test: /\.html$/, use: 'happypack/loader?id=raw' }
+      { test: /\.css$/, loaders: [ 'style-loader', 'css-loader' ] },
+      { test: /\.html$/, loaders: ['raw-loader'] },
     ]
   }
 }
