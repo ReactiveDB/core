@@ -82,7 +82,7 @@
     "sinon": "^5.0.0",
     "sinon-chai": "^3.0.0",
     "source-map-loader": "^0.2.3",
-    "style-loader": "^0.20.3",
+    "style-loader": "^0.21.0",
     "tman": "^1.7.4",
     "ts-loader": "^4.0.1",
     "ts-node": "^6.0.0",
