@@ -1,6 +1,7 @@
 import { Observer } from 'rxjs/Observer'
 import { Observable } from 'rxjs/Observable'
 import { OperatorFunction } from 'rxjs/interfaces'
+import { filter } from 'rxjs/operators/filter'
 import { from } from 'rxjs/observable/from'
 import { fromPromise } from 'rxjs/observable/fromPromise'
 import { combineAll } from 'rxjs/operators/combineAll'
@@ -10,12 +11,13 @@ import { mergeMap } from 'rxjs/operators/mergeMap'
 import { publishReplay } from 'rxjs/operators/publishReplay'
 import { reduce } from 'rxjs/operators/reduce'
 import { refCount } from 'rxjs/operators/refCount'
+import { scan } from 'rxjs/operators/scan'
 import { switchMap } from 'rxjs/operators/switchMap'
 import { async } from 'rxjs/scheduler/async'
 import * as lf from 'lovefield'
 import * as Exception from '../../exception'
 import { predicatableQuery, graph } from '../helper'
-import { identity, forEach, assert, warn } from '../../utils'
+import { identity, forEach, assert, warn, isNonNullable } from '../../utils'
 import { PredicateProvider } from './PredicateProvider'
 import { ShapeMatcher, OrderInfo, StatementType } from '../../interface'
 import { mapFn } from './mapFn'
@@ -120,9 +122,10 @@ export class Selector <T> {
       )
       : observeOn(this.getQuery())
 
-    return lfIssueFix(changesOnQuery)
-      .publishReplay(1)
-      .refCount()
+    return lfIssueFix(changesOnQuery).pipe(
+      publishReplay(1),
+      refCount()
+    )
   }
 
   private set change$ (dist$: Observable<T[]>) {
@@ -315,5 +318,8 @@ const lfIssueFix = <T>(changes: Observable<T[]>) => {
       ? null
       : curr
 
-  return (changes as any).scan(doKeep, null).filter(Boolean)
+  return changes.pipe(
+    scan(doKeep, null),
+    filter(isNonNullable)
+  )
 }

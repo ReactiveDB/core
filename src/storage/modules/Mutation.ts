@@ -1,16 +1,16 @@
 import * as lf from 'lovefield'
 
-import { forEach, assert, warn } from '../../utils'
+import { forEach, assertValue, warn } from '../../utils'
 import { fieldIdentifier } from '../symbols'
 import * as Exception from '../../exception'
 
 export class Mutation {
 
   private params: Object
-  private meta!: {
+  private meta: {
     key: string,
     val: any
-  }
+  } | undefined
 
   constructor(
     private db: lf.Database,
@@ -67,10 +67,9 @@ export class Mutation {
   }
 
   private toUpdater() {
-    assert(this.meta, Exception.PrimaryKeyNotProvided())
-
+    const meta = assertValue(this.meta, Exception.PrimaryKeyNotProvided())
     const query = this.db.update(this.table)
-    query.where(this.table[this.meta.key].eq(this.meta.val))
+    query.where(this.table[meta.key].eq(meta.val))
 
     forEach(this.params, (val, key) => {
       const column = this.table[key]
@@ -85,12 +84,11 @@ export class Mutation {
   }
 
   private toRow() {
-    assert(this.meta, Exception.PrimaryKeyNotProvided())
-
+    const meta = assertValue(this.meta, Exception.PrimaryKeyNotProvided())
     return {
       table: this.table,
       row: this.table.createRow({
-        [this.meta.key]: this.meta.val,
+        [meta.key]: meta.val,
         ...this.params
       })
     }
