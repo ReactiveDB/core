@@ -25,7 +25,7 @@ export { TaskSchema } from './Task'
 export { ProgramSchema } from './Program'
 export { ModuleSchema } from './Module'
 export { EngineerSchema } from './Engineer'
-export { TestSchema, TestFixture, TestFixture2 } from './Test'
+export { TestSchema, TestFixture2 } from './Test'
 
 /**
  * import ActivitySelectMeta from './Activity'
