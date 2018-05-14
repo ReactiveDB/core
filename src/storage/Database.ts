@@ -15,7 +15,7 @@ import Version from '../version'
 import { Traversable } from '../shared'
 import { Mutation, Selector, QueryToken, PredicateProvider } from './modules'
 import { dispose, contextTableName, fieldIdentifier, hiddenColName } from './symbols'
-import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, identity, warn } from '../utils'
+import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, assertValue, warn, isNonNullable } from '../utils'
 import { createPredicate, createPkClause, mergeTransactionResult, predicatableQuery, lfFactory } from './helper'
 import { Relationship, RDBType, DataStoreType, LeafType, StatementType, JoinMode } from '../interface/enum'
 import { SchemaDef, ColumnDef, ParsedSchema, Association, ScopedHandler } from '../interface'
@@ -51,8 +51,7 @@ export class Database {
 
   private findSchema = (name: string): ParsedSchema => {
     const schema = this.schemas.get(name)
-    assert(schema, Exception.NonExistentTable(name))
-    return schema!
+    return assertValue(schema, Exception.NonExistentTable(name))
   }
 
   /**
@@ -500,7 +499,7 @@ export class Database {
           indexes.push(key)
         }
 
-        const isNullable = ![def.primaryKey, def.index, def.unique].some(identity)
+        const isNullable = ![def.primaryKey, def.index, def.unique].some(isNonNullable)
         if (isNullable) {
           nullable.push(key)
         }
