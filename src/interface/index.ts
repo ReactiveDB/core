@@ -6,6 +6,10 @@ export type DeepPartial<T> = {
   [K in keyof T]?: Partial<T[K]>
 }
 
+export type RelationshipPredicate<T> = {
+  [P in keyof T]?: lf.schema.Column
+}
+
 export interface SchemaMetadata<T> {
   type: RDBType | Relationship
   primaryKey?: boolean
@@ -17,7 +21,7 @@ export interface SchemaMetadata<T> {
    */
   virtual?: {
     name: string
-    where<U>(ref: TableShape<U>): Predicate<T>
+    where<U>(ref: TableShape<U>): RelationshipPredicate<T>
   }
 }
 
@@ -26,7 +30,7 @@ export type TableShape<T> = lf.schema.Table & {
 }
 
 export type SchemaDef<T> = {
-  [P in keyof T]: SchemaMetadata<T[P]>
+  [P in keyof T]: SchemaMetadata<T>
 } & {
   dispose?: SchemaDisposeFunction<T>
   ['@@dispose']?: SchemaDisposeFunction<T>
@@ -170,9 +174,14 @@ export interface PredicateMeta<T> {
   $isNotNull: boolean
 }
 
-export type Predicate<T> = {
-  [P in keyof T & PredicateMeta<T>]?: Partial<PredicateMeta<T>> | ValueLiteral | Predicate<T[P]>
-}
+export type Predicate<T> = Partial<{
+  [P in keyof T]:
+    | Partial<PredicateMeta<T[P]>> // 操作符表达式，如 { $or: [{ $gt: 1 }, { $lt: 5 }] }
+    | ValueLiteral                 // 字面量值
+    | String                       // 一种特殊的字面量值类型，常用 interface X extends String { kind?: 'x' } 表达
+  }
+  & PredicateMeta<T>
+>
 
 export { StatementType, JoinMode, LeafType, Relationship, DataStoreType, RDBType }
 

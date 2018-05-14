@@ -171,14 +171,14 @@ export class Database {
     return this.database$.pipe(concatMap(insert))
   }
 
-  get<T>(tableName: string, query: Query<T> = {}, mode: JoinMode = JoinMode.imlicit): QueryToken<T> {
+  get<T = any>(tableName: string, query: Query<T> = {}, mode: JoinMode = JoinMode.imlicit): QueryToken<T> {
     const selector$ = this.database$.pipe(
       map(db => this.buildSelector(db, tableName, query, mode))
     )
     return new QueryToken<T>(selector$)
   }
 
-  update<T>(tableName: string, clause: Predicate<T>, raw: Partial<T>): Observable<ExecutorResult> {
+  update<T = any>(tableName: string, clause: Predicate<T>, raw: Partial<T>): Observable<ExecutorResult> {
     const type = getType(raw)
     if (type !== 'Object') {
       return Observable.throw(Exception.InvalidType(['Object', type]))
@@ -226,7 +226,7 @@ export class Database {
     return this.database$.pipe(concatMap(update))
   }
 
-  delete<T>(tableName: string, clause: Predicate<T> = {}): Observable<ExecutorResult> {
+  delete<T = any>(tableName: string, clause: Predicate<T> = {}): Observable<ExecutorResult> {
     const [ pk, err ] = tryCatch<string>(this.findPrimaryKey)(tableName)
     if (err) {
       return Observable.throw(err)
@@ -266,13 +266,13 @@ export class Database {
     return this.database$.pipe(concatMap(deletion))
   }
 
-  upsert<T>(tableName: string, raw: T): Observable<ExecutorResult>
+  upsert<T = any>(tableName: string, raw: T): Observable<ExecutorResult>
 
-  upsert<T>(tableName: string, raw: T[]): Observable<ExecutorResult>
+  upsert<T = any>(tableName: string, raw: T[]): Observable<ExecutorResult>
 
-  upsert<T>(tableName: string, raw: T | T[]): Observable<ExecutorResult>
+  upsert<T = any>(tableName: string, raw: T | T[]): Observable<ExecutorResult>
 
-  upsert<T>(tableName: string, raw: T | T[]): Observable<ExecutorResult> {
+  upsert<T = any>(tableName: string, raw: T | T[]): Observable<ExecutorResult> {
     const upsert = (db: lf.Database) => {
       const sharing = new Map<any, Mutation>()
       const insert: Mutation[] = []
@@ -297,7 +297,7 @@ export class Database {
     return this.database$.pipe(concatMap(upsert))
   }
 
-  remove<T>(tableName: string, clause: Clause<T> = {}): Observable<ExecutorResult> {
+  remove<T = any>(tableName: string, clause: Clause<T> = {}): Observable<ExecutorResult> {
     const [schema, err] = tryCatch<ParsedSchema>(this.findSchema)(tableName)
     if (err) {
       return Observable.throw(err)
@@ -571,7 +571,7 @@ export class Database {
       mainTable: table!
     }
     const { limit, skip } = clause
-    const provider = new PredicateProvider(table!, clause.where)
+    const provider = new PredicateProvider<T>(table!, clause.where)
 
     return new Selector<T>(db, query, matcher, provider, limit, skip, orderDesc)
   }
@@ -852,7 +852,9 @@ export class Database {
         entities.forEach(entity => {
           const pkVal = entity[pk]
           const clause = createPkClause(pk, pkVal)
-          const predicate = createPredicate(table, clause)
+          // todo(dingwen): 调查是该用 clause 还是 clause.where，
+          // 可以确定的是，clause 是带 where 的。
+          const predicate = createPredicate(table, clause.where)
           const query = predicatableQuery(db, table, predicate!, StatementType.Delete)
 
           queryCollection.push(query)

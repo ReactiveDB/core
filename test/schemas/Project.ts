@@ -4,7 +4,7 @@ export interface ProjectSchema {
   _id: TeambitionTypes.ProjectId
   name: string
   isArchived: boolean
-  posts: any[]
+  posts: any
 }
 export default (db: Database) => db.defineSchema<ProjectSchema>('Project', {
   _id: {
@@ -21,7 +21,7 @@ export default (db: Database) => db.defineSchema<ProjectSchema>('Project', {
     type: Relationship.oneToMany,
     virtual: {
       name: 'Post',
-      where: ref => ({
+      where: (ref) => ({
         _id: ref.belongTo
       })
     }

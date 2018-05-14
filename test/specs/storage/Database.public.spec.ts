@@ -610,7 +610,7 @@ export default describe('Database Testcase: ', () => {
 
     it('shouldn\'t to update column which is defined as primarykey', function* () {
       const note = 'foo'
-      yield database.update('Task', target._id as string, {
+      yield database.update('Task', target._id as any, {
         _id: 'bar',
         note
       })
@@ -652,7 +652,7 @@ export default describe('Database Testcase: ', () => {
       const u1 = uuid()
       const u2 = uuid()
 
-      yield database.update('Task', clause, {
+      yield database.update<TaskSchema>('Task', clause, {
         _stageId: u1
       })
 
@@ -662,7 +662,7 @@ export default describe('Database Testcase: ', () => {
         }
       }).values()
 
-      yield database.update('Task', clause, {
+      yield database.update<TaskSchema>('Task', clause, {
         _stageId: u2
       })
 
@@ -678,7 +678,7 @@ export default describe('Database Testcase: ', () => {
 
     it('should be able to update property which is stored as hidden column', function* () {
       const newCreated = new Date(2017, 1, 1)
-      yield database.update('Task', {
+      yield database.update<TaskSchema>('Task', {
         _id: target._id
       }, {
         created: newCreated.toISOString()
@@ -760,7 +760,7 @@ export default describe('Database Testcase: ', () => {
       const errSpy = sinon.spy((): void => void 0)
 
       tmpDB.connect()
-      tmpDB.update(T, { id: 1 }, {
+      tmpDB.update(T, { id: 1 } as any, {
         members: ['1', '2']
       })
       .catch(errSpy)
@@ -1048,11 +1048,8 @@ export default describe('Database Testcase: ', () => {
 
       const execRet1 = yield database.upsert<ProgramSchema>('Program', program)
 
-      yield database.delete<ProgramSchema>('Program', {
-        where: {
-          _id: program._id
-        }
-      })
+      // todo(dingwen): delete 的参数究竟需不需要 where
+      yield database.delete<ProgramSchema>('Program', { _id: program._id })
 
       const execRet2 = yield database.upsert<ProgramSchema>('Program', program)
 
@@ -1164,7 +1161,7 @@ export default describe('Database Testcase: ', () => {
       const moduleCount = 20
 
       const programs = programGen(programCount, moduleCount)
-      const engineerIds = Array.from(new Set(
+      const engineerIds: string[] = Array.from(new Set(
         programs
           .map(p => p.modules)
           .reduce((acc, pre) => acc.concat(pre))
@@ -1173,7 +1170,7 @@ export default describe('Database Testcase: ', () => {
       )
       yield database.upsert('Program', programs)
 
-      const clause = { where: { $in: engineerIds } }
+      const clause = { where: { _id: { $in: engineerIds } } }
       const storedEngineers = yield database.get('Engineer', clause).values()
 
       const execRet = yield database.remove('Module')

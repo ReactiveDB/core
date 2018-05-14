@@ -53,6 +53,8 @@ const predicateFactory = {
   },
 }
 
+type Pred = typeof predicateFactory
+
 const compoundPredicateFactory = {
   $and (predicates: lf.Predicate[]): lf.Predicate {
     return lf.op.and(...predicates)
@@ -67,7 +69,9 @@ const compoundPredicateFactory = {
   },
 }
 
-export class PredicateProvider<T> {
+type CompPred = typeof compoundPredicateFactory
+
+export class PredicateProvider<T = any> {
 
   constructor(
     private table: lf.schema.Table,
@@ -93,8 +97,12 @@ export class PredicateProvider<T> {
   }
 
   private normalizeMeta(meta: Predicate<T>, column?: lf.schema.Column): lf.Predicate[] {
-    const buildSinglePred = (col: lf.schema.Column, val: any, key: string): lf.Predicate =>
-      this.checkMethod(key) ? predicateFactory[key](col, val) : col.eq(val as ValueLiteral)
+    const buildSinglePred = <K extends string>(
+      col: lf.schema.Column,
+      val: K extends (keyof Pred) ? Pred[K] : ValueLiteral,
+      key: K
+    ): lf.Predicate =>
+      this.checkMethod(key) ? predicateFactory[key](col, val) : col.eq(val)
 
     const predicates: lf.Predicate[] = []
 
@@ -124,11 +132,11 @@ export class PredicateProvider<T> {
     return predicates
   }
 
-  private checkMethod(methodName: string) {
+  private checkMethod(methodName: string): methodName is keyof Pred {
     return typeof predicateFactory[methodName] === 'function'
   }
 
-  private checkCompound(methodName: string) {
+  private checkCompound(methodName: string): methodName is keyof CompPred {
     return typeof compoundPredicateFactory[methodName] === 'function'
   }
 
