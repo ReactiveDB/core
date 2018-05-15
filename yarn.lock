@@ -39,9 +39,9 @@
   version "8.0.19"
   resolved "https://registry.npmjs.org/@types/node/-/node-8.0.19.tgz#e46e2b0243de7d03f15b26b45c59ebb84f657a4e"
 
-"@types/node@^9.4.7":
-  version "9.4.7"
-  resolved "https://registry.npmjs.org/@types/node/-/node-9.4.7.tgz#57d81cd98719df2c9de118f2d5f3b1120dcd7275"
+"@types/node@^10.0.3":
+  version "10.0.3"
+  resolved "https://registry.npmjs.org/@types/node/-/node-10.0.3.tgz#1f89840c7aac2406cc43a2ecad98fc02a8e130e4"
 
 "@types/shelljs@^0.7.8":
   version "0.7.8"
