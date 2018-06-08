@@ -6588,7 +6588,7 @@ shell-quote@^1.6.1:
     array-reduce "~0.0.0"
     jsonify "~0.0.0"
 
-shelljs@^0.7.0, shelljs@^0.7.3:
+shelljs@^0.7.0:
   version "0.7.8"
   resolved "https://registry.npmjs.org/shelljs/-/shelljs-0.7.8.tgz#decbcf874b0d1e5fb72e14b164a9683048e9acb3"
   dependencies:
@@ -6604,13 +6604,13 @@ shelljs@^0.8.1:
     interpret "^1.0.0"
     rechoir "^0.6.2"
 
-shx@^0.2.2:
-  version "0.2.2"
-  resolved "https://registry.npmjs.org/shx/-/shx-0.2.2.tgz#0a304d020b0edf1306ad81570e80f0346df58a39"
+shx@^0.3.0:
+  version "0.3.0"
+  resolved "https://registry.npmjs.org/shx/-/shx-0.3.0.tgz#f978c7a2c18cbf26ecdc1c44c22cc0238ff7c444"
   dependencies:
     es6-object-assign "^1.0.3"
     minimist "^1.2.0"
-    shelljs "^0.7.3"
+    shelljs "^0.8.1"
 
 signal-exit@^3.0.0, signal-exit@^3.0.1, signal-exit@^3.0.2:
   version "3.0.2"
