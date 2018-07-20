@@ -4356,6 +4356,22 @@ lodash.get@^4.4.2:
   version "4.4.2"
   resolved "https://registry.npmjs.org/lodash.get/-/lodash.get-4.4.2.tgz#2d177f652fa31e939b4438d5341499dfa3825e99"
 
+lodash.isarray@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.npmjs.org/lodash.isarray/-/lodash.isarray-4.0.0.tgz#2aca496b28c4ca6d726715313590c02e6ea34403"
+
+lodash.isfunction@^3.0.9:
+  version "3.0.9"
+  resolved "https://registry.npmjs.org/lodash.isfunction/-/lodash.isfunction-3.0.9.tgz#06de25df4db327ac931981d1bdb067e5af68d051"
+
+lodash.isplainobject@^4.0.6:
+  version "4.0.6"
+  resolved "https://registry.npmjs.org/lodash.isplainobject/-/lodash.isplainobject-4.0.6.tgz#7c526a52d89b45c45cc690b88163be0497f550cb"
+
+lodash.keys@^4.2.0:
+  version "4.2.0"
+  resolved "https://registry.npmjs.org/lodash.keys/-/lodash.keys-4.2.0.tgz#a08602ac12e4fb83f91fc1fb7a360a4d9ba35205"
+
 lodash.memoize@^4.1.2:
   version "4.1.2"
   resolved "https://registry.npmjs.org/lodash.memoize/-/lodash.memoize-4.1.2.tgz#bcc6c49a42a2840ed997f323eada5ecd182e0bfe"
@@ -4368,9 +4384,9 @@ lodash.uniq@^4.5.0:
   version "4.5.0"
   resolved "https://registry.npmjs.org/lodash.uniq/-/lodash.uniq-4.5.0.tgz#d0225373aeb652adc1bc82e4945339a842754773"
 
-lodash@4.13.1:
-  version "4.13.1"
-  resolved "https://registry.npmjs.org/lodash/-/lodash-4.13.1.tgz#83e4b10913f48496d4d16fec4a560af2ee744b68"
+lodash.values@^4.3.0:
+  version "4.3.0"
+  resolved "https://registry.npmjs.org/lodash.values/-/lodash.values-4.3.0.tgz#a3a6c2b0ebecc5c2cba1c17e6e620fe81b53d347"
 
 lodash@^4.11.1, lodash@^4.13.1, lodash@^4.17.2, lodash@^4.17.4, lodash@^4.17.5, lodash@^4.3.0:
   version "4.17.5"
@@ -4871,11 +4887,15 @@ neo-async@^2.5.0:
   version "2.5.0"
   resolved "https://registry.npmjs.org/neo-async/-/neo-async-2.5.0.tgz#76b1c823130cca26acfbaccc8fbaf0a2fa33b18f"
 
-nesthydrationjs@^1.0.3:
-  version "1.0.3"
-  resolved "https://registry.npmjs.org/nesthydrationjs/-/nesthydrationjs-1.0.3.tgz#fc3975747be72604eeaeea1761261e5c868ed5d8"
+nesthydrationjs@^1.0.5:
+  version "1.0.5"
+  resolved "https://registry.npmjs.org/nesthydrationjs/-/nesthydrationjs-1.0.5.tgz#89fe5be87055184461de5a550475ac515491f921"
   dependencies:
-    lodash "4.13.1"
+    lodash.isarray "^4.0.0"
+    lodash.isfunction "^3.0.9"
+    lodash.isplainobject "^4.0.6"
+    lodash.keys "^4.2.0"
+    lodash.values "^4.3.0"
 
 nice-try@^1.0.4:
   version "1.0.4"
