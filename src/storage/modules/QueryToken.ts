@@ -39,7 +39,7 @@ export class QueryToken<T> {
   }
 
   values(): Observable<T[]> {
-    assert(!this.consumed, TokenConsumed())
+    assert(!this.consumed, TokenConsumed)
 
     this.consumed = true
     return this.selector$.pipe(
@@ -49,7 +49,7 @@ export class QueryToken<T> {
   }
 
   changes(): Observable<T[]> {
-    assert(!this.consumed, TokenConsumed())
+    assert(!this.consumed, TokenConsumed)
 
     this.consumed = true
     return this.selector$.pipe(
