@@ -29,9 +29,11 @@ export const InvalidType = (expect?: [string, string]) => {
 export const UnexpectedTransactionUse = () =>
   new ReactiveDBException('Please use Database#transaction to get a transaction scope first.')
 
-export const PrimaryKeyNotProvided = () => new ReactiveDBException(`Primary key was not provided.`)
+export const PrimaryKeyNotProvided = (moreInfo?: {}) =>
+  new ReactiveDBException(`Primary key was not provided.`, moreInfo)
 
-export const PrimaryKeyConflict = () => new ReactiveDBException(`Primary key was already provided.`)
+export const PrimaryKeyConflict = (moreInfo?: {}) =>
+  new ReactiveDBException(`Primary key was already provided.`, moreInfo)
 
 export const DatabaseIsNotEmpty = () =>
   new ReactiveDBException('Method: load cannnot be invoked since database is not empty.')

@@ -3,6 +3,7 @@ import { subscribeOn, tap, take, concatMap, skip, toArray, catchError, finalize 
 import * as moment from 'moment'
 import { describe, it, beforeEach, afterEach } from 'tman'
 import { expect, assert, use } from 'chai'
+import * as ChaiString from 'chai-string'
 import * as sinon from 'sinon'
 import * as SinonChai from 'sinon-chai'
 import { uuid, checkExecutorResult } from '../../utils'
@@ -22,6 +23,7 @@ import {
 } from '../../index'
 
 use(SinonChai)
+use(ChaiString)
 
 const FoolishTable = 'Undefined-Table'
 
@@ -193,7 +195,7 @@ export default describe('Database Testcase: ', () => {
         yield database.insert(FoolishTable, {})
         throw new Error('error code path')
       } catch (e) {
-        expect(e.message).to.equal(NonExistentTable(FoolishTable).message)
+        expect(e.message).to.startWith(NonExistentTable(FoolishTable).message)
       }
     })
 
@@ -398,7 +400,7 @@ export default describe('Database Testcase: ', () => {
         throw new Error('error path reached')
       } catch (e) {
         const standardErr = NonExistentTable(FoolishTable)
-        expect(e.message).equals(standardErr.message)
+        expect(e.message).to.startWith(standardErr.message)
       }
     })
 
@@ -850,7 +852,7 @@ export default describe('Database Testcase: ', () => {
         throw new Error('error path reached')
       } catch (e) {
         const standardErr = NonExistentTable(FoolishTable)
-        expect(e.message).equals(standardErr.message)
+        expect(e.message).to.startWith(standardErr.message)
       }
     })
   })
@@ -911,7 +913,7 @@ export default describe('Database Testcase: ', () => {
         yield database.delete(FoolishTable)
         throw new Error('error code path')
       } catch (e) {
-        expect(e.message).to.equal(NonExistentTable(FoolishTable).message)
+        expect(e.message).to.startWith(NonExistentTable(FoolishTable).message)
       }
     })
   })
@@ -1178,7 +1180,7 @@ export default describe('Database Testcase: ', () => {
         yield database.upsert(FoolishTable, {})
         throw new Error('error code path')
       } catch (e) {
-        expect(e.message).to.equal(NonExistentTable(FoolishTable).message)
+        expect(e.message).to.startWith(NonExistentTable(FoolishTable).message)
       }
     })
 
@@ -1298,7 +1300,7 @@ export default describe('Database Testcase: ', () => {
         yield database.remove(tableName)
         throw new Error('error code path')
       } catch (e) {
-        expect(e.message).to.equal(NonExistentTable(tableName).message)
+        expect(e.message).to.startWith(NonExistentTable(tableName).message)
       }
     })
   })
