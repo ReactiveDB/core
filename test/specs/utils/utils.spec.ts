@@ -381,7 +381,7 @@ export default describe('Utils Testcase: ', () => {
   describe('Func: assert', () => {
 
     it('should throw when assert failed [1]', () => {
-      const check = () => assert(false, Error('failed'))
+      const check = () => assert(false, (msg: string) => new Error(msg), 'failed')
       expect(check).to.throw('failed')
     })
 
@@ -391,8 +391,17 @@ export default describe('Utils Testcase: ', () => {
     })
 
     it('should not throw when assert successed', () => {
-      const check = () => assert(true, Error('error code path'))
+      const check = () => assert(true, 'error code path')
       expect(check).to.not.throw()
+    })
+
+    it('should not execute error function when assert condition is met', () => {
+      let x = 0
+      assert(true, () => {
+        x++
+        return new Error('failed')
+      })
+      expect(x).to.equal(0)
     })
 
   })
