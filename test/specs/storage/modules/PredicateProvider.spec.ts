@@ -1,6 +1,7 @@
 import * as lf from 'lovefield'
 import { describe, it, beforeEach } from 'tman'
 import { expect } from 'chai'
+import { tap } from 'rxjs/operators'
 import { PredicateProvider, lfFactory, DataStoreType } from '../../../index'
 
 export default describe('PredicateProvider test', () => {
@@ -33,9 +34,11 @@ export default describe('PredicateProvider test', () => {
       .addNullable(['nullable'])
 
     db$.connect()
-    db = yield db$.do(r => {
-      table = r.getSchema().table('TestPredicateProvider')
-    })
+    db = yield db$.pipe(
+      tap(r => {
+        table = r.getSchema().table('TestPredicateProvider')
+      })
+    )
     const rows: lf.Row[] = []
     for (let i = 0; i < dataLength; i ++) {
       rows.push(table.createRow({

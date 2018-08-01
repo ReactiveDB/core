@@ -2,6 +2,7 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "target": "ES2015",
+    "strict": false,
     "noImplicitThis": true,
     "noImplicitAny": true,
     "skipLibCheck": true,

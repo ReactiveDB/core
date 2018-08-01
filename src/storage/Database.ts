@@ -1,13 +1,6 @@
-import { Observable } from 'rxjs/Observable'
-import { ErrorObservable } from 'rxjs/observable/ErrorObservable'
-import { Subscription } from 'rxjs/Subscription'
-import { from } from 'rxjs/observable/from'
-import { fromPromise } from 'rxjs/observable/fromPromise'
-import { of as just } from 'rxjs/observable/of'
-import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable'
-import { concatMap } from 'rxjs/operators/concatMap'
-import { map } from 'rxjs/operators/map'
-import { tap } from 'rxjs/operators/tap'
+
+import { throwError, ConnectableObservable, Observable, Subscription, from, of as just } from 'rxjs'
+import { concatMap, map, tap } from 'rxjs/operators'
 import * as lf from 'lovefield'
 import * as Exception from '../exception'
 import * as typeDefinition from './helper/definition'
@@ -181,12 +174,12 @@ export class Database {
   update<T>(tableName: string, clause: Predicate<T>, raw: Partial<T>): Observable<ExecutorResult> {
     const type = getType(raw)
     if (type !== 'Object') {
-      return Observable.throw(Exception.InvalidType(['Object', type]))
+      return throwError(Exception.InvalidType(['Object', type]))
     }
 
     const [ schema, err ] = tryCatch<ParsedSchema>(this.findSchema)(tableName)
     if (err) {
-      return Observable.throw(err)
+      return throwError(err)
     }
 
     const update = (db: lf.Database) => {
@@ -229,7 +222,7 @@ export class Database {
   delete<T>(tableName: string, clause: Predicate<T> = {}): Observable<ExecutorResult> {
     const [ pk, err ] = tryCatch<string>(this.findPrimaryKey)(tableName)
     if (err) {
-      return Observable.throw(err)
+      return throwError(err)
     }
 
     const deletion = (db: lf.Database): Observable<ExecutorResult> => {
@@ -259,7 +252,7 @@ export class Database {
         return this.executor(db, [query]).pipe(tap(onError))
       }
 
-      return fromPromise(prefetch.exec())
+      return from(prefetch.exec())
         .pipe(concatMap(deleteByScopedIds))
     }
 
@@ -300,7 +293,7 @@ export class Database {
   remove<T>(tableName: string, clause: Clause<T> = {}): Observable<ExecutorResult> {
     const [schema, err] = tryCatch<ParsedSchema>(this.findSchema)(tableName)
     if (err) {
-      return Observable.throw(err)
+      return throwError(err)
     }
     const disposeHandler = schema!.dispose
 
@@ -344,7 +337,7 @@ export class Database {
       }
 
       const prefetch = predicatableQuery(db, table, predicate!, StatementType.Select)
-      return fromPromise(prefetch.exec()).pipe(
+      return from(prefetch.exec()).pipe(
         concatMap(removeByRootEntities)
       )
     }
@@ -352,9 +345,9 @@ export class Database {
     return this.database$.pipe(concatMap(remove))
   }
 
-  dispose(): ErrorObservable | Observable<ExecutorResult> {
+  dispose(): Observable<never> | Observable<ExecutorResult> {
     if (!this.connected) {
-      return Observable.throw(Exception.NotConnected())
+      return throwError(Exception.NotConnected())
     }
 
     const cleanUp = (db: lf.Database) => {
@@ -380,7 +373,7 @@ export class Database {
   executor(db: lf.Database, queries: lf.query.Builder[]) {
     const tx = db.createTransaction()
 
-    return fromPromise(tx.exec(queries)).pipe(
+    return from(tx.exec(queries)).pipe(
       tap(transactionErrorHandler),
       map((ret) => {
         return {
@@ -864,11 +857,11 @@ export class Database {
         const [ table ] = Database.getTables(db, tableName)
         const [ predicate, err ] = tryCatch(createPredicate)(table, where)
         if (err) {
-          return Observable.throw(err)
+          return throwError(err)
         }
         const query = predicatableQuery(db, table, predicate!, StatementType.Select)
 
-        return fromPromise<T[]>(query.exec() as any)
+        return from<T[]>(query.exec() as any)
       }
 
       return [get, remove]

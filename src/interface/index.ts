@@ -1,5 +1,4 @@
-import { Observable } from 'rxjs/Observable'
-import { PartialObserver } from 'rxjs/Observer'
+import { Observable, PartialObserver } from 'rxjs'
 import { RDBType, Relationship, LeafType, StatementType, JoinMode, DataStoreType } from './enum'
 
 export type DeepPartial<T> = {

@@ -1,3 +1,6 @@
+import { Observable } from 'rxjs'
+import { concatMap, tap } from 'rxjs/operators'
+
 import { Database, RDBType, Relationship } from '../index'
 
 export interface ProgramSchema {
@@ -40,14 +43,15 @@ export default (db: Database) => db.defineSchema<ProgramSchema>('Program', {
     const [ matcher1, disposer1 ] = scope('Module')
     const [ matcher2, disposer2 ] = scope('Engineer')
 
-    return matcher1({ parentId: { $in: rootEntities.map((e) => e._id) } })
-      .do(disposer1)
-      .concatMap(modules => {
+    return matcher1({ parentId: { $in: rootEntities.map((e) => e._id) } }).pipe(
+      tap(disposer1),
+      concatMap(modules => {
         const engineers = rootEntities
           .map(entity => entity.ownerId)
           .concat(modules.map((m: any) => m.ownerId))
         return matcher2({ _id: { $in: engineers } })
-      })
-      .do(disposer2)
+      }),
+      tap(disposer2),
+    ) as Observable<any>
   }
 })

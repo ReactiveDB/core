@@ -1,6 +1,5 @@
-import { Observable } from 'rxjs/Observable'
-import { OperatorFunction } from 'rxjs/interfaces'
-import { map } from 'rxjs/operators/map'
+import { Observable, OperatorFunction } from 'rxjs'
+import { map } from 'rxjs/operators'
 import { Query } from '../../interface'
 import { mapFn } from './mapFn'
 

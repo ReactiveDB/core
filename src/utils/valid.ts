@@ -1,13 +1,12 @@
-import { Observable } from 'rxjs/Observable'
-import { empty } from 'rxjs/observable/empty'
-import { skip } from 'rxjs/operators/skip'
-import { ErrorObservable } from 'rxjs/observable/ErrorObservable'
+
+import { throwError, Observable, EMPTY } from 'rxjs'
+import { skip } from 'rxjs/operators'
 
 // think it as asynchronous assert
-export function valid<T>(condition: any, error: Error): ErrorObservable | Observable<T> {
+export function valid<T>(condition: any, error: Error): Observable<never> | Observable<T> {
   if (!condition) {
-    return Observable.throw(error)
+    return throwError(error)
   }
 
-  return empty<T>().pipe(skip(1))
+  return EMPTY.pipe(skip(1))
 }

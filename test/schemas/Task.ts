@@ -1,3 +1,6 @@
+import { Observable } from 'rxjs'
+import { tap } from 'rxjs/operators'
+
 import { RDBType, Relationship } from '../index'
 import { TeambitionTypes, Database, SubtaskSchema } from '../index'
 
@@ -91,7 +94,7 @@ export default (db: Database) => {
     },
     dispose: (rootEntities, scope) => {
       const [ matcher, disposer ] = scope('Subtask')
-      return matcher({ _taskId: { $in: rootEntities.map((entity: any) => entity._id) } }).do(disposer)
+      return matcher({ _taskId: { $in: rootEntities.map((entity: any) => entity._id) } }).pipe(tap(disposer)) as Observable<any>
     }
   })
 }

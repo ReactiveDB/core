@@ -1,6 +1,8 @@
 import * as lf from 'lovefield'
 import { describe, it, beforeEach } from 'tman'
 import { expect } from 'chai'
+import { concatMap } from 'rxjs/operators'
+
 import {
   RDBType,
   Database,
@@ -120,9 +122,9 @@ export default describe('Database Method before Connect', () => {
       const tableName = 'Preload'
       const fixture = { name: dbname, version: fixedVersion, tables: { [tableName]: [ { _id: 'foo' }, { _id: 'bar' } ] } }
 
-      db.load(fixture).concatMap(() => {
+      db.load(fixture).pipe(concatMap(() => {
         return db.dump()
-      })
+      }))
       .subscribe((dump: any) => {
         expect(dump.tables[tableName]).have.lengthOf(2)
         expect(db['storedIds'].size).to.equal(2)

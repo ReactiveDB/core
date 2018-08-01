@@ -23,7 +23,7 @@ const pkg = require('../package.json')
 const README = fs.readFileSync(resolve(process.cwd(), 'README.md'), 'utf8')
 
 const cjsPkg = { ...pkg, main: './index.js' }
-const esPkg  = { ...cjsPkg, name: 'reactivedb-es' }
+const esPkg  = { ...cjsPkg, name: 'reactivedb-es', sideEffects: false }
 
 const write = (distPath: string, data: any) => {
   return new Promise((res, reject) => {

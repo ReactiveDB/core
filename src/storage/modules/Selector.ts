@@ -1,19 +1,22 @@
-import { Observer } from 'rxjs/Observer'
-import { Observable } from 'rxjs/Observable'
-import { OperatorFunction } from 'rxjs/interfaces'
-import { filter } from 'rxjs/operators/filter'
-import { from } from 'rxjs/observable/from'
-import { fromPromise } from 'rxjs/observable/fromPromise'
-import { combineAll } from 'rxjs/operators/combineAll'
-import { debounceTime } from 'rxjs/operators/debounceTime'
-import { map } from 'rxjs/operators/map'
-import { mergeMap } from 'rxjs/operators/mergeMap'
-import { publishReplay } from 'rxjs/operators/publishReplay'
-import { reduce } from 'rxjs/operators/reduce'
-import { refCount } from 'rxjs/operators/refCount'
-import { scan } from 'rxjs/operators/scan'
-import { switchMap } from 'rxjs/operators/switchMap'
-import { async } from 'rxjs/scheduler/async'
+import {
+  Observable,
+  Observer,
+  OperatorFunction,
+  from,
+  asyncScheduler,
+} from 'rxjs'
+import {
+  filter,
+  combineAll,
+  debounceTime,
+  map,
+  mergeMap,
+  publishReplay,
+  reduce,
+  refCount,
+  scan,
+  switchMap,
+} from 'rxjs/operators'
 import * as lf from 'lovefield'
 import * as Exception from '../../exception'
 import { predicatableQuery, graph } from '../helper'
@@ -53,9 +56,9 @@ export class Selector <T> {
     const dist = new Selector<U>(originalToken.db, fakeQuery as any, { } as any)
     dist.change$ = from(metaDatas).pipe(
       map(metas => metas.mapFn(metas.change$)),
-      combineAll<Observable<U[]>, U[][]>(),
+      combineAll<U[]>(),
       map(r => r.reduce((acc, val) => acc.concat(val))),
-      debounceTime(0, async),
+      debounceTime(0, asyncScheduler),
       publishReplay(1),
       refCount()
     )
@@ -206,9 +209,9 @@ export class Selector <T> {
       const p = this.rangeQuery.exec()
         .then(r => r.map(v => v[this.shape.pk.name]))
         .then(pks => this.getValue(this.getQuery(this.inPKs(pks))))
-      return this.mapFn(fromPromise(p))
+      return this.mapFn(from(p))
     } else {
-      return this.mapFn(fromPromise(this.getValue(this.getQuery()) as Promise<T[]>))
+      return this.mapFn(from(this.getValue(this.getQuery()) as Promise<T[]>))
     }
   }
 

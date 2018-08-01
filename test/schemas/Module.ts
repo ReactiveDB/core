@@ -1,3 +1,6 @@
+import { Observable } from 'rxjs'
+import { tap } from 'rxjs/operators'
+
 import { Database, RDBType, Relationship } from '../index'
 
 export interface ModuleSchema {
@@ -34,6 +37,6 @@ export default (db: Database) => db.defineSchema<ModuleSchema>('Module', {
   },
   dispose(rootEntities, scope) {
     const [ matcher, disposer ] = scope('Engineer')
-    return matcher({ _id: { $in: rootEntities.map(entity => entity.ownerId) } }).do(disposer)
+    return matcher({ _id: { $in: rootEntities.map(entity => entity.ownerId) } }).pipe(tap(disposer)) as Observable<any>
   }
 })

@@ -9,11 +9,15 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
+    "strict": true,
     "allowJs": true,
     "importHelpers": true,
     "noEmitHelpers": true,
-    "typeRoots": [
-      "node_modules/@types"
+    "lib": [
+      "es5",
+      "es2015",
+      "es2016",
+      "es2017"
     ]
   },
   "exclude": [

@@ -1,4 +1,14 @@
-import { Observable, Scheduler } from 'rxjs'
+import { Observable, asyncScheduler, from, forkJoin } from 'rxjs'
+import {
+  subscribeOn,
+  tap,
+  take,
+  concatMap,
+  skip,
+  toArray,
+  catchError,
+  finalize,
+} from 'rxjs/operators'
 import * as moment from 'moment'
 import { describe, it, beforeEach, afterEach } from 'tman'
 import { expect, assert, use } from 'chai'
@@ -252,11 +262,12 @@ export default describe('Database Testcase: ', () => {
     })
 
     it('on query without `where`, should result in QueryToken whose Selector does not have predicateProvider', function* () {
-      yield database.get<TaskSchema>('Task', {}).selector$
-        .subscribeOn(Scheduler.async)
-        .do((x: Selector<TaskSchema>) => {
+      yield database.get<TaskSchema>('Task', {}).selector$.pipe(
+        subscribeOn(asyncScheduler),
+        tap((x: Selector<TaskSchema>) => {
           expect(x.predicateProvider).to.be.undefined
-        })
+        }),
+      )
     })
 
     it('should get single record successfully', function* () {
@@ -384,37 +395,40 @@ export default describe('Database Testcase: ', () => {
       const result = yield database.get('Task', { skip: 20 }).values()
       taskCleanup(result)
 
-      yield Observable.from(fixture)
-        .skip(20)
-        .toArray()
-        .do(r => {
+      yield from(fixture).pipe(
+        skip(20),
+        toArray(),
+        tap(r => {
           expect(r).to.deep.equal(result)
-        })
+        }),
+      )
     })
 
     it('should be worked with `limit` clause', function* () {
       const result = yield database.get('Task', { limit: 10 }).values()
       taskCleanup(result)
 
-      yield Observable.from(fixture)
-        .take(10)
-        .toArray()
-        .do(r => {
+      yield from(fixture).pipe(
+        take(10),
+        toArray(),
+        tap(r => {
           expect(r).to.deep.equal(result)
-        })
+        }),
+      )
     })
 
     it('should be worked with both skip and limit', function* () {
       const result = yield database.get('Task', { limit: 10, skip: 20 }).values()
       taskCleanup(result)
 
-      yield Observable.from(fixture)
-        .skip(20)
-        .take(10)
-        .toArray()
-        .do(r => {
+      yield from(fixture).pipe(
+        skip(20),
+        take(10),
+        toArray(),
+        tap(r => {
           expect(r).to.deep.equal(result)
-        })
+        }),
+      )
     })
 
     it('should get records with order', function* () {
@@ -485,7 +499,7 @@ export default describe('Database Testcase: ', () => {
           database.insert('Post', posts)
         ]
 
-        Observable.forkJoin(...queries).subscribe(() => {
+        forkJoin(...queries).subscribe(() => {
           done()
         })
       })
@@ -508,35 +522,38 @@ export default describe('Database Testcase: ', () => {
       it('should apply `skip` clause on multi joined query', function* () {
         const result = yield database.get('Task', { skip: 20 }).values()
 
-        yield Observable.from(associationFixture)
-          .skip(20)
-          .toArray()
-          .do(r => {
+        yield from(associationFixture).pipe(
+          skip(20),
+          toArray(),
+          tap(r => {
             expect(r).to.deep.equal(result)
-          })
+          }),
+        )
       })
 
       it('should be worked with `limit` clause on multi joined query', function* () {
         const result = yield database.get('Task', { limit: 10 }).values()
 
-        yield Observable.from(associationFixture)
-          .take(10)
-          .toArray()
-          .do(r => {
+        yield from(associationFixture).pipe(
+          take(10),
+          toArray(),
+          tap(r => {
             expect(r).to.deep.equal(result)
-          })
+          }),
+        )
       })
 
       it('should be worked with both skip and limit on multi joined query', function* () {
         const result = yield database.get('Task', { limit: 10, skip: 20 }).values()
 
-        yield Observable.from(associationFixture)
-          .skip(20)
-          .take(10)
-          .toArray()
-          .do(r => {
+        yield from(associationFixture).pipe(
+          skip(20),
+          take(10),
+          toArray(),
+          tap(r => {
             expect(r).to.deep.equal(result)
-          })
+          }),
+        )
       })
 
       it('should throw if only navigator was included in query', function* () {
@@ -718,10 +735,11 @@ export default describe('Database Testcase: ', () => {
       })
 
       yield database.get<TaskSchema>('Task')
-        .values()
-        .do(([t]) => {
-          expect(t.content).to.equal(newContent)
-        })
+        .values().pipe(
+          tap(([t]) => {
+            expect(t.content).to.equal(newContent)
+          }),
+        )
     })
 
     it('should throw if patching data is plural', function* () {
@@ -763,12 +781,14 @@ export default describe('Database Testcase: ', () => {
       tmpDB.update(T, { id: 1 }, {
         members: ['1', '2']
       })
-      .catch(errSpy)
-      .finally(() => {
-        expect(errSpy).not.be.called
-        tmpDB.dispose()
-        done()
-      })
+      .pipe(
+        catchError(errSpy),
+        finalize(() => {
+          expect(errSpy).not.be.called
+          tmpDB.dispose()
+          done()
+        }),
+      )
       .subscribe()
     })
 
@@ -1302,8 +1322,9 @@ export default describe('Database Testcase: ', () => {
       const programs1 = programGen(programCount, moduleCount)
       const programs2 = programGen(programCount, moduleCount)
 
-      database.get('Program').changes()
-        .skip(1)
+      database.get('Program').changes().pipe(
+        skip(1)
+      )
         .subscribe((r) => {
           // 第一次的更新推送就输出了 2次 upsert 的执行结果
           expect(r.length).to.equal(programCount * 2)
@@ -1311,12 +1332,14 @@ export default describe('Database Testcase: ', () => {
           // 这里会导致没办法 afterEach hook, 故暂时先删除
         })
 
-      database.transaction()
-        .concatMap(([ db, tx ]) =>
-          db.upsert('Program', programs1)
-            .concatMap(() => db.upsert('Program', programs2))
-            .concatMap(() => tx.commit())
-        )
+      database.transaction().pipe(
+        concatMap(([ db, tx ]) =>
+          db.upsert('Program', programs1).pipe(
+            concatMap(() => db.upsert('Program', programs2)),
+            concatMap(() => tx.commit()),
+          )
+        ),
+      )
         .subscribe()
     })
 
@@ -1324,12 +1347,14 @@ export default describe('Database Testcase: ', () => {
       const posts1 = postGen(10, 'goog')
       const posts2 = postGen(10, 'facebook')
 
-      const ret = yield database.transaction()
-        .concatMap(([ db, tx ]) => {
-          return db.upsert('Post', posts1)
-            .concatMap(() => db.upsert('Post', posts2))
-            .concatMap(() => tx.commit())
-        })
+      const ret = yield database.transaction().pipe(
+        concatMap(([ db, tx ]) => {
+          return db.upsert('Post', posts1).pipe(
+            concatMap(() => db.upsert('Post', posts2)),
+            concatMap(() => tx.commit()),
+          )
+        }),
+      )
 
       checkExecutorResult(ret, 20)
     })
@@ -1338,12 +1363,14 @@ export default describe('Database Testcase: ', () => {
       const posts1 = postGen(10, 'goog')
       const posts2 = postGen(10, 'facebook')
 
-      const ret = yield database.transaction()
-        .concatMap(([ db, tx ]) => {
-          return db.insert('Post', posts1)
-            .concatMap(() => db.insert('Post', posts2))
-            .concatMap(() => tx.commit())
-        })
+      const ret = yield database.transaction().pipe(
+        concatMap(([ db, tx ]) => {
+          return db.insert('Post', posts1).pipe(
+            concatMap(() => db.insert('Post', posts2)),
+            concatMap(() => tx.commit()),
+          )
+        }),
+      )
 
       checkExecutorResult(ret, 20)
     })
@@ -1354,12 +1381,14 @@ export default describe('Database Testcase: ', () => {
 
       yield database.insert('Post', posts1.concat(posts2))
 
-      const ret = yield database.transaction()
-        .concatMap(([ db, tx ]) => {
-          return db.delete('Post', { where: { _id: { $in: posts1.map(p => p._id) } } })
-            .concatMap(() => db.delete('Post', { where: { _id: { $in: posts2.map(p => p._id) } } }))
-            .concatMap(() => tx.commit())
-        })
+      const ret = yield database.transaction().pipe(
+        concatMap(([ db, tx ]) => {
+          return db.delete('Post', { where: { _id: { $in: posts1.map(p => p._id) } } }).pipe(
+            concatMap(() => db.delete('Post', { where: { _id: { $in: posts2.map(p => p._id) } } })),
+            concatMap(() => tx.commit()),
+          )
+        }),
+      )
 
       checkExecutorResult(ret, 0, 2)
     })
@@ -1370,12 +1399,14 @@ export default describe('Database Testcase: ', () => {
 
       yield database.insert('Post', posts1.concat(posts2))
 
-      const ret = yield database.transaction()
-        .concatMap(([ db, tx ]) => {
-          return db.remove('Post', { where: { _id: { $in: posts1.map(p => p._id) } } })
-            .concatMap(() => db.remove('Post', { where: { _id: { $in: posts2.map(p => p._id) } } }))
-            .concatMap(() => tx.commit())
-        })
+      const ret = yield database.transaction().pipe(
+        concatMap(([ db, tx ]) => {
+          return db.remove('Post', { where: { _id: { $in: posts1.map(p => p._id) } } }).pipe(
+            concatMap(() => db.remove('Post', { where: { _id: { $in: posts2.map(p => p._id) } } })),
+            concatMap(() => tx.commit()),
+          )
+        }),
+      )
 
       checkExecutorResult(ret, 0, 2)
     })
@@ -1385,11 +1416,13 @@ export default describe('Database Testcase: ', () => {
 
       yield database.upsert('Program', programs)
 
-      const ret = yield database.transaction()
-        .concatMap(([ db, tx ]) => {
-          return db.remove('Program')
-            .concatMap(() => tx.commit())
+      const ret = yield database.transaction().pipe(
+        concatMap(([ db, tx ]) => {
+          return db.remove('Program').pipe(
+            concatMap(() => tx.commit()),
+          )
         })
+      )
 
       checkExecutorResult(ret, 0, 10 + 10 + 1)
     })
@@ -1403,10 +1436,11 @@ export default describe('Database Testcase: ', () => {
       delete program.modules
 
       try {
-        yield database.transaction()
-          .concatMap(([ db, tx ]) => {
-            return db.upsert('Program', program).concatMap(() => tx.commit())
-          })
+        yield database.transaction().pipe(
+          concatMap(([ db, tx ]) => {
+            return db.upsert('Program', program).pipe(concatMap(() => tx.commit()))
+          }),
+        )
         throw new Error('error code path')
       } catch (e) {
         expect(e.message).to.not.equal('error code path')
@@ -1423,15 +1457,17 @@ export default describe('Database Testcase: ', () => {
       const programs1 = programGen(programCount, moduleCount)
       const programs2 = programGen(programCount, moduleCount)
 
-      const ret = yield database.transaction()
-        .concatMap(([ db, tx ]) => {
-          return db.upsert('Program', programs1)
-            .concatMap(() => db.upsert('Program', programs2))
-            .concatMap(() => {
+      const ret = yield database.transaction().pipe(
+        concatMap(([ db, tx ]) => {
+          return db.upsert('Program', programs1).pipe(
+            concatMap(() => db.upsert('Program', programs2)),
+            concatMap(() => {
               tx.abort()
               return tx.commit()
-            })
-        })
+            }),
+          )
+        }),
+      )
 
       checkExecutorResult(ret)
     })

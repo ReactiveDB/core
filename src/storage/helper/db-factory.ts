@@ -1,8 +1,6 @@
 import * as lf from 'lovefield'
-import { Observable } from 'rxjs/Observable'
-import { ConnectableObservable } from 'rxjs/observable/ConnectableObservable'
-import { ReplaySubject } from 'rxjs/ReplaySubject'
-import { Observer } from 'rxjs/Observer'
+import { Observable, ConnectableObservable, ReplaySubject, Observer } from 'rxjs'
+import { publishReplay } from 'rxjs/operators'
 import { LfFactoryInit } from '../../interface'
 
 export const rawDb$ = new ReplaySubject<lf.raw.BackStore>(1)
@@ -26,6 +24,5 @@ export const lfFactory = (schemaBuilder: lf.schema.Builder, config: LfFactoryIni
         observer.complete()
       })
       .catch(e => observer.error(e))
-  })
-    .publishReplay(1)
+  }).pipe(publishReplay(1))
 }

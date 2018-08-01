@@ -1,8 +1,28 @@
-import { Observable, Scheduler, Subscription } from 'rxjs'
+import {
+  Subscription,
+  of,
+  defer,
+  range,
+  from,
+  asyncScheduler,
+  asapScheduler,
+} from 'rxjs'
 import * as lf from 'lovefield'
 import { expect, use } from 'chai'
 import * as sinon from 'sinon'
 import * as SinonChai from 'sinon-chai'
+import {
+  map,
+  tap,
+  skip,
+  subscribeOn,
+  take,
+  concat,
+  zip,
+  publish,
+  refCount,
+  last,
+} from 'rxjs/operators'
 import { beforeEach, it, describe, afterEach } from 'tman'
 import {
   Selector,
@@ -47,17 +67,17 @@ export default describe('Selector test', () => {
 
     db$.connect()
 
-    return db$.map((testDB) => ({
+    return db$.pipe(map((testDB) => ({
       db: testDB,
       table: testDB.getSchema().table('TestSelectMetadata')
-    }))
+    })))
   }
 
   beforeEach(function * () {
-    yield constructDBAndATable().do((r) => {
+    yield constructDBAndATable().pipe(tap((r) => {
       db = r.db
       table = r.table
-    })
+    }))
 
     const rows: lf.Row[] = []
     storeData = []
@@ -175,8 +195,8 @@ export default describe('Selector test', () => {
       ]
     )
 
-    yield selector.values()
-      .do(result => {
+    yield selector.values().pipe(
+      tap(result => {
         expect(result).to.have.lengthOf(950)
         const expectResult = storeData.filter(r => r.time >= 50)
           .sort((a, b) => {
@@ -186,7 +206,8 @@ export default describe('Selector test', () => {
           })
 
         expect(result).to.deep.equal(expectResult)
-      })
+      }),
+    )
   })
 
   describe('Selector.prototype.changes', () => {
@@ -199,8 +220,9 @@ export default describe('Selector test', () => {
 
       const newName = 'test name change'
 
-      subscription = selector.changes()
-        .skip(1)
+      subscription = selector.changes().pipe(
+        skip(1),
+      )
         .subscribe((r: any[]) => {
           expect(r[0].name).to.equal(newName)
           done()
@@ -213,10 +235,10 @@ export default describe('Selector test', () => {
     })
 
     it('observe asynchronous insertions completely', function* () {
-      yield constructDBAndATable().do((r) => {
+      yield constructDBAndATable().pipe(tap((r) => {
         db = r.db
         table = r.table // ensure empty table
-      })
+      }))
 
       const n = 3
       const rows = [
@@ -227,13 +249,15 @@ export default describe('Selector test', () => {
       const insertRow = (i: number) =>
         db.insert().into(table).values([table.createRow(rows[i])]).exec()
 
-      const count$ = Observable.range(0, n + 1)
+      const count$ = range(0, n + 1)
 
-      const insert$ = Observable.concat(
-        Observable.of({}).subscribeOn(Scheduler.asap),
-        Observable.defer(() => insertRow(0)).subscribeOn(Scheduler.asap),
-        Observable.defer(() => insertRow(1)).subscribeOn(Scheduler.asap),
-        Observable.defer(() => insertRow(2)).subscribeOn(Scheduler.asap)
+      const insert$ = of({}).pipe(
+        subscribeOn(asapScheduler),
+        concat(
+          defer(() => insertRow(0)).pipe(subscribeOn(asapScheduler)),
+          defer(() => insertRow(1)).pipe(subscribeOn(asapScheduler)),
+          defer(() => insertRow(2)).pipe(subscribeOn(asapScheduler)),
+        ),
       )
 
       const change$ = new Selector(db,
@@ -242,11 +266,11 @@ export default describe('Selector test', () => {
         new PredicateProvider(table, {}),
       ).changes()
 
-      yield Observable.zip(count$, insert$, change$,
-        (nth, _, result) => {
+      yield count$.pipe(zip(
+        insert$, change$
+      , (nth, _, result) => {
           expect(result).to.deep.equal(rows.slice(0, nth))
-        }
-      )
+      }))
     })
 
     it('should observe deletion of the only row in db', function* () {
@@ -272,12 +296,13 @@ export default describe('Selector test', () => {
         .where(table['_id'].eq('_id:939.5'))
         .exec()
 
-      yield signal
-        .subscribeOn(Scheduler.async)
-        .take(1)
-        .do((r: any) => {
+      yield signal.pipe(
+        subscribeOn(asyncScheduler),
+        take(1),
+        tap((r: any) => {
           expect(r).to.deep.equal([])
-        })
+        }),
+      )
     })
 
     it('unsubscribe should ok', function* () {
@@ -321,29 +346,33 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
       yield db.update(table)
         .set(table['name'], newName)
         .where(table['_id'].eq('_id:50'))
         .exec()
 
-      yield signal.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(([ result ]) => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap(([ result ]) => {
           expect(result['name']).to.equal(newName)
-        })
+        }),
+      )
 
       yield db.update(table)
         .set(table['name'], newName + newName)
         .where(table['_id'].eq('_id:50'))
         .exec()
 
-      yield signal.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(([ result ]) => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap(([ result ]) => {
           expect(result['name']).to.equal(newName + newName)
-        })
+        }),
+      )
 
     })
 
@@ -363,10 +392,12 @@ export default describe('Selector test', () => {
         .where(table['_id'].eq('_id:50'))
         .exec()
 
-      yield changes.take(1)
-        .do(([ result1 ]) => {
+      yield changes.pipe(
+        take(1),
+        tap(([ result1 ]) => {
           expect(result1['name']).to.equal(newName)
-        })
+        }),
+      )
 
       const error = new TypeError('not happy')
 
@@ -378,7 +409,7 @@ export default describe('Selector test', () => {
         .exec()
 
       try {
-        yield changes.take(1)
+        yield changes.pipe(take(1))
       } catch (e) {
         expect(e.message).to.equal(error.message)
       }
@@ -397,13 +428,14 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe()
 
-      yield signal
-        .subscribeOn(Scheduler.async)
-        .take(1)
-        .do((r: any) => {
+      yield signal.pipe(
+        subscribeOn(asyncScheduler),
+        take(1),
+        tap((r: any) => {
           // 确定能推出空结果集
           expect(r).to.deep.equal([])
-        })
+        }),
+      )
 
       const impossibleRow = {
         _id: '_id:939.5',
@@ -417,13 +449,14 @@ export default describe('Selector test', () => {
         .values([table.createRow(impossibleRow)])
         .exec()
 
-      yield signal
-        .subscribeOn(Scheduler.async)
-        .take(1)
-        .do((r: any) => {
+      yield signal.pipe(
+        subscribeOn(asyncScheduler),
+        take(1),
+        tap((r: any) => {
           // 确定在空结果集上也能推出更新
           expect(r[0]).to.deep.equal(impossibleRow)
-        })
+        }),
+      )
     })
 
     it('should observe changes when skip and limit', function* () {
@@ -440,19 +473,20 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
       yield db.update(table)
         .set(table['name'], newName)
         .where(table['_id'].eq('_id:71'))
         .exec()
 
-      yield signal
-        .take(1)
-        .subscribeOn(Scheduler.async)
-        .do((r: any) => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap((r: any) => {
           expect(r[0].name).to.equal(newName)
-        })
+        }),
+      )
     })
 
     it('should observe changes with skip and limit and sortBy', function* () {
@@ -473,19 +507,20 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
       yield db.update(table)
         .set(table['name'], newName)
         .where(table['_id'].eq('_id:921'))
         .exec()
 
-      yield signal
-        .subscribeOn(Scheduler.async)
-        .take(1)
-        .do((r: any) => {
+      yield signal.pipe(
+        subscribeOn(asyncScheduler),
+        take(1),
+        tap((r: any) => {
           expect(r[0].name).to.equal(newName)
-        })
+        }),
+      )
 
       const row = { _id: '_id:939.5', name: 'name:939.5', time: 939.5, priority: 10 }
 
@@ -494,23 +529,26 @@ export default describe('Selector test', () => {
         .values([table.createRow(row)])
         .exec()
 
-      yield signal
-        .subscribeOn(Scheduler.async)
-        .take(1)
-        .do((r: any) => {
+      yield signal.pipe(
+        subscribeOn(asyncScheduler),
+        take(1),
+        tap((r: any) => {
           expect(r[r.length - 1]).to.deep.equal(row)
-        })
+        }),
+      )
 
       yield db.delete()
         .from(table)
         .where(table['_id'].eq('_id:930'))
         .exec()
 
-      yield signal.take(1)
-        .subscribeOn(Scheduler.async)
-        .do((r: any) => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap((r: any) => {
           expect(r[r.length - 1]._id).to.equal('_id:940')
-        })
+        }),
+      )
     })
 
     it('predicate should be clone before use when skip and limit', function* () {
@@ -525,7 +563,7 @@ export default describe('Selector test', () => {
 
       const signal = selector.changes()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
       subscription = signal.subscribe()
 
@@ -534,24 +572,26 @@ export default describe('Selector test', () => {
         .where(table['_id'].eq('_id:71'))
         .exec()
 
-      yield signal
-        .subscribeOn(Scheduler.async)
-        .take(1)
-        .do(([ r ]) => {
+      yield signal.pipe(
+        subscribeOn(asyncScheduler),
+        take(1),
+        tap(([ r ]) => {
           expect(r['name']).to.equal(newName)
-        })
+        }),
+      )
 
       yield db.update(table)
         .set(table['name'], newName + newName)
         .where(table['_id'].eq('_id:71'))
         .exec()
 
-      yield signal
-        .subscribeOn(Scheduler.async)
-        .take(1)
-        .do(([ r ]) => {
+      yield signal.pipe(
+        subscribeOn(asyncScheduler),
+        take(1),
+        tap(([ r ]) => {
           expect(r['name']).to.equal(newName + newName)
         })
+      )
     })
 
     it('should observe changes when prefetched data changed', function* () {
@@ -566,22 +606,24 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
       yield db.delete()
         .from(table)
         .where(lf.op.and(table['time'].gte(71), table['time'].lte(80)))
         .exec()
 
-      yield signal.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(r => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap(r => {
           expect(r).to.have.lengthOf(20)
           r.forEach((v: any) => {
             expect(v.time).to.gt(80)
             expect(v.time).to.lte(100)
           })
-        })
+        }),
+      )
     })
 
     it('should observe changes when last page data changed', function* () {
@@ -596,22 +638,24 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
       yield db.delete()
         .from(table)
         .where(lf.op.and(table['time'].gte(981), table['time'].lte(990)))
         .exec()
 
-      yield signal.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(r => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap(r => {
           expect(r).to.have.lengthOf(9)
           r.forEach((v: any) => {
             expect(v.time).to.gt(990)
             expect(v.time).to.lt(1000)
           })
-        })
+        }),
+      )
     })
 
     it('should observe updates to an inserted row', function* () {
@@ -626,7 +670,7 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
       const newRow = { _id: '_id:929.5', name: 'name:929.5', time: -1, priority: 10 }
       const row = table.createRow(newRow)
@@ -642,9 +686,10 @@ export default describe('Selector test', () => {
         .where(table['_id'].eq(newRow._id))
         .exec()
 
-      yield signal.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(r => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap(r => {
           expect(r).to.have.lengthOf(1)
           const diff = r.filter((d: Fixture) => d._id === newRow._id)
           expect(diff).to.have.lengthOf(1)
@@ -653,7 +698,8 @@ export default describe('Selector test', () => {
             expect(diffRow._id).to.equal(newRow._id)
             expect(diffRow.name).to.equal(newName)
           }
-        })
+        }),
+      )
     })
 
     it('query without prefetch should only emit one values when init', function* () {
@@ -669,7 +715,7 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe(spy)
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
       expect(spy.callCount).to.equal(1)
     })
@@ -687,7 +733,7 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe(spy)
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
       expect(spy.callCount).to.equal(1)
     })
@@ -706,7 +752,7 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe(spy)
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
       expect(spy.callCount).to.equal(1)
     })
@@ -777,10 +823,11 @@ export default describe('Selector test', () => {
     })
 
     it('changes should observe all values from original SelectMeta', function* () {
-      const changes$ = dist.changes()
-        .subscribeOn(Scheduler.async, 1)
-        .publish()
-        .refCount()
+      const changes$ = dist.changes().pipe(
+        subscribeOn(asyncScheduler, 1),
+        publish(),
+        refCount(),
+      )
 
       changes$.subscribe()
 
@@ -788,31 +835,37 @@ export default describe('Selector test', () => {
       const update2 = 'test update name 2'
       const update3 = 'test update name 3'
 
-      yield changes$.take(1)
+      yield changes$.pipe(take(1))
 
       yield db.update(table)
         .set(table['name'], update1)
         .where(table['_id'].eq('_id:15'))
         .exec()
 
-      yield changes$.take(1)
-        .do(r => expect(r[15].name).equal(update1))
+      yield changes$.pipe(
+        take(1),
+        tap(r => expect(r[15].name).equal(update1)),
+      )
 
       yield db.update(table)
         .set(table['name'], update2)
         .where(table['_id'].eq('_id:55'))
         .exec()
 
-      yield changes$.take(1)
-        .do(r => expect(r[55].name).equal(update2))
+      yield changes$.pipe(
+        take(1),
+        tap(r => expect(r[55].name).equal(update2)),
+      )
 
       yield db.update(table)
         .set(table['name'], update3)
         .where(table['_id'].eq('_id:125'))
         .exec()
 
-      yield changes$.take(1)
-        .do(r => expect(r[125].name).equal(update3))
+      yield changes$.pipe(
+        take(1),
+        tap(r => expect(r[125].name).equal(update3)),
+      )
     })
 
     it('changes should observe all values with limit and skip', function* () {
@@ -830,43 +883,50 @@ export default describe('Selector test', () => {
       )
 
       const signal = selector5.combine(selector6)
-        .changes()
-        .subscribeOn(Scheduler.async, 1)
-        .publish()
-        .refCount()
+        .changes().pipe(
+          subscribeOn(asyncScheduler, 1),
+          publish(),
+          refCount(),
+        )
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
       yield db.delete()
         .from(table)
         .where(table['time'].eq(81))
         .exec()
 
-      yield signal.take(1)
-        .do(r => {
+      yield signal.pipe(
+        take(1),
+        tap((r: any[]) => {
           expect(r).to.have.lengthOf(40)
           r.forEach(v => expect(v['time']).not.equal(81))
-          Observable.from(r)
-            .skip(19)
-            .take(1)
+          from(r).pipe(
+            skip(19),
+            take(1),
+          )
             .subscribe(v => expect(v['time']).to.equal(91))
         })
+      )
 
       yield db.delete()
         .from(table)
         .where(table['time'].eq(135))
         .exec()
 
-      yield signal.take(1)
-        .do(r => {
+      yield signal.pipe(
+        take(1),
+        tap((r: any[]) => {
           expect(r).to.have.lengthOf(40)
           r.forEach(v => expect(v['time']).not.equal(135))
-          Observable.from(r)
-            .last()
+          from(r).pipe(
+            last()
+          )
             .subscribe(v => expect(v['time']).to.equal(141))
-        })
+        }),
+      )
 
       const newName = 'xxx'
 
@@ -875,22 +935,26 @@ export default describe('Selector test', () => {
         .where(table['time'].eq(82))
         .exec()
 
-      yield signal.take(1)
-        .do(r => {
+      yield signal.pipe(
+        take(1),
+        tap((r: any[]) => {
           r.filter(v => v['time'] === 82)
             .forEach(v => expect(v['name']).to.equal(newName))
-        })
+        }),
+      )
 
       yield db.update(table)
         .set(table['name'], newName)
         .where(table['time'].eq(136))
         .exec()
 
-      yield signal.take(1)
-        .do(r => {
+      yield signal.pipe(
+        take(1),
+        tap((r: any[]) => {
           r.filter(v => v['time'] === 136)
             .forEach(v => expect(v['name']).to.equal(newName))
-        })
+        }),
+      )
     })
 
     it('combined Selector#toString should return query String', () => {
@@ -998,27 +1062,33 @@ export default describe('Selector test', () => {
         .where(table['_id'].eq('_id:51'))
         .exec()
 
-      yield changes$.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(r => expect(r[1].name).equal(update1))
+      yield changes$.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap(r => expect(r[1].name).equal(update1)),
+      )
 
       yield db.update(table)
         .set(table['name'], update2)
         .where(table['_id'].eq('_id:55'))
         .exec()
 
-      yield changes$.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(r => expect(r[5].name).equal(update2))
+      yield changes$.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap(r => expect(r[5].name).equal(update2)),
+      )
 
       yield db.update(table)
         .set(table['name'], update3)
         .where(table['_id'].eq('_id:125'))
         .exec()
 
-      yield changes$.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(r => expect(r[75].name).equal(update3))
+      yield changes$.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap(r => expect(r[75].name).equal(update3)),
+      )
     })
 
     it('concat selector should ok when neither selectors have predicateProvider', function* () {
@@ -1069,7 +1139,7 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
       const newRow = { _id: '_id:929.5', name: 'name:929.5', time: 929.5, priority: 10 }
 
@@ -1080,11 +1150,13 @@ export default describe('Selector test', () => {
         .values([row])
         .exec()
 
-      yield signal.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(([r]) => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap(([r]) => {
           expect(r).to.deep.equal(newRow)
         })
+      )
 
       yield db.delete()
         .from(table)
@@ -1214,9 +1286,9 @@ export default describe('Selector test', () => {
     let selector4: Selector<any>
     let concated: Selector<any>
     let combined: Selector<any>
-    const mapFn = (stream$: any) => stream$.map((v: any) => v.map(() => 1))
-    const mapFn2 = (stream$: any) => stream$.map((v: any) => v.map(() => 2))
-    const mapFn3 = (stream$: any) => stream$.map((v: any) => v.map(() => 3))
+    const mapFn = (stream$: any) => stream$.pipe(map((v: any) => v.map(() => 1)))
+    const mapFn2 = (stream$: any) => stream$.pipe(map((v: any) => v.map(() => 2)))
+    const mapFn3 = (stream$: any) => stream$.pipe(map((v: any) => v.map(() => 3)))
 
     mapFn.toString = () => 'TEST_MAP_FN'
 
@@ -1259,59 +1331,65 @@ export default describe('Selector test', () => {
 
     it('should map all result from value', function* () {
 
-      yield selector1.values()
-        .do(data => {
+      yield selector1.values().pipe(
+        tap(data => {
           data.forEach(r => expect(r).to.equal(1))
         })
+      )
     })
 
     it('should map all result from changes', function* () {
 
-      yield selector1.changes()
-        .take(1)
-        .do(data => {
+      yield selector1.changes().pipe(
+        take(1),
+        tap(data => {
           data.forEach(r => expect(r).to.equal(1))
-        })
+        }),
+      )
     })
 
     it('should map all result from concated selector#value', function* () {
-      yield concated.values()
-        .do(data => {
+      yield concated.values().pipe(
+        tap(data => {
           data.forEach(r => expect(r).to.equal(1))
-        })
+        }),
+      )
     })
 
     it('should map all result from concated selector#change', function* () {
-      yield concated.changes()
-        .take(1)
-        .do(data => {
+      yield concated.changes().pipe(
+        take(1),
+        tap(data => {
           data.forEach(r => expect(r).to.equal(1))
         })
+      )
     })
 
     it('should map all result from combined selector#value', function* () {
-      yield combined.values()
-        .do(data => {
+      yield combined.values().pipe(
+        tap(data => {
           data.splice(0, 20)
             .forEach(r => expect(r).to.equal(2))
-        })
-        .do(data => {
+        }),
+        tap(data => {
           data.splice(20)
             .forEach(r => expect(r).to.equal(3))
         })
+      )
     })
 
     it('should map all result from combined selector#changes', function* () {
-      yield combined.changes()
-        .take(1)
-        .do(data => {
+      yield combined.changes().pipe(
+        take(1),
+        tap(data => {
           data.splice(0, 20)
             .forEach(r => expect(r).to.equal(2))
-        })
-        .do(data => {
+        }),
+        tap(data => {
           data.splice(20)
             .forEach(r => expect(r).to.equal(3))
         })
+      )
     })
   })
 

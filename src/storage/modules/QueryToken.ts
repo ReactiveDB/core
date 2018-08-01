@@ -1,14 +1,14 @@
-import { Observable } from 'rxjs/Observable'
-import { OperatorFunction } from 'rxjs/interfaces'
-import { from } from 'rxjs/observable/from'
-import { combineAll } from 'rxjs/operators/combineAll'
-import { map } from 'rxjs/operators/map'
-import { publishReplay } from 'rxjs/operators/publishReplay'
-import { refCount } from 'rxjs/operators/refCount'
-import { skipWhile } from 'rxjs/operators/skipWhile'
-import { switchMap } from 'rxjs/operators/switchMap'
-import { take } from 'rxjs/operators/take'
-import { tap } from 'rxjs/operators/tap'
+import { Observable, OperatorFunction, from } from 'rxjs'
+import {
+  combineAll,
+  map,
+  publishReplay,
+  refCount,
+  skipWhile,
+  switchMap,
+  take,
+  tap,
+} from 'rxjs/operators'
 import { Selector } from './Selector'
 import { ProxySelector } from './ProxySelector'
 import { assert } from '../../utils/assert'
@@ -61,7 +61,7 @@ export class QueryToken<T> {
     tokens.unshift(this)
     const newSelector$ = from(tokens).pipe(
       map(token => token.selector$.pipe(skipWhileProxySelector)),
-      combineAll<Observable<Selector<T>>, Selector<T>[]>(),
+      combineAll<Selector<T>>(),
       map((r) => {
         const first = r.shift()
         return first!.concat(...r)
@@ -74,7 +74,7 @@ export class QueryToken<T> {
     tokens.unshift(this)
     const newSelector$ = from(tokens).pipe(
       map(token => token.selector$.pipe(skipWhileProxySelector)),
-      combineAll<Observable<Selector<T>>, Selector<T>[]>(),
+      combineAll<Selector<T>>(),
       map((r) => {
         const first = r.shift()
         return first!.combine(...r)

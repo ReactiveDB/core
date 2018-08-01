@@ -1,4 +1,5 @@
 import { Subject, Subscription } from 'rxjs'
+import { map } from 'rxjs/operators'
 import { expect } from 'chai'
 import { beforeEach, it, describe, afterEach } from 'tman'
 import { ProxySelector } from '../../../index'
@@ -73,7 +74,7 @@ export default describe('ProxySelector test', () => {
     }
 
     subscription = selector
-      .map(s$ => s$.map(r => r.map(() => 1)))
+      .map(s$ => s$.pipe(map(r => r.map(() => 1))))
       .values()
       .subscribe((r) => {
         expect(r).to.deep.equal([1])
@@ -89,7 +90,7 @@ export default describe('ProxySelector test', () => {
     }
 
     subscription = selector
-      .map(s$ => s$.map(r => r.map(() => 1)))
+      .map(s$ => s$.pipe(map(r => r.map(() => 1))))
       .changes()
       .subscribe((r) => {
         expect(r).to.deep.equal([1])
