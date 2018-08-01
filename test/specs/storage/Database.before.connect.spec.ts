@@ -10,11 +10,10 @@ import {
   DataStoreType,
   PrimaryKeyNotProvided,
   DatabaseIsNotEmpty,
-  UnmodifiableTable
+  UnmodifiableTable,
 } from '../../index'
 
 export default describe('Database Method before Connect', () => {
-
   let i = 1
   let database: Database
   const tablename = 'TestTable'
@@ -25,11 +24,11 @@ export default describe('Database Method before Connect', () => {
   })
 
   describe('Database.prototype.defineSchema', () => {
-    it('should throw since primaryKey wasn\'t specified', () => {
+    it("should throw since primaryKey wasn't specified", () => {
       const metaData = {
         _id: {
-          type: RDBType.STRING
-        }
+          type: RDBType.STRING,
+        },
       }
       const define = () => {
         database.defineSchema(tablename, metaData)
@@ -42,8 +41,8 @@ export default describe('Database Method before Connect', () => {
       const metaData = {
         _id: {
           type: RDBType.STRING,
-          primaryKey: true
-        }
+          primaryKey: true,
+        },
       }
       const define = () => {
         database.defineSchema(tablename, metaData)
@@ -57,20 +56,20 @@ export default describe('Database Method before Connect', () => {
       const metaData = {
         _id: {
           type: RDBType.STRING,
-          primaryKey: true
+          primaryKey: true,
         },
         name: {
-          type: RDBType.STRING
+          type: RDBType.STRING,
         },
         juju: {
           type: Relationship.oneToOne,
           virtual: {
             name: 'JuJu',
             where: (data: lf.schema.Table) => ({
-              name: data['name']
-            })
-          }
-        }
+              name: data['name'],
+            }),
+          },
+        },
       }
       database.defineSchema(tablename, metaData)
       expect(database['schemaDefs'].get(tablename)).to.equal(metaData)
@@ -82,8 +81,8 @@ export default describe('Database Method before Connect', () => {
       const metaData = {
         _id: {
           type: RDBType.STRING,
-          primaryKey: true
-        }
+          primaryKey: true,
+        },
       }
 
       db.connect()
@@ -100,7 +99,6 @@ export default describe('Database Method before Connect', () => {
   })
 
   describe('Database.prototype.load', () => {
-
     let db: Database
     let fixedVersion = 1000
     let dbname: string = null
@@ -114,22 +112,25 @@ export default describe('Database Method before Connect', () => {
       const metaData = {
         _id: {
           type: RDBType.STRING,
-          primaryKey: true
-        }
+          primaryKey: true,
+        },
       }
       db.defineSchema('Preload', metaData)
 
       const tableName = 'Preload'
-      const fixture = { name: dbname, version: fixedVersion, tables: { [tableName]: [ { _id: 'foo' }, { _id: 'bar' } ] } }
+      const fixture = { name: dbname, version: fixedVersion, tables: { [tableName]: [{ _id: 'foo' }, { _id: 'bar' }] } }
 
-      db.load(fixture).pipe(concatMap(() => {
-        return db.dump()
-      }))
-      .subscribe((dump: any) => {
-        expect(dump.tables[tableName]).have.lengthOf(2)
-        expect(db['storedIds'].size).to.equal(2)
-        done()
-      })
+      db.load(fixture)
+        .pipe(
+          concatMap(() => {
+            return db.dump()
+          }),
+        )
+        .subscribe((dump: any) => {
+          expect(dump.tables[tableName]).have.lengthOf(2)
+          expect(db['storedIds'].size).to.equal(2)
+          done()
+        })
 
       db.connect()
     })
@@ -138,21 +139,19 @@ export default describe('Database Method before Connect', () => {
       const metaData = {
         _id: {
           type: RDBType.STRING,
-          primaryKey: true
-        }
+          primaryKey: true,
+        },
       }
       db.defineSchema('Preload', metaData)
 
       db.connect()
       const check = () => {
         const tableName = 'Preload'
-        const fixture = { name: dbname, version: 2, tables: { [tableName]: [ { _id: 'foo' }, { _id: 'bar' } ] } }
+        const fixture = { name: dbname, version: 2, tables: { [tableName]: [{ _id: 'foo' }, { _id: 'bar' }] } }
         db.load(fixture)
       }
 
       expect(check).to.throw(DatabaseIsNotEmpty().message)
     })
-
   })
-
 })

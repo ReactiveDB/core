@@ -7,9 +7,7 @@ import * as SinonChai from 'sinon-chai'
 use(SinonChai)
 
 export default describe('Traversable Testcase: ', () => {
-
   describe('Class: Traversable', () => {
-
     let fixture: any
     let traversable: Traversable<any>
     let nodeOrder: any[]
@@ -21,58 +19,120 @@ export default describe('Traversable Testcase: ', () => {
     beforeEach(() => {
       fixture = [
         {
-          '_id': '1',
-          'ownerId': '2',
-          'owner': {
-            '_id': '3',
-            'name': 'teh0diarsz'
+          _id: '1',
+          ownerId: '2',
+          owner: {
+            _id: '3',
+            name: 'teh0diarsz',
           },
-          'modules': [
+          modules: [
             {
-              '_id': 'c531fd0f',
-              'name': 'ljz6eexwd4',
-              'ownerId': '4',
-              'parentId': '5',
-              'programmer': {
-                '_id': '6',
-                'name': 'teh0diarsz'
-              }
-            }
-          ]
-        }
+              _id: 'c531fd0f',
+              name: 'ljz6eexwd4',
+              ownerId: '4',
+              parentId: '5',
+              programmer: {
+                _id: '6',
+                name: 'teh0diarsz',
+              },
+            },
+          ],
+        },
       ]
 
       nodeOrder = [
-        fixture, fixture[0], fixture[0]._id, fixture[0].ownerId, fixture[0].owner,
-        fixture[0].owner._id, fixture[0].owner.name, fixture[0].modules,
-        fixture[0].modules[0], fixture[0].modules[0]._id, fixture[0].modules[0].name,
-        fixture[0].modules[0].ownerId, fixture[0].modules[0].parentId, fixture[0].modules[0].programmer,
-        fixture[0].modules[0].programmer._id, fixture[0].modules[0].programmer.name
+        fixture,
+        fixture[0],
+        fixture[0]._id,
+        fixture[0].ownerId,
+        fixture[0].owner,
+        fixture[0].owner._id,
+        fixture[0].owner.name,
+        fixture[0].modules,
+        fixture[0].modules[0],
+        fixture[0].modules[0]._id,
+        fixture[0].modules[0].name,
+        fixture[0].modules[0].ownerId,
+        fixture[0].modules[0].parentId,
+        fixture[0].modules[0].programmer,
+        fixture[0].modules[0].programmer._id,
+        fixture[0].modules[0].programmer.name,
       ]
 
       keyOrder = [
-        undefined, 0, '_id', 'ownerId', 'owner', '_id', 'name', 'modules', 0,
-        '_id', 'name', 'ownerId', 'parentId', 'programmer', '_id', 'name'
+        undefined,
+        0,
+        '_id',
+        'ownerId',
+        'owner',
+        '_id',
+        'name',
+        'modules',
+        0,
+        '_id',
+        'name',
+        'ownerId',
+        'parentId',
+        'programmer',
+        '_id',
+        'name',
       ]
 
       parentOrder = [
-        undefined, fixture, fixture[0], fixture[0], fixture[0], fixture[0].owner,
-        fixture[0].owner, fixture[0], fixture[0].modules, fixture[0].modules[0],
-        fixture[0].modules[0], fixture[0].modules[0], fixture[0].modules[0],
-        fixture[0].modules[0], fixture[0].modules[0].programmer, fixture[0].modules[0].programmer
+        undefined,
+        fixture,
+        fixture[0],
+        fixture[0],
+        fixture[0],
+        fixture[0].owner,
+        fixture[0].owner,
+        fixture[0],
+        fixture[0].modules,
+        fixture[0].modules[0],
+        fixture[0].modules[0],
+        fixture[0].modules[0],
+        fixture[0].modules[0],
+        fixture[0].modules[0],
+        fixture[0].modules[0].programmer,
+        fixture[0].modules[0].programmer,
       ]
 
       pathOrder = [
-        [], [0], [0, '_id'], [0, 'ownerId'], [0, 'owner'], [0, 'owner', '_id'],
-        [0, 'owner', 'name'], [0, 'modules'], [0, 'modules', 0], [0, 'modules', 0, '_id'],
-        [0, 'modules', 0, 'name'], [0, 'modules', 0, 'ownerId'], [0, 'modules', 0, 'parentId'],
-        [0, 'modules', 0, 'programmer'], [0, 'modules', 0, 'programmer', '_id'], [0, 'modules', 0, 'programmer', 'name']
+        [],
+        [0],
+        [0, '_id'],
+        [0, 'ownerId'],
+        [0, 'owner'],
+        [0, 'owner', '_id'],
+        [0, 'owner', 'name'],
+        [0, 'modules'],
+        [0, 'modules', 0],
+        [0, 'modules', 0, '_id'],
+        [0, 'modules', 0, 'name'],
+        [0, 'modules', 0, 'ownerId'],
+        [0, 'modules', 0, 'parentId'],
+        [0, 'modules', 0, 'programmer'],
+        [0, 'modules', 0, 'programmer', '_id'],
+        [0, 'modules', 0, 'programmer', 'name'],
       ]
 
       childrenOrder = [
-        [0], [ '_id', 'ownerId', 'owner', 'modules' ], [], [], [ '_id', 'name' ],
-        [], [], [0], [ '_id', 'name', 'ownerId', 'parentId', 'programmer' ],
-        [], [], [], [], [ '_id', 'name' ], [], []
+        [0],
+        ['_id', 'ownerId', 'owner', 'modules'],
+        [],
+        [],
+        ['_id', 'name'],
+        [],
+        [],
+        [0],
+        ['_id', 'name', 'ownerId', 'parentId', 'programmer'],
+        [],
+        [],
+        [],
+        [],
+        ['_id', 'name'],
+        [],
+        [],
       ]
 
       traversable = new Traversable(fixture)
@@ -83,7 +143,6 @@ export default describe('Traversable Testcase: ', () => {
     })
 
     describe('Method: keys', () => {
-
       it('should be able to handle Object correctly', () => {
         const obj = { a: 1, b: 2, c: 3, d: [4] }
         const ret = traversable.keys(obj)
@@ -100,31 +159,27 @@ export default describe('Traversable Testcase: ', () => {
 
       it('should be able to handle sorts of basic type', () => {
         const array = [/\w*/, true, false, 1, 'str', new Date(), (): void => void 0]
-        array.forEach(item => {
+        array.forEach((item) => {
           const ret = traversable.keys(item)
           expect(ret).is.deep.equal([])
         })
       })
-
     })
 
     describe('Method: context', () => {
-
       it('should mount ctxgen function successfully', () => {
         const spy = sinon.spy()
         traversable.context(spy)
-        sinon.stub(traversable, 'forEach').callsFake(function (this: any) {
+        sinon.stub(traversable, 'forEach').callsFake(function(this: any) {
           this.ctxgen()
         })
 
         traversable.forEach(() => void 0)
         expect(spy).to.be.called
       })
-
     })
 
     describe('Method: forEach', () => {
-
       it('should skip the eachFunc when returanValue of ctxgen is false', () => {
         const fn = () => false
         const spy = sinon.spy()
@@ -175,10 +230,14 @@ export default describe('Traversable Testcase: ', () => {
 
       it('should be able to use `context.isLeaf`', () => {
         traversable.forEach((ctx, node) => {
-          if (node === fixture ||
-          node === fixture[0] || node === fixture[0].owner ||
-          node === fixture[0].modules || node === fixture[0].modules[0] ||
-          node === fixture[0].modules[0].programmer) {
+          if (
+            node === fixture ||
+            node === fixture[0] ||
+            node === fixture[0].owner ||
+            node === fixture[0].modules ||
+            node === fixture[0].modules[0] ||
+            node === fixture[0].modules[0].programmer
+          ) {
             expect(ctx.isLeaf).to.equal(false)
           } else {
             expect(ctx.isLeaf).to.equal(true)
@@ -203,7 +262,7 @@ export default describe('Traversable Testcase: ', () => {
           }
         })
 
-        nodeOrder.forEach(n => expect(n['@@tag']).to.not.equal(true))
+        nodeOrder.forEach((n) => expect(n['@@tag']).to.not.equal(true))
       })
 
       it('should be able to get nodeType via `context.type`', () => {
@@ -218,7 +277,7 @@ export default describe('Traversable Testcase: ', () => {
         })
       })
 
-      it('should be able to get node\'s keyIndex via `context.key`', () => {
+      it("should be able to get node's keyIndex via `context.key`", () => {
         let index = 0
         traversable.forEach((ctx) => {
           expect(ctx.key).to.equal(keyOrder[index])
@@ -246,16 +305,13 @@ export default describe('Traversable Testcase: ', () => {
         })
       })
 
-      it('should be able to get keyIndex of node\'s children via `context.children`', () => {
+      it("should be able to get keyIndex of node's children via `context.children`", () => {
         let index = 0
         traversable.forEach((ctx) => {
           expect(ctx.children).to.deep.equal(childrenOrder[index])
           index++
         })
       })
-
     })
-
   })
-
 })

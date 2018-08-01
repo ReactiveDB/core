@@ -39,29 +39,29 @@ export class MockSelector<T> {
     return this.mapFn(this.change$)
   }
 
-  values () {
+  values() {
     return this.mapFn(this.change$.pipe(take(1)))
   }
 
-  concat(... metas: MockSelector<T>[]) {
+  concat(...metas: MockSelector<T>[]) {
     const dist = this.combine(...metas)
     dist['__test_label_selector_kind__'] = 'by concat'
     return dist
   }
 
-  combine(... metas: MockSelector<T>[]) {
+  combine(...metas: MockSelector<T>[]) {
     metas.unshift(this)
-    const dist = new MockSelector(new Map)
+    const dist = new MockSelector(new Map())
     dist.values = () => {
       return from(metas).pipe(
-        flatMap(meta => meta.values()),
+        flatMap((meta) => meta.values()),
         reduce((acc: T[], val: T[]) => acc.concat(val)),
       )
     }
 
     dist.changes = () => {
       return from(metas).pipe(
-        map(meta => meta.changes()),
+        map((meta) => meta.changes()),
         combineAll(),
         map((r: T[][]) => r.reduce((acc, val) => acc.concat(val))),
       )

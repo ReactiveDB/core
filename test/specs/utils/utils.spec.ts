@@ -3,11 +3,8 @@ import { describe, it } from 'tman'
 import { expect } from 'chai'
 
 export default describe('Utils Testcase: ', () => {
-
   describe('Func: forEach', () => {
-
     describe('Array Iteration', () => {
-
       it('should be able to execute successfully', () => {
         const fixture = [1, 2, 3, 4, 5, 6]
         const dest: number[] = []
@@ -23,7 +20,7 @@ export default describe('Utils Testcase: ', () => {
         const fixture = [0, 1, 2, 3, 4, 5]
         const dest: number[] = []
 
-        forEach(fixture.map(e => e * 2), (_, index) => {
+        forEach(fixture.map((e) => e * 2), (_, index) => {
           dest.push(index)
         })
 
@@ -34,7 +31,7 @@ export default describe('Utils Testcase: ', () => {
         const arr = [0, 1, 2, 3, 4]
         const dest: number[] = []
 
-        forEach(arr, ele => {
+        forEach(arr, (ele) => {
           if (ele === 2) {
             return false
           }
@@ -48,9 +45,13 @@ export default describe('Utils Testcase: ', () => {
         const arr = [0, 1, 2, 3, 4, 5]
         const result: number[] = []
 
-        forEach(arr, (val) => {
-        result.push(val)
-        }, true)
+        forEach(
+          arr,
+          (val) => {
+            result.push(val)
+          },
+          true,
+        )
 
         expect(result).to.eql(arr.reverse())
       })
@@ -59,16 +60,19 @@ export default describe('Utils Testcase: ', () => {
         const arr = [0, 1, 2, 3, 4]
         const dest: number[] = []
 
-        forEach(arr, ele => {
-          if (ele === 1) {
-            return false
-          }
-          return dest.push(ele)
-        }, true)
+        forEach(
+          arr,
+          (ele) => {
+            if (ele === 1) {
+              return false
+            }
+            return dest.push(ele)
+          },
+          true,
+        )
 
         expect(dest).to.have.lengthOf(3)
       })
-
     })
 
     describe('Object Iteration', () => {
@@ -77,7 +81,7 @@ export default describe('Utils Testcase: ', () => {
         const dest = [1, 2, 3, 4, 5]
         const arr: number[] = []
 
-        forEach(obj, val => {
+        forEach(obj, (val) => {
           arr.push(val)
         })
 
@@ -101,7 +105,7 @@ export default describe('Utils Testcase: ', () => {
         const arr: any[] = []
         const dest = [1, 2, 3]
 
-        forEach(obj, val => {
+        forEach(obj, (val) => {
           if (val === 4) {
             return false
           }
@@ -110,11 +114,9 @@ export default describe('Utils Testcase: ', () => {
 
         expect(arr).to.deep.equal(dest)
       })
-
     })
 
     describe('Set Iteration', () => {
-
       it('should be able to execute successfully', () => {
         const origin = [1, 2, 3, 4, 5]
         const set = new Set(origin)
@@ -155,11 +157,9 @@ export default describe('Utils Testcase: ', () => {
 
         expect(ret).have.lengthOf(1)
       })
-
     })
 
     describe('Map Iteration', () => {
-
       it('should be able to execute successfully', () => {
         const kv: any = [['a', 1], ['b', 2], ['c', 3]]
         const map = new Map(kv)
@@ -201,13 +201,10 @@ export default describe('Utils Testcase: ', () => {
 
         expect(dest).have.lengthOf(1)
       })
-
     })
-
   })
 
   describe('Func: getType', () => {
-
     const checkList = [
       { src: null, type: 'Null' },
       { src: new Date(), type: 'Date' },
@@ -217,20 +214,23 @@ export default describe('Utils Testcase: ', () => {
       { src: 1, type: 'Number' },
       { src: {}, type: 'Object' },
       { src: (): void => void 0, type: 'Function' },
-      { src: function (): void { return void 0 }, type: 'Function' },
-      { src: undefined, type: 'Undefined' }
+      {
+        src: function(): void {
+          return void 0
+        },
+        type: 'Function',
+      },
+      { src: undefined, type: 'Undefined' },
     ]
 
-    checkList.forEach(item => {
-      it(`should return type: ${ item.type } correctly`, () => {
+    checkList.forEach((item) => {
+      it(`should return type: ${item.type} correctly`, () => {
         expect(getType(item.src)).is.equal(item.type)
       })
     })
-
   })
 
   describe('Func: clone', () => {
-
     it('should be able to handle Array', () => {
       const fixture = [1, 2, 3, [4, 5, 6]]
       const cloned = clone(fixture)
@@ -313,14 +313,14 @@ export default describe('Utils Testcase: ', () => {
           b: 6,
           c: {
             a: 7,
-            b: [8, 9, 10]
-          }
+            b: [8, 9, 10],
+          },
         },
         d: standardDate,
         f: 'f',
         e: false,
         g: true,
-        h: /\w*/
+        h: /\w*/,
       }
 
       const sealed = {
@@ -331,14 +331,14 @@ export default describe('Utils Testcase: ', () => {
           b: 6,
           c: {
             a: 7,
-            b: [8, 9, 10]
-          }
+            b: [8, 9, 10],
+          },
         },
         d: standardDate,
         f: 'f',
         e: false,
         g: true,
-        h: /\w*/
+        h: /\w*/,
       }
 
       const modifed = {
@@ -349,14 +349,14 @@ export default describe('Utils Testcase: ', () => {
           b: 60,
           c: {
             a: 70,
-            b: [80, 90, 100]
-          }
+            b: [80, 90, 100],
+          },
         },
         d: standardDate,
         f: 'f',
         e: false,
         g: true,
-        h: /\w*/
+        h: /\w*/,
       }
 
       const cloned = clone(fixture)
@@ -368,18 +368,16 @@ export default describe('Utils Testcase: ', () => {
         b: mul(cloned.c.b),
         c: {
           a: mul(cloned.c.c.a),
-          b: cloned.c.c.b.map(mul)
-        }
+          b: cloned.c.c.b.map(mul),
+        },
       }
 
       expect(cloned).to.deep.equal(modifed)
       expect(fixture).to.deep.equal(sealed)
     })
-
   })
 
   describe('Func: assert', () => {
-
     it('should throw when assert failed [1]', () => {
       const check = () => assert(false, (msg: string) => new Error(msg), 'failed')
       expect(check).to.throw('failed')
@@ -403,17 +401,13 @@ export default describe('Utils Testcase: ', () => {
       })
       expect(x).to.equal(0)
     })
-
   })
 
   describe('Func: hash', () => {
-
     it('should be able to convert string to hash', () => {
       expect(hash('')).to.equal(0)
       expect(hash(' ')).to.equal(32)
       expect(hash('  ')).to.equal(1024)
     })
-
   })
-
 })

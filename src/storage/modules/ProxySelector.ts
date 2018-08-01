@@ -4,19 +4,12 @@ import { Query } from '../../interface'
 import { mapFn } from './mapFn'
 
 export class ProxySelector<T> {
-
   public request$: Observable<T[]>
 
   private mapFn: (stream$: Observable<T[]>) => Observable<any> = mapFn
 
-  constructor (
-    request$: Observable<T | T[]>,
-    public query: Query<T>,
-    public tableName: string
-  ) {
-    this.request$ = request$.pipe(
-      map(r => Array.isArray(r) ? r : [ r ])
-    )
+  constructor(request$: Observable<T | T[]>, public query: Query<T>, public tableName: string) {
+    this.request$ = request$.pipe(map((r) => (Array.isArray(r) ? r : [r])))
   }
 
   values() {
@@ -29,6 +22,6 @@ export class ProxySelector<T> {
 
   map<K>(fn: OperatorFunction<T[], K[]>) {
     this.mapFn = fn
-    return this as any as ProxySelector<K>
+    return (this as any) as ProxySelector<K>
   }
 }

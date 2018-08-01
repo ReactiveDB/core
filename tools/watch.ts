@@ -1,28 +1,32 @@
 import * as path from 'path'
-import { Observable, Observer } from 'rxjs'
+import { Observable, Observer, from } from 'rxjs'
+import { map, mergeMap, debounceTime } from 'rxjs/operators'
 import { runTman } from './tman'
 
 const fileWacher = require('node-watch')
 
-function watch (paths: string[]) {
-  return Observable.from(paths)
-    .map(p => path.join(process.cwd(), p))
-    .mergeMap(path => {
+function watch(paths: string[]) {
+  return from(paths).pipe(
+    map((p) => path.join(process.cwd(), p)),
+    mergeMap((p) => {
       return Observable.create((observer: Observer<string>) => {
-        fileWacher(path, { recursive: true }, (_: any, fileName: string) => {
+        fileWacher(p, { recursive: true }, (_: any, fileName: string) => {
           observer.next(fileName)
         })
       })
-    })
-    .debounceTime(500)
+    }),
+    debounceTime(500),
+  )
 }
 
-watch(['spec-js'])
-  .subscribe(() => {
+watch(['spec-js']).subscribe(
+  () => {
     runTman()
-  }, err => {
+  },
+  (err) => {
     console.error(err)
-  })
+  },
+)
 
 process.on('uncaughtException', (err: any) => {
   console.info(`Caught exception: ${err.stack}`)

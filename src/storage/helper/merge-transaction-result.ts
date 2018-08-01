@@ -1,9 +1,6 @@
 import * as lf from 'lovefield'
 
-export function mergeTransactionResult(
-  queries: lf.query.Builder[],
-  transactionResult: any[]
-) {
+export function mergeTransactionResult(queries: lf.query.Builder[], transactionResult: any[]) {
   const ret = { insert: 0, update: 0, delete: 0 }
 
   queries.forEach((query, index) => {

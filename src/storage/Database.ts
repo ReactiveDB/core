@@ -1,4 +1,3 @@
-
 import { throwError, ConnectableObservable, Observable, Subscription, from, of as just } from 'rxjs'
 import { concatMap, map, tap } from 'rxjs/operators'
 import * as lf from 'lovefield'
@@ -13,14 +12,23 @@ import { createPredicate, createPkClause, mergeTransactionResult, predicatableQu
 import { Relationship, RDBType, DataStoreType, LeafType, StatementType, JoinMode } from '../interface/enum'
 import { SchemaDef, ColumnDef, ParsedSchema, Association, ScopedHandler } from '../interface'
 import { ColumnLeaf, NavigatorLeaf, ExecutorResult, UpsertContext, SelectContext } from '../interface'
-import { Record, Field, JoinInfo, Query, Clause, Predicate, Transaction, TransactionDescriptor, TransactionEffects } from '../interface'
+import {
+  Record,
+  Field,
+  JoinInfo,
+  Query,
+  Clause,
+  Predicate,
+  Transaction,
+  TransactionDescriptor,
+  TransactionEffects,
+} from '../interface'
 
 const transactionErrorHandler = {
-  error: () => warn(`Execute failed, transaction is already marked for rollback.`)
+  error: () => warn(`Execute failed, transaction is already marked for rollback.`),
 }
 
 export class Database {
-
   public static version = Version
 
   public static getTables(db: lf.Database, ...tableNames: string[]) {
@@ -55,8 +63,7 @@ export class Database {
     const advanced = !this.schemaDefs.has(tableName) && !this.connected
     assert(advanced, Exception.UnmodifiableTable)
 
-    const hasPK = Object.keys(schema)
-      .some((key: string) => schema[key].primaryKey === true)
+    const hasPK = Object.keys(schema).some((key: string) => schema[key].primaryKey === true)
     assert(hasPK, Exception.PrimaryKeyNotProvided)
 
     this.schemaDefs.set(tableName, schema)
@@ -74,7 +81,7 @@ export class Database {
     storeType: DataStoreType = DataStoreType.MEMORY,
     enableInspector: boolean = false,
     name = 'ReactiveDB',
-    version = 1
+    version = 1,
   ) {
     this.schemaBuilder = lf.schema.create(name, version)
     this.database$ = lfFactory(this.schemaBuilder, { storeType, enableInspector })
@@ -99,14 +106,12 @@ export class Database {
     const load = (db: lf.Database) => {
       forEach(data.tables, (entities: any[], name: string) => {
         const schema = this.findSchema(name)
-        entities.forEach((entity: any) =>
-          this.storedIds.add(fieldIdentifier(name, entity[schema.pk])))
+        entities.forEach((entity: any) => this.storedIds.add(fieldIdentifier(name, entity[schema.pk])))
       })
       return db.import(data).catch(() => {
         forEach(data.tables, (entities: any[], name: string) => {
           const schema = this.findSchema(name)
-          entities.forEach((entity: any) =>
-            this.storedIds.delete(fieldIdentifier(name, entity[schema.pk])))
+          entities.forEach((entity: any) => this.storedIds.delete(fieldIdentifier(name, entity[schema.pk])))
         })
       })
     }
@@ -124,7 +129,7 @@ export class Database {
       const schema = this.findSchema(tableName)
       const pk = schema.pk
       const columnMapper = schema.mapper
-      const [ table ] = Database.getTables(db, tableName)
+      const [table] = Database.getTables(db, tableName)
       const muts: Mutation[] = []
       const entities = clone(raw)
 
@@ -151,8 +156,8 @@ export class Database {
       })
 
       const { contextIds, queries } = Mutation.aggregate(db, muts, [])
-      contextIds.forEach(id => this.storedIds.add(id))
-      const onError = { error: () => contextIds.forEach(id => this.storedIds.delete(id)) }
+      contextIds.forEach((id) => this.storedIds.add(id))
+      const onError = { error: () => contextIds.forEach((id) => this.storedIds.delete(id)) }
 
       if (this.inTransaction) {
         this.attachTx(onError)
@@ -165,9 +170,7 @@ export class Database {
   }
 
   get<T>(tableName: string, query: Query<T> = {}, mode: JoinMode = JoinMode.imlicit): QueryToken<T> {
-    const selector$ = this.database$.pipe(
-      map(db => this.buildSelector(db, tableName, query, mode))
-    )
+    const selector$ = this.database$.pipe(map((db) => this.buildSelector(db, tableName, query, mode)))
     return new QueryToken<T>(selector$)
   }
 
@@ -177,14 +180,14 @@ export class Database {
       return throwError(Exception.InvalidType(['Object', type]))
     }
 
-    const [ schema, err ] = tryCatch<ParsedSchema>(this.findSchema)(tableName)
+    const [schema, err] = tryCatch<ParsedSchema>(this.findSchema)(tableName)
     if (err) {
       return throwError(err)
     }
 
     const update = (db: lf.Database) => {
       const entity = clone(raw)
-      const [ table ] = Database.getTables(db, tableName)
+      const [table] = Database.getTables(db, tableName)
       const columnMapper = schema!.mapper
       const hiddenPayload = Object.create(null)
 
@@ -220,28 +223,25 @@ export class Database {
   }
 
   delete<T>(tableName: string, clause: Predicate<T> = {}): Observable<ExecutorResult> {
-    const [ pk, err ] = tryCatch<string>(this.findPrimaryKey)(tableName)
+    const [pk, err] = tryCatch<string>(this.findPrimaryKey)(tableName)
     if (err) {
       return throwError(err)
     }
 
     const deletion = (db: lf.Database): Observable<ExecutorResult> => {
-      const [ table ] = Database.getTables(db, tableName)
+      const [table] = Database.getTables(db, tableName)
       const column = table[pk!]
       const provider = new PredicateProvider(table, clause)
-      const prefetch =
-        predicatableQuery(db, table, provider.getPredicate(), StatementType.Select, column)
+      const prefetch = predicatableQuery(db, table, provider.getPredicate(), StatementType.Select, column)
       const deleteByScopedIds = (scopedIds: Object[]) => {
         const query = predicatableQuery(db, table, provider.getPredicate(), StatementType.Delete)
 
-        scopedIds.forEach((entity) =>
-          this.storedIds.delete(fieldIdentifier(tableName, entity[pk!])))
+        scopedIds.forEach((entity) => this.storedIds.delete(fieldIdentifier(tableName, entity[pk!])))
 
         const onError = {
           error: () => {
-            scopedIds.forEach((entity: object) =>
-              this.storedIds.add(fieldIdentifier(tableName, entity[pk!])))
-          }
+            scopedIds.forEach((entity: object) => this.storedIds.add(fieldIdentifier(tableName, entity[pk!])))
+          },
         }
 
         if (this.inTransaction) {
@@ -252,8 +252,7 @@ export class Database {
         return this.executor(db, [query]).pipe(tap(onError))
       }
 
-      return from(prefetch.exec())
-        .pipe(concatMap(deleteByScopedIds))
+      return from(prefetch.exec()).pipe(concatMap(deleteByScopedIds))
     }
 
     return this.database$.pipe(concatMap(deletion))
@@ -274,8 +273,8 @@ export class Database {
       this.traverseCompound(db, tableName, clone(raw), insert, update, sharing)
       const { contextIds, queries } = Mutation.aggregate(db, insert, update)
       if (queries.length > 0) {
-        contextIds.forEach(id => this.storedIds.add(id))
-        const onError = { error: () => contextIds.forEach(id => this.storedIds.delete(id)) }
+        contextIds.forEach((id) => this.storedIds.add(id))
+        const onError = { error: () => contextIds.forEach((id) => this.storedIds.delete(id)) }
 
         if (this.inTransaction) {
           this.attachTx(onError)
@@ -298,7 +297,7 @@ export class Database {
     const disposeHandler = schema!.dispose
 
     const remove = (db: lf.Database) => {
-      const [ table ] = Database.getTables(db, tableName)
+      const [table] = Database.getTables(db, tableName)
       const predicate = createPredicate(table, clause.where)
 
       const queries: lf.query.Builder[] = []
@@ -306,12 +305,12 @@ export class Database {
       queries.push(predicatableQuery(db, table, predicate!, StatementType.Delete))
 
       const removeByRootEntities = (rootEntities: Object[]) => {
-        rootEntities.forEach(entity => {
+        rootEntities.forEach((entity) => {
           removedIds.push(fieldIdentifier(tableName, entity[schema!.pk]))
         })
 
         const onError = {
-          error: () => removedIds.forEach((id: string) => this.storedIds.add(id))
+          error: () => removedIds.forEach((id: string) => this.storedIds.add(id)),
         }
 
         if (disposeHandler) {
@@ -324,7 +323,7 @@ export class Database {
                 return this.executor(db, queries)
               }
               return this.executor(db, queries).pipe(tap(onError))
-            })
+            }),
           )
         } else {
           removedIds.forEach((id: string) => this.storedIds.delete(id))
@@ -337,9 +336,7 @@ export class Database {
       }
 
       const prefetch = predicatableQuery(db, table, predicate!, StatementType.Select)
-      return from(prefetch.exec()).pipe(
-        concatMap(removeByRootEntities)
-      )
+      return from(prefetch.exec()).pipe(concatMap(removeByRootEntities))
     }
 
     return this.database$.pipe(concatMap(remove))
@@ -351,7 +348,10 @@ export class Database {
     }
 
     const cleanUp = (db: lf.Database) => {
-      const deletions = db.getSchema().tables().map(t => db.delete().from(t))
+      const deletions = db
+        .getSchema()
+        .tables()
+        .map((t) => db.delete().from(t))
       return this.executor(db, deletions).pipe(
         tap(() => {
           db.close()
@@ -359,7 +359,7 @@ export class Database {
           this.storedIds.clear()
           this.schemaBuilder = null
           this.subscription!.unsubscribe()
-        })
+        }),
       )
     }
 
@@ -378,68 +378,70 @@ export class Database {
       map((ret) => {
         return {
           result: true,
-          ...mergeTransactionResult(queries, ret)
+          ...mergeTransactionResult(queries, ret),
         }
-      })
+      }),
     )
   }
 
   transaction(): Observable<Transaction<Database>> {
     type ProxyProperty = Pick<Database, 'attachTx' | 'executor' | 'inTransaction'>
 
-    return this.database$.pipe(map(db => {
-      const tx = db.createTransaction()
-      const transactionQueries: lf.query.Builder[] = []
-      const effects: TransactionEffects[] = []
+    return this.database$.pipe(
+      map((db) => {
+        const tx = db.createTransaction()
+        const transactionQueries: lf.query.Builder[] = []
+        const effects: TransactionEffects[] = []
 
-      const transactionContext: TransactionDescriptor<ProxyProperty> = {
-        attachTx: {
-          get() {
-            return (handler: TransactionEffects) => {
-              effects.push(handler)
-            }
-          }
-        },
-        executor: {
-          get() {
-            return (_: lf.Database, queries: lf.query.Builder[]) => {
-              transactionQueries.push(...queries)
-              return just(null)
-            }
-          }
-        },
-        inTransaction: {
-          get() {
-            return true
-          }
-        }
-      }
-
-      const customTx = {
-        commit: () => {
-          return effects.reduce((acc, curr) => {
-            return acc.pipe(tap(curr))
-          }, from(tx.exec(transactionQueries))).pipe(
-            map((r) => {
-              return {
-                result: true,
-                ...mergeTransactionResult(transactionQueries, r)
+        const transactionContext: TransactionDescriptor<ProxyProperty> = {
+          attachTx: {
+            get() {
+              return (handler: TransactionEffects) => {
+                effects.push(handler)
               }
-            }))
-        },
-        abort: () => {
-          effects.length = 0
-          transactionQueries.length = 0
+            },
+          },
+          executor: {
+            get() {
+              return (_: lf.Database, queries: lf.query.Builder[]) => {
+                transactionQueries.push(...queries)
+                return just(null)
+              }
+            },
+          },
+          inTransaction: {
+            get() {
+              return true
+            },
+          },
         }
-      }
 
-      const ret: Transaction<Database> = [
-        Object.create(this, transactionContext),
-        customTx
-      ]
+        const customTx = {
+          commit: () => {
+            return effects
+              .reduce((acc, curr) => {
+                return acc.pipe(tap(curr))
+              }, from(tx.exec(transactionQueries)))
+              .pipe(
+                map((r) => {
+                  return {
+                    result: true,
+                    ...mergeTransactionResult(transactionQueries, r),
+                  }
+                }),
+              )
+          },
+          abort: () => {
+            effects.length = 0
+            transactionQueries.length = 0
+          },
+        }
 
-      return ret
-    }))
+        const ret: Transaction<Database> = [Object.create(this, transactionContext), customTx]
+
+        return ret
+      }),
+    )
   }
 
   private buildTables() {
@@ -452,11 +454,7 @@ export class Database {
   /**
    * 解析 schemaDefs, 根据解析后的 metadata 建表
    */
-  private parseSchemaDef(
-    tableName: string,
-    schemaDef: SchemaDef<any>,
-    tableBuilder: lf.schema.TableBuilder
-  ) {
+  private parseSchemaDef(tableName: string, schemaDef: SchemaDef<any>, tableBuilder: lf.schema.TableBuilder) {
     const uniques: string[] = []
     const indexes: string[] = []
     const primaryKey: string[] = []
@@ -466,7 +464,8 @@ export class Database {
     const mapper = new Map<string, Function>()
     const disposeHandler =
       (typeof schemaDef.dispose === 'function' && schemaDef.dispose) ||
-      (typeof schemaDef[dispose] === 'function' && schemaDef[dispose]) || undefined
+      (typeof schemaDef[dispose] === 'function' && schemaDef[dispose]) ||
+      undefined
 
     // src: schemaDef; dest: uniques, indexes, primaryKey, nullable, associations, mapper
     // no short-curcuiting
@@ -500,7 +499,7 @@ export class Database {
         associations.set(key, {
           where: def.virtual.where,
           type: def.type as Relationship,
-          name: def.virtual.name
+          name: def.virtual.name,
         })
       }
     })
@@ -510,7 +509,7 @@ export class Database {
       mapper,
       columns,
       dispose: disposeHandler,
-      associations
+      associations,
     })
 
     if (indexes.length) {
@@ -528,40 +527,41 @@ export class Database {
     tableBuilder.addPrimaryKey(primaryKey)
   }
 
-  private buildSelector<T>(
-    db: lf.Database,
-    tableName: string,
-    clause: Query<T>,
-    mode: JoinMode
-  ) {
+  private buildSelector<T>(db: lf.Database, tableName: string, clause: Query<T>, mode: JoinMode) {
     const schema = this.findSchema(tableName)
     const pk = schema.pk
     const containFields = !!clause.fields
 
     const containKey = containFields ? contains(pk, clause.fields!) : true
     const fields: Set<Field> = containFields ? new Set(clause.fields) : new Set(schema.columns.keys())
-    const { table, columns, joinInfo, definition } =
-      this.traverseQueryFields(db, tableName, fields, containKey, !containFields, [], {}, mode)
-    const query =
-      predicatableQuery(db, table!, null, StatementType.Select, ...columns)
+    const { table, columns, joinInfo, definition } = this.traverseQueryFields(
+      db,
+      tableName,
+      fields,
+      containKey,
+      !containFields,
+      [],
+      {},
+      mode,
+    )
+    const query = predicatableQuery(db, table!, null, StatementType.Select, ...columns)
 
-    joinInfo.forEach((info: JoinInfo) =>
-      query.leftOuterJoin(info.table, info.predicate))
+    joinInfo.forEach((info: JoinInfo) => query.leftOuterJoin(info.table, info.predicate))
 
-    const orderDesc = (clause.orderBy || []).map(desc => {
+    const orderDesc = (clause.orderBy || []).map((desc) => {
       return {
         column: table![desc.fieldName],
-        orderBy: !desc.orderBy ? null : lf.Order[desc.orderBy]
+        orderBy: !desc.orderBy ? null : lf.Order[desc.orderBy],
       }
     })
 
     const matcher = {
       pk: {
         name: pk,
-        queried: containKey
+        queried: containKey,
       },
       definition,
-      mainTable: table!
+      mainTable: table!,
     }
     const { limit, skip } = clause
     const provider = new PredicateProvider(table!, clause.where)
@@ -574,7 +574,7 @@ export class Database {
     columnName: string,
     rdbType: RDBType,
     nullable: string[],
-    mapper: Map<string, Function>
+    mapper: Map<string, Function>,
   ): lf.schema.TableBuilder {
     const hiddenName = hiddenColName(columnName)
 
@@ -585,18 +585,14 @@ export class Database {
         return tableBuilder.addColumn(columnName, lf.Type.BOOLEAN)
       case RDBType.DATE_TIME:
         nullable.push(hiddenName)
-        mapper.set(columnName, (val: string) => val ? new Date(val).valueOf() : new Date(0).valueOf())
-        return tableBuilder
-          .addColumn(columnName, lf.Type.INTEGER)
-          .addColumn(hiddenName, lf.Type.STRING)
+        mapper.set(columnName, (val: string) => (val ? new Date(val).valueOf() : new Date(0).valueOf()))
+        return tableBuilder.addColumn(columnName, lf.Type.INTEGER).addColumn(hiddenName, lf.Type.STRING)
       case RDBType.INTEGER:
         return tableBuilder.addColumn(columnName, lf.Type.INTEGER)
       case RDBType.LITERAL_ARRAY:
         nullable.push(hiddenName)
-        mapper.set(columnName, (val: any[]) => val ? val.join('|') : '')
-        return tableBuilder
-          .addColumn(columnName, lf.Type.STRING)
-          .addColumn(hiddenName, lf.Type.OBJECT)
+        mapper.set(columnName, (val: any[]) => (val ? val.join('|') : ''))
+        return tableBuilder.addColumn(columnName, lf.Type.STRING).addColumn(hiddenName, lf.Type.OBJECT)
       case RDBType.NUMBER:
         return tableBuilder.addColumn(columnName, lf.Type.NUMBER)
       case RDBType.OBJECT:
@@ -618,7 +614,7 @@ export class Database {
     glob: boolean,
     path: string[] = [],
     context: Record = {},
-    mode: JoinMode
+    mode: JoinMode,
   ) {
     const schema = this.findSchema(tableName)
     const rootDefinition = Object.create(null)
@@ -640,8 +636,7 @@ export class Database {
       navigators.push(nav)
     })
 
-    const onlyNavigator = Array.from(fieldsValue.keys())
-      .every(key => contains(key, navigators))
+    const onlyNavigator = Array.from(fieldsValue.keys()).every((key) => contains(key, navigators))
     assert(!onlyNavigator, Exception.InvalidQuery)
 
     if (!hasKey) {
@@ -669,16 +664,11 @@ export class Database {
       } else {
         const { where, type } = defs as Association
         rootDefinition[key] = typeDefinition.revise(type!, ret.definition)
-        const [ predicate, err ] = tryCatch(createPredicate)(currentTable, where(ret.table))
+        const [predicate, err] = tryCatch(createPredicate)(currentTable, where(ret.table))
         if (err) {
-          warn(
-            `Failed to build predicate, since ${err.message}` +
-            `, on table: ${ret.table.getName()}`
-          )
+          warn(`Failed to build predicate, since ${err.message}` + `, on table: ${ret.table.getName()}`)
         }
-        const joinLink = predicate
-          ? [{ table: ret.table, predicate }, ...ret.joinInfo]
-          : ret.joinInfo
+        const joinLink = predicate ? [{ table: ret.table, predicate }, ...ret.joinInfo] : ret.joinInfo
 
         joinInfo.push(...joinLink)
       }
@@ -723,8 +713,16 @@ export class Database {
           break
         case LeafType.navigator:
           const { containKey, fields, assocaiation } = ctx.leaf as NavigatorLeaf
-          const ret =
-            this.traverseQueryFields(db, assocaiation.name, new Set(fields), containKey, glob, path.slice(0), context, mode)
+          const ret = this.traverseQueryFields(
+            db,
+            assocaiation.name,
+            new Set(fields),
+            containKey,
+            glob,
+            path.slice(0),
+            context,
+            mode,
+          )
           handleAdvanced(ret, ctx.key, assocaiation)
           ctx.skip()
           break
@@ -740,14 +738,15 @@ export class Database {
     compoundEntites: any,
     insertMutList: Mutation[],
     updateMutList: Mutation[],
-    sharing: Map<string, Mutation>
+    sharing: Map<string, Mutation>,
   ) {
     if (compoundEntites == null) {
       return
     }
     if (Array.isArray(compoundEntites)) {
       compoundEntites.forEach((item) =>
-        this.traverseCompound(db, tableName, item, insertMutList, updateMutList, sharing))
+        this.traverseCompound(db, tableName, item, insertMutList, updateMutList, sharing),
+      )
       return
     }
 
@@ -756,10 +755,10 @@ export class Database {
     const pkVal = compoundEntites[pk]
     assert(pkVal !== undefined, Exception.PrimaryKeyNotProvided)
 
-    const [ table ] = Database.getTables(db, tableName)
+    const [table] = Database.getTables(db, tableName)
     const identifier = fieldIdentifier(tableName, pkVal)
     const visited = contains(identifier, sharing)
-    const stored =  contains(identifier, this.storedIds)
+    const stored = contains(identifier, this.storedIds)
     const mut = visited ? sharing.get(identifier)! : new Mutation(db, table)
 
     if (!visited) {
@@ -780,11 +779,13 @@ export class Database {
         ctx!.skip()
       }
 
-      return (ctx!.isRoot || (!isColumn && !isNavigator)) ? false : {
-        mapper,
-        visited,
-        isNavigatorLeaf: isNavigator
-      }
+      return ctx!.isRoot || (!isColumn && !isNavigator)
+        ? false
+        : {
+            mapper,
+            visited,
+            isNavigatorLeaf: isNavigator,
+          }
     })
 
     traversable.forEach((ctx, node) => {
@@ -797,10 +798,12 @@ export class Database {
 
       if (ctx.key !== pk) {
         // 如果字段不为主键
-        const res = ctx.mapper ? {
-          [ctx.key]: ctx.mapper(node),
-          [hiddenColName(ctx.key)]: node
-        } : { [ctx.key]: node }
+        const res = ctx.mapper
+          ? {
+              [ctx.key]: ctx.mapper(node),
+              [hiddenColName(ctx.key)]: node,
+            }
+          : { [ctx.key]: node }
         mut.patch(res)
       } else if (ctx.key === pk && !ctx.visited) {
         // 如果该字段为该表主键, 且该节点是第一次在过程中访问
@@ -819,20 +822,18 @@ export class Database {
 
     return {
       identifier,
-      column: ret
+      column: ret,
     }
   }
 
   private navigatorLeaf(assocaiation: Association, _: string, val: any) {
     const schema = this.findSchema(assocaiation.name)
-    const fields = typeof val === 'string'
-      ? new Set(schema.columns.keys())
-      : val
+    const fields = typeof val === 'string' ? new Set(schema.columns.keys()) : val
 
     return {
       fields,
       assocaiation,
-      containKey: contains(schema.pk, val)
+      containKey: contains(schema.pk, val),
     }
   }
 
@@ -841,8 +842,8 @@ export class Database {
       const pk = this.findPrimaryKey(tableName)
 
       const remove = (entities: T[]) => {
-        const [ table ] = Database.getTables(db, tableName)
-        entities.forEach(entity => {
+        const [table] = Database.getTables(db, tableName)
+        entities.forEach((entity) => {
           const pkVal = entity[pk]
           const clause = createPkClause(pk, pkVal)
           const predicate = createPredicate(table, clause)
@@ -854,8 +855,8 @@ export class Database {
       }
 
       const get = (where: Predicate<any> | null = null) => {
-        const [ table ] = Database.getTables(db, tableName)
-        const [ predicate, err ] = tryCatch(createPredicate)(table, where)
+        const [table] = Database.getTables(db, tableName)
+        const [predicate, err] = tryCatch(createPredicate)(table, where)
         if (err) {
           return throwError(err)
         }
@@ -867,5 +868,4 @@ export class Database {
       return [get, remove]
     }
   }
-
 }

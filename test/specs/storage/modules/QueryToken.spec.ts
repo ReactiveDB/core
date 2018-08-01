@@ -1,33 +1,22 @@
 import { describe, beforeEach, it } from 'tman'
 import { expect } from 'chai'
 import { of } from 'rxjs'
-import {
-  combineLatest,
-  take,
-  skip,
-  publishReplay,
-  refCount,
-  tap,
-  map,
-  publish,
-} from 'rxjs/operators'
+import { combineLatest, take, skip, publishReplay, refCount, tap, map, publish } from 'rxjs/operators'
 
 import { MockSelector } from '../../../utils/mocks'
 import { taskGen } from '../../../utils/generators'
 import { QueryToken, TaskSchema, clone, TokenConsumed } from '../../../index'
 
 export default describe('QueryToken Testcase', () => {
-
   const generateMockTestdata = (_tasks: TaskSchema[]) => {
     const testData = new Map<string, TaskSchema>()
-    clone(_tasks).forEach(val => {
+    clone(_tasks).forEach((val) => {
       testData.set(val._id as string, val)
     })
     return testData
   }
 
   describe('Class QueryToken:', () => {
-
     let queryToken: QueryToken<TaskSchema>
     let mockSelector: MockSelector<TaskSchema>
     let tasks: TaskSchema[]
@@ -43,21 +32,21 @@ export default describe('QueryToken Testcase', () => {
     })
 
     describe('Method: values', () => {
-      it('should return values', done => {
-        queryToken.values().pipe(
-          combineLatest(mockSelector.values())
-        )
-          .subscribe(([ r1, r2 ]) => {
+      it('should return values', (done) => {
+        queryToken
+          .values()
+          .pipe(combineLatest(mockSelector.values()))
+          .subscribe(([r1, r2]) => {
             expect(r1).to.deep.equal(r2)
             done()
           })
       })
 
-      it('should be completed after values emited', function* () {
+      it('should be completed after values emited', function*() {
         yield queryToken.values()
       })
 
-      it('should throw when reconsumed', function* () {
+      it('should throw when reconsumed', function*() {
         yield queryToken.values()
         const fn = () => queryToken.values()
         expect(fn).to.throw(TokenConsumed().message)
@@ -65,29 +54,29 @@ export default describe('QueryToken Testcase', () => {
     })
 
     describe('Method: changes', () => {
-      it('should get initial value', function* () {
+      it('should get initial value', function*() {
         const value = yield queryToken.changes().pipe(take(1))
         expect(value).to.deep.equal(tasks)
       })
 
-      it('should be notified when something updated', done => {
+      it('should be notified when something updated', (done) => {
         const task = tasks[0]
         const newNote = 'test task note'
 
-        queryToken.changes().pipe(
-          skip(1)
-        )
-          .subscribe(r => {
+        queryToken
+          .changes()
+          .pipe(skip(1))
+          .subscribe((r) => {
             expect(r[0].note).to.equal(newNote)
             done()
           })
 
         MockSelector.update(task._id as string, {
-          note: newNote
+          note: newNote,
         })
       })
 
-      it('should throw when reconsumed', function* () {
+      it('should throw when reconsumed', function*() {
         yield queryToken.changes().pipe(take(1))
 
         const fn = () => queryToken.changes().pipe(take(1))
@@ -97,7 +86,7 @@ export default describe('QueryToken Testcase', () => {
     })
 
     describe('Method: toString', () => {
-      it('should be able to stringify', function* () {
+      it('should be able to stringify', function*() {
         const sql = yield queryToken.toString()
         expect(sql).to.equal(mockSelector.toString())
       })
@@ -123,12 +112,12 @@ export default describe('QueryToken Testcase', () => {
         expect(combined).to.be.instanceof(QueryToken)
       })
 
-      it('should return combined values', function* () {
+      it('should return combined values', function*() {
         const result = yield combined.values()
         expect(result).to.deep.equal(tasks.concat(tasks2))
       })
 
-      it('should be notified once origin Selector updated', function* () {
+      it('should be notified once origin Selector updated', function*() {
         const source$ = combined.changes().pipe(
           publishReplay(1),
           refCount(),
@@ -140,29 +129,29 @@ export default describe('QueryToken Testcase', () => {
         const newNote2 = 'test note 2'
 
         MockSelector.update(tasks[0]._id as string, {
-          note: newNote1
+          note: newNote1,
         })
 
         yield source$.pipe(
           take(1),
-          tap(r => {
+          tap((r) => {
             expect(r[0].note).to.equal(newNote1)
           }),
         )
 
         MockSelector.update(tasks2[0]._id as string, {
-          note: newNote2
+          note: newNote2,
         })
 
         yield source$.pipe(
           take(1),
-          tap(r => {
+          tap((r) => {
             expect(r[tasks.length].note).to.equal(newNote2)
           }),
         )
       })
 
-      it('should throw when reconsumed values', function* () {
+      it('should throw when reconsumed values', function*() {
         yield combined.values()
 
         const fn1 = () => combined.values()
@@ -170,7 +159,7 @@ export default describe('QueryToken Testcase', () => {
         expect(fn1).to.throw(TokenConsumed().message)
       })
 
-      it('should throw when reconsumed changes', function* () {
+      it('should throw when reconsumed changes', function*() {
         yield combined.changes().pipe(take(1))
 
         const fn1 = () => combined.changes()
@@ -199,12 +188,12 @@ export default describe('QueryToken Testcase', () => {
         expect(concated).to.be.instanceof(QueryToken)
       })
 
-      it('should return concated values', function* () {
+      it('should return concated values', function*() {
         const result = yield concated.values()
         expect(result).to.deep.equal(tasks.concat(tasks2))
       })
 
-      it('should be notified once origin Selector updated', function* () {
+      it('should be notified once origin Selector updated', function*() {
         const source$ = concated.changes().pipe(
           publishReplay(1),
           refCount(),
@@ -216,29 +205,29 @@ export default describe('QueryToken Testcase', () => {
         const newNote2 = 'test note 2'
 
         MockSelector.update(tasks[0]._id as string, {
-          note: newNote1
+          note: newNote1,
         })
 
         yield source$.pipe(
           take(1),
-          tap(r => {
+          tap((r) => {
             expect(r[0].note).to.equal(newNote1)
           }),
         )
 
         MockSelector.update(tasks2[0]._id as string, {
-          note: newNote2
+          note: newNote2,
         })
 
         yield source$.pipe(
           take(1),
-          tap(r => {
+          tap((r) => {
             expect(r[tasks.length].note).to.equal(newNote2)
           }),
         )
       })
 
-      it('should throw when reconsumed values', function* () {
+      it('should throw when reconsumed values', function*() {
         yield concated.values()
 
         const fn1 = () => concated.values()
@@ -246,7 +235,7 @@ export default describe('QueryToken Testcase', () => {
         expect(fn1).to.throw(TokenConsumed().message)
       })
 
-      it('should throw when reconsumed changes', function* () {
+      it('should throw when reconsumed changes', function*() {
         yield concated.changes().pipe(take(1))
 
         const fn1 = () => concated.changes()
@@ -256,18 +245,18 @@ export default describe('QueryToken Testcase', () => {
     })
 
     describe('Method: map', () => {
-      it('should replace the returnValue of `values`', function* () {
-        const q1 = queryToken.map(v => v.pipe(map(r => r.map(() => 1))))
+      it('should replace the returnValue of `values`', function*() {
+        const q1 = queryToken.map((v) => v.pipe(map((r) => r.map(() => 1))))
 
         yield q1.values().pipe(
-          tap(r => {
-            r.forEach(v => expect(v).to.equal(1))
+          tap((r) => {
+            r.forEach((v) => expect(v).to.equal(1))
           }),
         )
       })
 
-      it('should replace the returnValue of `changes`', function* () {
-        const q2 = queryToken.map(v => v.pipe(map(r => r.map(() => 2))))
+      it('should replace the returnValue of `changes`', function*() {
+        const q2 = queryToken.map((v) => v.pipe(map((r) => r.map(() => 2))))
 
         const signal = q2.changes().pipe(
           publish(),
@@ -277,44 +266,43 @@ export default describe('QueryToken Testcase', () => {
         yield signal.pipe(
           take(1),
           tap((r: any[]) => {
-            r.forEach(v => expect(v).to.equal(2))
+            r.forEach((v) => expect(v).to.equal(2))
           }),
         )
 
         MockSelector.update(tasks[0]._id as string, {
-          note: 'new note'
+          note: 'new note',
         })
 
         yield signal.pipe(
           take(1),
           tap((r: any[]) => {
-            r.forEach(v => expect(v).to.equal(2))
+            r.forEach((v) => expect(v).to.equal(2))
           }),
         )
       })
 
-      it('should replace returnValue of the combined token\'s `values`', function* () {
+      it("should replace returnValue of the combined token's `values`", function*() {
         const tasks1 = taskGen(25)
         const mockSelector1 = new MockSelector(generateMockTestdata(tasks1))
         const queryToken1 = new QueryToken(of(mockSelector1) as any)
 
-        const q3 = queryToken1.map(v => v.pipe(map(r => r.map(() => 3))))
+        const q3 = queryToken1.map((v) => v.pipe(map((r) => r.map(() => 3))))
 
         const distToken = q3.combine(queryToken1)
         yield distToken.values().pipe(
-          tap(r => {
-            r.splice(25, 50)
-              .forEach(v => expect(v).to.equal(3))
+          tap((r) => {
+            r.splice(25, 50).forEach((v) => expect(v).to.equal(3))
           }),
         )
       })
 
-      it('should replace returnValue of the combined token\'s `changes`', function* () {
+      it("should replace returnValue of the combined token's `changes`", function*() {
         const tasks1 = taskGen(25)
         const mockSelector1 = new MockSelector(generateMockTestdata(tasks1))
         const queryToken1 = new QueryToken(of(mockSelector1) as any)
 
-        const q4 = queryToken1.map(v => v.pipe(map(r => r.map(() => 4))))
+        const q4 = queryToken1.map((v) => v.pipe(map((r) => r.map(() => 4))))
 
         const distToken = q4.combine(queryToken1)
         const signal = distToken.changes().pipe(
@@ -325,23 +313,21 @@ export default describe('QueryToken Testcase', () => {
         yield signal.pipe(
           take(1),
           tap((r: any[]) => {
-            r.splice(25, 50).forEach(v => expect(v).to.equal(4))
+            r.splice(25, 50).forEach((v) => expect(v).to.equal(4))
           }),
         )
 
         MockSelector.update(tasks1[0]._id as string, {
-          note: 'new note'
+          note: 'new note',
         })
 
         yield signal.pipe(
           take(1),
           tap((r: any[]) => {
-            r.splice(25, 50).forEach(v => expect(v).to.equal(4))
+            r.splice(25, 50).forEach((v) => expect(v).to.equal(4))
           }),
         )
       })
     })
-
   })
-
 })

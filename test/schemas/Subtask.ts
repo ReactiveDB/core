@@ -8,22 +8,23 @@ export interface SubtaskSchema {
   created: string
 }
 
-export default (db: Database) => db.defineSchema<SubtaskSchema>('Subtask', {
-  _id: {
-    type: RDBType.STRING,
-    primaryKey: true
-  },
-  content: {
-    type: RDBType.STRING
-  },
-  _taskId: {
-    type: RDBType.STRING,
-    index: true
-  },
-  isDone: {
-    type: RDBType.BOOLEAN
-  },
-  created: {
-    type: RDBType.DATE_TIME
-  }
-})
+export default (db: Database) =>
+  db.defineSchema<SubtaskSchema>('Subtask', {
+    _id: {
+      type: RDBType.STRING,
+      primaryKey: true,
+    },
+    content: {
+      type: RDBType.STRING,
+    },
+    _taskId: {
+      type: RDBType.STRING,
+      index: true,
+    },
+    isDone: {
+      type: RDBType.BOOLEAN,
+    },
+    created: {
+      type: RDBType.DATE_TIME,
+    },
+  })

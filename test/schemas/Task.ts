@@ -17,84 +17,86 @@ export interface TaskSchema {
   accomplished: string
   project?: {
     _id: TeambitionTypes.ProjectId
-    name: string,
-    isArchived: boolean,
+    name: string
+    isArchived: boolean
     posts?: any[]
   }
   subtasks: SubtaskSchema[]
   subtasksCount: number
-  created: string,
+  created: string
   involveMembers: string[]
 }
 
 export default (db: Database) => {
   db.defineSchema<TaskSchema>('Task', {
     _creatorId: {
-      type: RDBType.STRING
+      type: RDBType.STRING,
     },
     _executorId: {
-      type: RDBType.STRING
+      type: RDBType.STRING,
     },
     _projectId: {
-      type: RDBType.STRING
+      type: RDBType.STRING,
     },
     _id: {
       type: RDBType.STRING,
-      primaryKey: true
+      primaryKey: true,
     },
     _sourceId: {
-      type: RDBType.STRING
+      type: RDBType.STRING,
     },
     _stageId: {
       type: RDBType.STRING,
-      index: true
+      index: true,
     },
     _tasklistId: {
-      type: RDBType.STRING
+      type: RDBType.STRING,
     },
     accomplished: {
-      type: RDBType.STRING
+      type: RDBType.STRING,
     },
     content: {
-      type: RDBType.STRING
+      type: RDBType.STRING,
     },
     note: {
-      type: RDBType.STRING
+      type: RDBType.STRING,
     },
     project: {
       type: Relationship.oneToOne,
       virtual: {
         name: 'Project',
-        where: ref => {
+        where: (ref) => {
           return {
-            _projectId: ref._id
+            _projectId: ref._id,
           }
-        }
-      }
+        },
+      },
     },
     subtasks: {
       type: Relationship.oneToMany,
       virtual: {
         name: 'Subtask',
-        where: ref => {
+        where: (ref) => {
           return {
-            _id: ref._taskId
+            _id: ref._taskId,
           }
-        }
-      }
+        },
+      },
     },
     subtasksCount: {
-      type: RDBType.NUMBER
+      type: RDBType.NUMBER,
     },
     involveMembers: {
-      type: RDBType.LITERAL_ARRAY
+      type: RDBType.LITERAL_ARRAY,
     },
     created: {
-      type: RDBType.DATE_TIME
+      type: RDBType.DATE_TIME,
     },
     dispose: (rootEntities, scope) => {
-      const [ matcher, disposer ] = scope('Subtask')
-      return matcher({ _taskId: { $in: rootEntities.map((entity: any) => entity._id) } }).pipe(tap(disposer)) as Observable<any>
-    }
+      const [matcher, disposer] = scope('Subtask')
+      return matcher({ _taskId: { $in: rootEntities.map((entity: any) => entity._id) } }).pipe(
+        tap(disposer),
+      ) as Observable<any>
+    },
   })
 }

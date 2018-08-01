@@ -6,23 +6,24 @@ export interface EngineerSchema {
   leadProgram?: ProgramSchema[]
 }
 
-export default (db: Database) => db.defineSchema<EngineerSchema>('Engineer', {
-  _id: {
-    type: RDBType.STRING,
-    primaryKey: true
-  },
-  name: {
-    type: RDBType.STRING
-  },
-  leadProgram: {
-    type: Relationship.oneToMany,
-    virtual: {
-      name: 'Program',
-      where(table) {
-        return {
-          _id: table.ownerId
-        }
-      }
-    }
-  }
-})
+export default (db: Database) =>
+  db.defineSchema<EngineerSchema>('Engineer', {
+    _id: {
+      type: RDBType.STRING,
+      primaryKey: true,
+    },
+    name: {
+      type: RDBType.STRING,
+    },
+    leadProgram: {
+      type: Relationship.oneToMany,
+      virtual: {
+        name: 'Program',
+        where(table) {
+          return {
+            _id: table.ownerId,
+          }
+        },
+      },
+    },
+  })

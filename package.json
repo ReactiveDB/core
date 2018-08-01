@@ -17,6 +17,7 @@
     "copy_src_es": "shx mkdir -p ./dist/es/src && shx cp -r ./src/* ./dist/es/src",
     "cover": "rm -rf ./.nyc_output ./coverage && NODE_ENV=test nyc --reporter=html --reporter=lcov --exclude=node_modules --exclude=spec-js/test --exclude=spec-js/src/storage/lovefield.js --exclude=spec-js/src/shared/Logger.js --exclude=spec-js/src/utils/option.js --exclude=spec-js/src/utils/valid.js --exclude=spec-js/src/addons/aggresive-optimizer.js tman --mocha spec-js/test/run.js && nyc report",
     "lint": "tslint -c tslint.json src/*.ts --project ./tsconfig.json \"src/**/*.ts\" \"./test/**/*.ts\" -e \"./test/e2e/*.ts\"",
+    "precommit": "lint-staged",
     "publish_all": "ts-node ./tools/publish.ts",
     "start": "webpack-dev-server --inline --colors --progress --port 3000",
     "start-demo": "webpack-dev-server --config ./example/webpack.config.js --inline --colors --progress --port 3001 --open",
@@ -70,11 +71,14 @@
     "css-loader": "^1.0.0",
     "extract-text-webpack-plugin": "^4.0.0-beta.0",
     "html-webpack-plugin": "^3.0.6",
+    "husky": "^0.14.3",
+    "lint-staged": "^7.2.0",
     "madge": "^3.0.1",
     "moment": "^2.21.0",
     "node-watch": "^0.5.8",
     "npm-run-all": "^4.1.2",
     "nyc": "^12.0.1",
+    "prettier": "^1.14.0",
     "raw-loader": "^0.5.1",
     "rxjs": "^6.2.2",
     "shelljs": "^0.8.1",
@@ -100,8 +104,23 @@
     "nesthydrationjs": "^1.0.5"
   },
   "peerDependencies": {
-    "rxjs": "^5.5.0",
+    "rxjs": "^6.0.0",
     "tslib": "^1.9.0"
   },
-  "typings": "./index.d.ts"
+  "typings": "./index.d.ts",
+  "prettier": {
+    "printWidth": 120,
+    "semi": false,
+    "trailingComma": "all",
+    "singleQuote": true,
+    "arrowParens": "always",
+    "parser": "typescript"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "prettier --write",
+      "tslint -c tslint.json -p tsconfig.json --fix",
+      "git add"
+    ]
+  }
 }

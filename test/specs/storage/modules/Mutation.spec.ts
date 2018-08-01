@@ -10,7 +10,6 @@ import { MockDatabase, MockDatabaseTable, MockUpdate, MockInsert } from '../../.
 use(SinonChai)
 
 export default describe('Mutation Testcase: ', () => {
-
   describe('Class: Mutation', () => {
     let fixture: any[]
     let table: any
@@ -18,16 +17,20 @@ export default describe('Mutation Testcase: ', () => {
     const mockTableName = 'MockTable'
 
     beforeEach(() => {
-      fixture = [{
-        '_id': '577b996b841059b6b09f7370',
-        'content': 'foo',
-      }, {
-        '_id': '577b996b841059b6b09f7371',
-        'content': 'bar'
-      }, {
-        '_id': '577b996b841059b6b09f7372',
-        'content': 'baz'
-      }]
+      fixture = [
+        {
+          _id: '577b996b841059b6b09f7370',
+          content: 'foo',
+        },
+        {
+          _id: '577b996b841059b6b09f7371',
+          content: 'bar',
+        },
+        {
+          _id: '577b996b841059b6b09f7372',
+          content: 'baz',
+        },
+      ]
 
       database = new MockDatabase()
       table = new MockDatabaseTable(mockTableName)
@@ -39,7 +42,6 @@ export default describe('Mutation Testcase: ', () => {
     })
 
     describe('Method: withId', () => {
-
       const originFn = Mutation.aggregate
       after(() => {
         Mutation.aggregate = originFn
@@ -49,18 +51,16 @@ export default describe('Mutation Testcase: ', () => {
         const mut = new Mutation(database, table, { foo: 666, bar: 233 })
         mut.withId('id', 42)
 
-        sinon.stub(Mutation, 'aggregate').callsFake((_: any, [ m ]: any[], __: any[]) => {
+        sinon.stub(Mutation, 'aggregate').callsFake((_: any, [m]: any[], __: any[]) => {
           const meta = { key: 'id', val: 42 }
           expect(m.meta).to.deep.equal(meta)
         })
 
         Mutation.aggregate(database, [mut], [])
       })
-
     })
 
     describe('Method: refId', () => {
-
       it('should be able to return specified Id.', () => {
         fixture.forEach((f, index) => {
           const mut = new Mutation(database, table, f)
@@ -69,17 +69,15 @@ export default describe('Mutation Testcase: ', () => {
           expect(mut.refId()).to.equal(index)
         })
       })
-
     })
 
     describe('Method: patch', () => {
-
       it('should be able to patch the additional compound data.', () => {
         const key = 'content'
         const muts = fixture.map((f, index) => {
           const mut = new Mutation(database, table, f)
           mut.withId('i', index).patch({
-            [key]: f[key] + index
+            [key]: f[key] + index,
           })
           return mut
         })
@@ -91,11 +89,9 @@ export default describe('Mutation Testcase: ', () => {
           expect((q as any).params.content).is.equal(`${fixture[i][key]}${i}`)
         })
       })
-
     })
 
     describe('Static Method: aggregate', () => {
-
       it('should be able to transform mutations to queries which will be executed as update statement', () => {
         const muts = fixture.map((item, index) => {
           const mut = new Mutation(database, table, item)
@@ -105,8 +101,7 @@ export default describe('Mutation Testcase: ', () => {
 
         const { contextIds, queries } = Mutation.aggregate(database, [], muts)
 
-        queries.forEach(q =>
-          expect(q).is.instanceOf(MockUpdate))
+        queries.forEach((q) => expect(q).is.instanceOf(MockUpdate))
 
         expect(contextIds).have.lengthOf(0)
         expect(queries).have.lengthOf(3)
@@ -119,10 +114,10 @@ export default describe('Mutation Testcase: ', () => {
 
         const { contextIds, queries } = Mutation.aggregate(database, muts, [])
 
-        queries.forEach(q =>
-          expect(q).is.instanceOf(MockInsert))
-        contextIds.sort((x, y) => x - y).forEach((k, i) =>
-          expect(k).is.equal(fieldIdentifier(mockTableName, i.toString())))
+        queries.forEach((q) => expect(q).is.instanceOf(MockInsert))
+        contextIds
+          .sort((x, y) => x - y)
+          .forEach((k, i) => expect(k).is.equal(fieldIdentifier(mockTableName, i.toString())))
 
         expect(contextIds).have.lengthOf(3)
         expect(queries).have.lengthOf(1)
@@ -161,9 +156,6 @@ export default describe('Mutation Testcase: ', () => {
 
         expect(queries).have.lengthOf(0)
       })
-
     })
-
   })
-
 })

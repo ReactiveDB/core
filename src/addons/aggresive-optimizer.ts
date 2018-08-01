@@ -33,7 +33,7 @@ const compareFn = function(ctx: any, left: any, right: any) {
 export const aggresiveOptimizer = () => {
   lf.ObserverRegistry.Entry_.prototype.updateResults = function(newResults: any[]) {
     const oldList: any = (this.lastResults_ && this.lastResults_.entries) || []
-    const newList: any = (newResults.entries) || []
+    const newList: any = newResults.entries || []
 
     const hasChanges = compareFn(this.diffCalculator_, oldList, newList)
     this.lastResults_ = newResults

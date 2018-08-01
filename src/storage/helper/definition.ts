@@ -31,7 +31,7 @@ export function revise(relation: Relationship, def: Object) {
  */
 export function create(column: string, asId: boolean, type: RDBType): ColumnDef {
   if (type === RDBType.LITERAL_ARRAY) {
-     return { column, id: asId, type: LiteralArray }
+    return { column, id: asId, type: LiteralArray }
   }
 
   return { column, id: asId }

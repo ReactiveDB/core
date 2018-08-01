@@ -2,12 +2,9 @@ import { forEach, getType } from '../utils'
 import { TraverseContext } from '../interface'
 
 export class Traversable<T> {
-
   private ctxgen: (key: any, val: any, ctx: TraverseContext) => T | boolean
 
-  constructor(
-    private entities: any
-  ) {
+  constructor(private entities: any) {
     this.ctxgen = () => true
   }
 
@@ -37,7 +34,7 @@ export class Traversable<T> {
   forEach(eachFunc: (ctx: T & TraverseContext, node: any) => void) {
     const self = this
     let index = -1
-    function walk (node: any, path: string[] = [], parents: any[] = []) {
+    function walk(node: any, path: string[] = [], parents: any[] = []) {
       let advanced = true
       const children = self.keys(node)
       const parent = parents[parents.length - 1]
@@ -52,16 +49,14 @@ export class Traversable<T> {
         key: path[path.length - 1],
         isLeaf: children.length === 0,
         type: () => getType(node),
-        skip: () => advanced = false,
-        index
+        skip: () => (advanced = false),
+        index,
       }
 
-      const ret: Object | boolean =
-        self.ctxgen(path[path.length - 1], node, defaultCtx)
+      const ret: Object | boolean = self.ctxgen(path[path.length - 1], node, defaultCtx)
 
       if (ret !== false) {
-        const ctx =
-          typeof ret === 'object' ? { ...defaultCtx, ...ret } : defaultCtx
+        const ctx = typeof ret === 'object' ? { ...defaultCtx, ...ret } : defaultCtx
 
         eachFunc.call(null, ctx, node)
       }
@@ -71,8 +66,7 @@ export class Traversable<T> {
       } else if (!defaultCtx.isLeaf) {
         forEach(node, (val, key) => {
           const nextPath = path.concat(key)
-          const nextParents =
-            Array.isArray(node) ? parents.concat([node]) : parents.concat(node)
+          const nextParents = Array.isArray(node) ? parents.concat([node]) : parents.concat(node)
 
           walk(val, nextPath, nextParents)
         })
@@ -81,5 +75,4 @@ export class Traversable<T> {
 
     walk(this.entities)
   }
-
 }
