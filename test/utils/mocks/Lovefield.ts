@@ -46,16 +46,14 @@ export class MockUpdate extends MockQueryBuilder {
 }
 
 export class MockDatabaseTable {
-  constructor(
-    private name: string = null
-  ) {
+  constructor(private name: string = null) {
     return new Proxy(this, {
       get: function(target, prop) {
         if (target[prop]) {
           return target[prop]
         }
         return new MockComparator(prop.toString())
-      }
+      },
     })
   }
 
@@ -83,13 +81,8 @@ export class MockComparator {
   public in: lf.Predicate
   public isNull: lf.Predicate
 
-  constructor(
-    private propName: string
-  ) {
-    this.and = this.between = this.eq =
-    this.gt = this.gte = this.in =
-    this.isNull = this.lt = this.lte =
-    this.match = this.not = this.handler
+  constructor(private propName: string) {
+    this.and = this.between = this.eq = this.gt = this.gte = this.in = this.isNull = this.lt = this.lte = this.match = this.not = this.handler
   }
 
   valueOf() {
@@ -116,7 +109,7 @@ export class MockDatabase {
 
   getSchema() {
     return {
-      table: () => new MockDatabaseTable()
+      table: () => new MockDatabaseTable(),
     }
   }
 }

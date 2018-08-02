@@ -1,5 +1,5 @@
-import { ReplaySubject } from 'rxjs/ReplaySubject'
-import { Observable } from 'rxjs/Observable'
+import { ReplaySubject, Observable, from } from 'rxjs'
+import { combineAll, map, flatMap, reduce, take } from 'rxjs/operators'
 
 export class MockSelector<T> {
   static datas = new Map<string, any>()
@@ -39,30 +39,32 @@ export class MockSelector<T> {
     return this.mapFn(this.change$)
   }
 
-  values () {
-    return this.mapFn(this.change$.take(1))
+  values() {
+    return this.mapFn(this.change$.pipe(take(1)))
   }
 
-  concat(... metas: MockSelector<T>[]) {
+  concat(...metas: MockSelector<T>[]) {
     const dist = this.combine(...metas)
     dist['__test_label_selector_kind__'] = 'by concat'
     return dist
   }
 
-  combine(... metas: MockSelector<T>[]) {
+  combine(...metas: MockSelector<T>[]) {
     metas.unshift(this)
-    const dist = new MockSelector(new Map)
+    const dist = new MockSelector(new Map())
     dist.values = () => {
-      return Observable.from(metas)
-        .flatMap(meta => meta.values())
-        .reduce((acc: T[], val: T[]) => acc.concat(val))
+      return from(metas).pipe(
+        flatMap((meta) => meta.values()),
+        reduce((acc: T[], val: T[]) => acc.concat(val)),
+      )
     }
 
     dist.changes = () => {
-      return Observable.from(metas)
-        .map(meta => meta.changes())
-        .combineAll()
-        .map((r: T[][]) => r.reduce((acc, val) => acc.concat(val)))
+      return from(metas).pipe(
+        map((meta) => meta.changes()),
+        combineAll(),
+        map((r: T[][]) => r.reduce((acc, val) => acc.concat(val))),
+      )
     }
     dist['__test_label_selector_kind__'] = 'by combine'
     return dist

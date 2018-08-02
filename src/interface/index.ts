@@ -1,10 +1,7 @@
-import { Observable } from 'rxjs/Observable'
-import { PartialObserver } from 'rxjs/Observer'
+import { Observable, PartialObserver } from 'rxjs'
 import { RDBType, Relationship, LeafType, StatementType, JoinMode, DataStoreType } from './enum'
 
-export type DeepPartial<T> = {
-  [K in keyof T]?: Partial<T[K]>
-}
+export type DeepPartial<T> = { [K in keyof T]?: Partial<T[K]> }
 
 export interface SchemaMetadata<T> {
   type: RDBType | Relationship
@@ -21,13 +18,9 @@ export interface SchemaMetadata<T> {
   }
 }
 
-export type TableShape<T> = lf.schema.Table & {
-  [P in keyof T]: lf.schema.Column
-}
+export type TableShape<T> = lf.schema.Table & { [P in keyof T]: lf.schema.Column }
 
-export type SchemaDef<T> = {
-  [P in keyof T]: SchemaMetadata<T[P]>
-} & {
+export type SchemaDef<T> = { [P in keyof T]: SchemaMetadata<T[P]> } & {
   dispose?: SchemaDisposeFunction<T>
   ['@@dispose']?: SchemaDisposeFunction<T>
 }
@@ -71,7 +64,7 @@ export interface Query<T> extends Clause<T> {
 }
 
 export interface JoinInfo {
-  table: lf.schema.Table,
+  table: lf.schema.Table
   predicate: lf.Predicate
 }
 
@@ -101,8 +94,8 @@ export interface TraverseContext {
 
 export interface UpsertContext {
   mapper: Function | null
-  isNavigatorLeaf: boolean,
-  visited: boolean,
+  isNavigatorLeaf: boolean
+  visited: boolean
 }
 
 export interface SelectContext {
@@ -121,18 +114,17 @@ export interface NavigatorLeaf {
   assocaiation: Association
 }
 
-export type ScopedHandler = [
-  (where?: Predicate<any>) => Observable<any>,
-  (ret: any[]) => void
-]
+export type ScopedHandler = [(where?: Predicate<any>) => Observable<any>, (ret: any[]) => void]
 
-export type SchemaDisposeFunction<T> =
-  (entities: Partial<T>[], scopedHandler: (name: string) => ScopedHandler) => Observable<Partial<T>>
+export type SchemaDisposeFunction<T> = (
+  entities: Partial<T>[],
+  scopedHandler: (name: string) => ScopedHandler,
+) => Observable<Partial<T>>
 
 export interface ShapeMatcher {
   mainTable: lf.schema.Table
   pk: {
-    name: string,
+    name: string
     queried: boolean
   }
   definition: Object
@@ -164,7 +156,7 @@ export interface PredicateMeta<T> {
   $match: RegExp
   $notMatch: RegExp
   $has: ValueLiteral
-  $between: [ number, number ]
+  $between: [number, number]
   $in: ValueLiteral[]
   $isNull: boolean
   $isNotNull: boolean
@@ -176,9 +168,7 @@ export type Predicate<T> = {
 
 export { StatementType, JoinMode, LeafType, Relationship, DataStoreType, RDBType }
 
-export type TransactionDescriptor<T> = {
-  [P in keyof T]: PropertyDescriptor
-}
+export type TransactionDescriptor<T> = { [P in keyof T]: PropertyDescriptor }
 
 export type TransactionHandler = {
   commit: () => Observable<ExecutorResult>
@@ -187,4 +177,6 @@ export type TransactionHandler = {
 
 export type Transaction<T> = [T, TransactionHandler]
 
-export type TransactionEffects<T = any> = PartialObserver<T> | { next: (x: T) => void, error?: (e: any) => void, complete?: () => void }
+export type TransactionEffects<T = any> =
+  | PartialObserver<T>
+  | { next: (x: T) => void; error?: (e: any) => void; complete?: () => void }

@@ -3,14 +3,12 @@ import { expect } from 'chai'
 import { definition, Relationship, RDBType, NotImplemented, UnexpectedRelationship } from '../../../index'
 
 export default describe('Helper - definition Testcase: ', () => {
-
   describe('Func: create', () => {
-
     it('should be able to create a basic column definition', () => {
       const def = definition.create('foo', true, RDBType.INTEGER)
       expect(def).to.deep.equal({
         column: 'foo',
-        id: true
+        id: true,
       })
     })
 
@@ -19,35 +17,33 @@ export default describe('Helper - definition Testcase: ', () => {
       expect(def).to.deep.equal({
         column: 'bar',
         id: false,
-        type: 'LiteralArray'
+        type: 'LiteralArray',
       })
     })
-
   })
 
   describe('Func: revise', () => {
-
     it('should revise the definition based on oneToOne relationship', () => {
       const fixture = {
         foo: {
           column: 'id',
-          id: true
-        }
+          id: true,
+        },
       }
       const def = definition.revise(Relationship.oneToOne, fixture)
 
       expect(def).to.deep.equal({
         foo: {
           column: 'id',
-          id: false
-        }
+          id: false,
+        },
       })
     })
 
     it('should revise the definition based on oneToMany relationship', () => {
       const fixture = {
         column: 'id',
-        id: true
+        id: true,
       }
       const def = definition.revise(Relationship.oneToMany, fixture)
 
@@ -57,7 +53,7 @@ export default describe('Helper - definition Testcase: ', () => {
     it('should revise the definition based on manyToMany relationship', () => {
       const fixture = {
         column: 'id',
-        id: true
+        id: true,
       }
 
       const check = () => definition.revise(Relationship.manyToMany, fixture)
@@ -69,14 +65,12 @@ export default describe('Helper - definition Testcase: ', () => {
       const fixture = {
         foo: {
           column: 'foo',
-          id: true
-        }
+          id: true,
+        },
       }
       const check = () => definition.revise(123 as any, fixture)
 
       expect(check).to.throw(UnexpectedRelationship().message)
     })
-
   })
-
 })

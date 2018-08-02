@@ -3,28 +3,27 @@ import { forEach, warn } from '../../utils'
 import { ValueLiteral, VaildEqType, Predicate, PredicateMeta } from '../../interface'
 
 const predicateFactory = {
-
-  $ne <T extends ValueLiteral>(column: lf.schema.Column, value: T): lf.Predicate {
+  $ne<T extends ValueLiteral>(column: lf.schema.Column, value: T): lf.Predicate {
     return lf.op.not(column.eq(value))
   },
 
-  $lt <T extends VaildEqType>(column: lf.schema.Column, value: T): lf.Predicate {
+  $lt<T extends VaildEqType>(column: lf.schema.Column, value: T): lf.Predicate {
     return column.lt(value)
   },
 
-  $lte <T extends VaildEqType>(column: lf.schema.Column, value: T): lf.Predicate {
+  $lte<T extends VaildEqType>(column: lf.schema.Column, value: T): lf.Predicate {
     return column.lte(value)
   },
 
-  $gt <T extends VaildEqType>(column: lf.schema.Column, value: T): lf.Predicate {
+  $gt<T extends VaildEqType>(column: lf.schema.Column, value: T): lf.Predicate {
     return column.gt(value)
   },
 
-  $gte <T extends VaildEqType>(column: lf.schema.Column, value: T): lf.Predicate {
+  $gte<T extends VaildEqType>(column: lf.schema.Column, value: T): lf.Predicate {
     return column.gte(value)
   },
 
-  $match (column: lf.schema.Column, reg: RegExp): lf.Predicate {
+  $match(column: lf.schema.Column, reg: RegExp): lf.Predicate {
     return column.match(reg)
   },
 
@@ -32,7 +31,7 @@ const predicateFactory = {
     return lf.op.not(column.match(reg))
   },
 
-  $between (column: lf.schema.Column, values: [ number, number ]): lf.Predicate {
+  $between(column: lf.schema.Column, values: [number, number]): lf.Predicate {
     return column.between(values[0], values[1])
   },
 
@@ -40,39 +39,35 @@ const predicateFactory = {
     return column.match(new RegExp(`(${value}\\b)`))
   },
 
-  $in (column: lf.schema.Column, range: ValueLiteral[]): lf.Predicate {
+  $in(column: lf.schema.Column, range: ValueLiteral[]): lf.Predicate {
     return column.in(range)
   },
 
-  $isNull (column: lf.schema.Column): lf.Predicate {
+  $isNull(column: lf.schema.Column): lf.Predicate {
     return column.isNull()
   },
 
-  $isNotNull (column: lf.schema.Column): lf.Predicate {
+  $isNotNull(column: lf.schema.Column): lf.Predicate {
     return column.isNotNull()
   },
 }
 
 const compoundPredicateFactory = {
-  $and (predicates: lf.Predicate[]): lf.Predicate {
+  $and(predicates: lf.Predicate[]): lf.Predicate {
     return lf.op.and(...predicates)
   },
 
-  $or (predicates: lf.Predicate[]): lf.Predicate {
+  $or(predicates: lf.Predicate[]): lf.Predicate {
     return lf.op.or(...predicates)
   },
 
-  $not (predicates: lf.Predicate[]): lf.Predicate {
+  $not(predicates: lf.Predicate[]): lf.Predicate {
     return lf.op.not(predicates[0])
   },
 }
 
 export class PredicateProvider<T> {
-
-  constructor(
-    private table: lf.schema.Table,
-    private meta?: Predicate<T>
-  ) { }
+  constructor(private table: lf.schema.Table, private meta?: Predicate<T>) {}
 
   getPredicate(): lf.Predicate | null {
     const predicates = this.meta ? this.normalizeMeta(this.meta) : []
@@ -133,10 +128,12 @@ export class PredicateProvider<T> {
   }
 
   private checkPredicate(val: Partial<PredicateMeta<T>> | ValueLiteral) {
-    return val && typeof val === 'object' &&
+    return (
+      val &&
+      typeof val === 'object' &&
       !(val instanceof Array) &&
       !(val instanceof RegExp) &&
       !(val instanceof (lf.schema as any).BaseColumn)
+    )
   }
-
 }

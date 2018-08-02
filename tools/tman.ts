@@ -4,7 +4,7 @@ const testDir = path.join(process.cwd(), 'spec-js/test')
 const testFile = `${testDir}/run`
 
 export function runTman() {
-  Object.keys(require.cache).forEach(id => {
+  Object.keys(require.cache).forEach((id) => {
     delete require.cache[id]
   })
 

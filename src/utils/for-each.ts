@@ -1,17 +1,18 @@
 import { noop } from './noop'
 
-export function forEach<T> (target: Array<T>, eachFunc: (val: T, key: number) => void, inverse?: boolean): void
+export function forEach<T>(target: Array<T>, eachFunc: (val: T, key: number) => void, inverse?: boolean): void
 
-export function forEach<T> (
+export function forEach<T>(
   target: {
     [index: string]: T
   },
-  eachFunc: (val: T, key: string) => void, inverse?: boolean
+  eachFunc: (val: T, key: string) => void,
+  inverse?: boolean,
 ): void
 
-export function forEach (target: any, eachFunc: (val: any, key: any) => void, inverse?: boolean): void
+export function forEach(target: any, eachFunc: (val: any, key: any) => void, inverse?: boolean): void
 
-export function forEach (target: any, eachFunc: (val: any, key: any) => any, inverse?: boolean): void {
+export function forEach(target: any, eachFunc: (val: any, key: any) => any, inverse?: boolean): void {
   let length: number
   let handler = eachFunc
   if (target instanceof Set || target instanceof Map) {
@@ -32,13 +33,12 @@ export function forEach (target: any, eachFunc: (val: any, key: any) => any, inv
       }
     } else {
       let i = length
-      while (i --) {
+      while (i--) {
         if (eachFunc(target[i], i) === false) {
           break
         }
       }
     }
-
   } else if (typeof target === 'object') {
     const keys = Object.keys(target)
     let key: string

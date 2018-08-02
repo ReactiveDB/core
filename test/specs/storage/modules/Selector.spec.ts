@@ -1,24 +1,18 @@
-import { Observable, Scheduler, Subscription } from 'rxjs'
+import { Subscription, of, defer, range, from, asyncScheduler, asapScheduler } from 'rxjs'
 import * as lf from 'lovefield'
 import { expect, use } from 'chai'
 import * as sinon from 'sinon'
 import * as SinonChai from 'sinon-chai'
+import { map, tap, skip, subscribeOn, take, concat, zip, publish, refCount, last } from 'rxjs/operators'
 import { beforeEach, it, describe, afterEach } from 'tman'
-import {
-  Selector,
-  DataStoreType,
-  lfFactory,
-  ShapeMatcher,
-  PredicateProvider,
-  TokenConcatFailed
-} from '../../../index'
+import { Selector, DataStoreType, lfFactory, ShapeMatcher, PredicateProvider, TokenConcatFailed } from '../../../index'
 
 use(SinonChai)
 
 interface Fixture {
-  _id: string,
-  time: number,
-  name: string,
+  _id: string
+  time: number
+  name: string
   folded?: boolean
 }
 
@@ -32,14 +26,15 @@ export default describe('Selector test', () => {
   let subscription: Subscription
 
   const constructDBAndATable = () => {
-    const schemaBuilder = lf.schema.create('SelectorTest', version ++)
+    const schemaBuilder = lf.schema.create('SelectorTest', version++)
     const db$ = lfFactory(schemaBuilder, {
       storeType: DataStoreType.MEMORY,
-      enableInspector: false
+      enableInspector: false,
     })
 
     const tableBuilder = schemaBuilder.createTable('TestSelectMetadata')
-    tableBuilder.addColumn('_id', lf.Type.STRING)
+    tableBuilder
+      .addColumn('_id', lf.Type.STRING)
       .addColumn('name', lf.Type.STRING)
       .addColumn('time', lf.Type.NUMBER)
       .addColumn('priority', lf.Type.NUMBER)
@@ -47,58 +42,66 @@ export default describe('Selector test', () => {
 
     db$.connect()
 
-    return db$.map((testDB) => ({
-      db: testDB,
-      table: testDB.getSchema().table('TestSelectMetadata')
-    }))
+    return db$.pipe(
+      map((testDB) => ({
+        db: testDB,
+        table: testDB.getSchema().table('TestSelectMetadata'),
+      })),
+    )
   }
 
-  beforeEach(function * () {
-    yield constructDBAndATable().do((r) => {
-      db = r.db
-      table = r.table
-    })
+  beforeEach(function*() {
+    yield constructDBAndATable().pipe(
+      tap((r) => {
+        db = r.db
+        table = r.table
+      }),
+    )
 
     const rows: lf.Row[] = []
     storeData = []
-    for (let i = 0; i < 1000; i ++) {
+    for (let i = 0; i < 1000; i++) {
       const priority = Math.ceil(i / 100)
       const row = {
         _id: `_id:${i}`,
         name: `name:${i}`,
         time: i,
-        priority: priority < 0 ? -priority : priority
+        priority: priority < 0 ? -priority : priority,
       }
       rows.push(table.createRow(row))
       storeData.push(row)
     }
 
-    yield db.insert().into(table).values(rows).exec()
+    yield db
+      .insert()
+      .into(table)
+      .values(rows)
+      .exec()
 
     tableShape = {
       mainTable: table,
       pk: {
         queried: true,
-        name: '_id'
+        name: '_id',
       },
       definition: {
         _id: {
           column: '_id',
-          id: true
+          id: true,
         },
         name: {
           column: 'name',
-          id: false
+          id: false,
         },
         time: {
           column: 'time',
-          id: false
+          id: false,
         },
         priority: {
           column: 'priority',
-          id: false
-        }
-      }
+          id: false,
+        },
+      },
     }
   })
 
@@ -119,11 +122,12 @@ export default describe('Selector test', () => {
     expect(selector.toString()).to.equal('SELECT * FROM TestSelectMetadata;')
   })
 
-  it('should getValues successfully via table shape', function* () {
-    const selector = new Selector<Fixture>(db,
+  it('should getValues successfully via table shape', function*() {
+    const selector = new Selector<Fixture>(
+      db,
       db.select().from(table),
       tableShape,
-      new PredicateProvider(table, { time: { $gte: 50 } })
+      new PredicateProvider(table, { time: { $gte: 50 } }),
     )
 
     const results = yield selector.values()
@@ -134,12 +138,14 @@ export default describe('Selector test', () => {
     })
   })
 
-  it('should get correct items when skip and limit', function* () {
-    const selector = new Selector(db,
+  it('should get correct items when skip and limit', function*() {
+    const selector = new Selector(
+      db,
       db.select().from(table),
       tableShape,
       new PredicateProvider(table, { time: { $gt: 50 } }),
-      20, 20
+      20,
+      20,
     )
     const result = yield selector.values()
 
@@ -151,11 +157,13 @@ export default describe('Selector test', () => {
   })
 
   it('should get sql string by toString method', () => {
-    const selector = new Selector(db,
+    const selector = new Selector(
+      db,
       db.select().from(table),
       tableShape,
       new PredicateProvider(table, { time: { $gt: 50 } }),
-      20, 20
+      20,
+      20,
     )
 
     const sql = selector.toString()
@@ -163,44 +171,45 @@ export default describe('Selector test', () => {
     expect(sql).to.equal('SELECT * FROM TestSelectMetadata WHERE (TestSelectMetadata.time > 50);')
   })
 
-  it('should get correct results with orderBy', function* () {
-    const selector = new Selector(db,
+  it('should get correct results with orderBy', function*() {
+    const selector = new Selector(
+      db,
       db.select().from(table),
       tableShape,
       new PredicateProvider(table, { time: { $gte: 50 } }),
-      null, null,
-      [
-        { column: table['priority'], orderBy: lf.Order.ASC },
-        { column: table['time'], orderBy: lf.Order.DESC },
-      ]
+      null,
+      null,
+      [{ column: table['priority'], orderBy: lf.Order.ASC }, { column: table['time'], orderBy: lf.Order.DESC }],
     )
 
-    yield selector.values()
-      .do(result => {
+    yield selector.values().pipe(
+      tap((result) => {
         expect(result).to.have.lengthOf(950)
-        const expectResult = storeData.filter(r => r.time >= 50)
-          .sort((a, b) => {
-            const higherPriority = Math.sign(a.priority - b.priority)
-            const earlier = -Math.sign(a.time - b.time)
-            return higherPriority * 10 + earlier
-          })
+        const expectResult = storeData.filter((r) => r.time >= 50).sort((a, b) => {
+          const higherPriority = Math.sign(a.priority - b.priority)
+          const earlier = -Math.sign(a.time - b.time)
+          return higherPriority * 10 + earlier
+        })
 
         expect(result).to.deep.equal(expectResult)
-      })
+      }),
+    )
   })
 
   describe('Selector.prototype.changes', () => {
-    it('observe should ok', done => {
-      const selector = new Selector(db,
+    it('observe should ok', (done) => {
+      const selector = new Selector(
+        db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } })
+        new PredicateProvider(table, { time: { $gte: 50 } }),
       )
 
       const newName = 'test name change'
 
-      subscription = selector.changes()
-        .skip(1)
+      subscription = selector
+        .changes()
+        .pipe(skip(1))
         .subscribe((r: any[]) => {
           expect(r[0].name).to.equal(newName)
           done()
@@ -212,95 +221,102 @@ export default describe('Selector test', () => {
         .exec()
     })
 
-    it('observe asynchronous insertions completely', function* () {
-      yield constructDBAndATable().do((r) => {
-        db = r.db
-        table = r.table // ensure empty table
-      })
+    it('observe asynchronous insertions completely', function*() {
+      yield constructDBAndATable().pipe(
+        tap((r) => {
+          db = r.db
+          table = r.table // ensure empty table
+        }),
+      )
 
       const n = 3
       const rows = [
         { _id: '_id:939.1', name: 'name:939.1', time: 939.1, priority: 10 },
         { _id: '_id:939.2', name: 'name:939.2', time: 939.2, priority: 20 },
-        { _id: '_id:939.3', name: 'name:939.3', time: 939.3, priority: 30 }
+        { _id: '_id:939.3', name: 'name:939.3', time: 939.3, priority: 30 },
       ]
       const insertRow = (i: number) =>
-        db.insert().into(table).values([table.createRow(rows[i])]).exec()
+        db
+          .insert()
+          .into(table)
+          .values([table.createRow(rows[i])])
+          .exec()
 
-      const count$ = Observable.range(0, n + 1)
+      const count$ = range(0, n + 1)
 
-      const insert$ = Observable.concat(
-        Observable.of({}).subscribeOn(Scheduler.asap),
-        Observable.defer(() => insertRow(0)).subscribeOn(Scheduler.asap),
-        Observable.defer(() => insertRow(1)).subscribeOn(Scheduler.asap),
-        Observable.defer(() => insertRow(2)).subscribeOn(Scheduler.asap)
+      const insert$ = of({}).pipe(
+        subscribeOn(asapScheduler),
+        concat(
+          defer(() => insertRow(0)).pipe(subscribeOn(asapScheduler)),
+          defer(() => insertRow(1)).pipe(subscribeOn(asapScheduler)),
+          defer(() => insertRow(2)).pipe(subscribeOn(asapScheduler)),
+        ),
       )
 
-      const change$ = new Selector(db,
-        db.select().from(table),
-        tableShape,
-        new PredicateProvider(table, {}),
-      ).changes()
+      const change$ = new Selector(db, db.select().from(table), tableShape, new PredicateProvider(table, {})).changes()
 
-      yield Observable.zip(count$, insert$, change$,
-        (nth, _, result) => {
+      yield count$.pipe(
+        zip(insert$, change$, (nth, _, result) => {
           expect(result).to.deep.equal(rows.slice(0, nth))
-        }
+        }),
       )
     })
 
-    it('should observe deletion of the only row in db', function* () {
-      db.delete().from(table).exec() // 清空 table
+    it('should observe deletion of the only row in db', function*() {
+      db.delete()
+        .from(table)
+        .exec() // 清空 table
 
-      const selector = new Selector(db,
-        db.select().from(table),
-        tableShape,
-        new PredicateProvider(table, {}),
-      )
+      const selector = new Selector(db, db.select().from(table), tableShape, new PredicateProvider(table, {}))
 
       const row = { _id: '_id:939.5', name: 'name:939.5', time: 939.5, priority: 10 }
 
-      yield db.insert()
+      yield db
+        .insert()
         .into(table)
         .values([table.createRow(row)])
         .exec()
 
       const signal = selector.changes()
       subscription = signal.subscribe()
-      yield db.delete()
+      yield db
+        .delete()
         .from(table)
         .where(table['_id'].eq('_id:939.5'))
         .exec()
 
-      yield signal
-        .subscribeOn(Scheduler.async)
-        .take(1)
-        .do((r: any) => {
+      yield signal.pipe(
+        subscribeOn(asyncScheduler),
+        take(1),
+        tap((r: any) => {
           expect(r).to.deep.equal([])
-        })
+        }),
+      )
     })
 
-    it('unsubscribe should ok', function* () {
-      const selector = new Selector(db,
+    it('unsubscribe should ok', function*() {
+      const selector = new Selector(
+        db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } })
+        new PredicateProvider(table, { time: { $gte: 50 } }),
       )
       const spy = sinon.spy((): void => void 0)
 
       const newName = 'test name change'
 
-      const _subscription = selector.changes()
-        .subscribe(spy)
+      const _subscription = selector.changes().subscribe(spy)
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], newName)
         .where(table['_id'].eq('_id:50'))
         .exec()
 
       _subscription.unsubscribe()
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], newName)
         .where(table['_id'].eq('_id:50'))
         .exec()
@@ -308,11 +324,12 @@ export default describe('Selector test', () => {
       expect(spy.callCount).to.equal(1)
     })
 
-    it('predicate should be clone before use', function* () {
-      const selector = new Selector(db,
+    it('predicate should be clone before use', function*() {
+      const selector = new Selector(
+        db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } })
+        new PredicateProvider(table, { time: { $gte: 50 } }),
       )
 
       const newName = 'test name change'
@@ -321,117 +338,134 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], newName)
         .where(table['_id'].eq('_id:50'))
         .exec()
 
-      yield signal.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(([ result ]) => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap(([result]) => {
           expect(result['name']).to.equal(newName)
-        })
+        }),
+      )
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], newName + newName)
         .where(table['_id'].eq('_id:50'))
         .exec()
 
-      yield signal.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(([ result ]) => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap(([result]) => {
           expect(result['name']).to.equal(newName + newName)
-        })
-
+        }),
+      )
     })
 
-    it('should throw when getValue error', function* () {
-      const selector = new Selector(db,
+    it('should throw when getValue error', function*() {
+      const selector = new Selector(
+        db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } })
+        new PredicateProvider(table, { time: { $gte: 50 } }),
       )
 
       const changes = selector.changes()
 
       const newName = 'test name change'
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], newName)
         .where(table['_id'].eq('_id:50'))
         .exec()
 
-      yield changes.take(1)
-        .do(([ result1 ]) => {
+      yield changes.pipe(
+        take(1),
+        tap(([result1]) => {
           expect(result1['name']).to.equal(newName)
-        })
+        }),
+      )
 
       const error = new TypeError('not happy')
 
       selector['getValue'] = () => Promise.reject(error)
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], newName + newName)
         .where(table['_id'].eq('_id:50'))
         .exec()
 
       try {
-        yield changes.take(1)
+        yield changes.pipe(take(1))
       } catch (e) {
         expect(e.message).to.equal(error.message)
       }
     })
 
-    it('should work correctly with empty result set', function* () {
+    it('should work correctly with empty result set', function*() {
       const impossibleTime = -1
-      const selector = new Selector(db,
+      const selector = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $eq: impossibleTime } }),
-        1, 0 // 添加 limit, skip 以模仿实际使用场景
+        1,
+        0, // 添加 limit, skip 以模仿实际使用场景
       )
 
       const signal = selector.changes()
 
       subscription = signal.subscribe()
 
-      yield signal
-        .subscribeOn(Scheduler.async)
-        .take(1)
-        .do((r: any) => {
+      yield signal.pipe(
+        subscribeOn(asyncScheduler),
+        take(1),
+        tap((r: any) => {
           // 确定能推出空结果集
           expect(r).to.deep.equal([])
-        })
+        }),
+      )
 
       const impossibleRow = {
         _id: '_id:939.5',
         name: 'name:939.5',
         time: impossibleTime,
-        priority: 10
+        priority: 10,
       }
 
-      yield db.insert()
+      yield db
+        .insert()
         .into(table)
         .values([table.createRow(impossibleRow)])
         .exec()
 
-      yield signal
-        .subscribeOn(Scheduler.async)
-        .take(1)
-        .do((r: any) => {
+      yield signal.pipe(
+        subscribeOn(asyncScheduler),
+        take(1),
+        tap((r: any) => {
           // 确定在空结果集上也能推出更新
           expect(r[0]).to.deep.equal(impossibleRow)
-        })
+        }),
+      )
     })
 
-    it('should observe changes when skip and limit', function* () {
-      const selector = new Selector(db,
+    it('should observe changes when skip and limit', function*() {
+      const selector = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gt: 50 } }),
-        20, 20
+        20,
+        20,
       )
 
       const newName = 'new test name'
@@ -440,31 +474,32 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], newName)
         .where(table['_id'].eq('_id:71'))
         .exec()
 
-      yield signal
-        .take(1)
-        .subscribeOn(Scheduler.async)
-        .do((r: any) => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap((r: any) => {
           expect(r[0].name).to.equal(newName)
-        })
+        }),
+      )
     })
 
-    it('should observe changes with skip and limit and sortBy', function* () {
-      const selector = new Selector(db,
+    it('should observe changes with skip and limit and sortBy', function*() {
+      const selector = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gt: 50 } }),
-        20, 20,
-        [
-          { column: table['priority'], orderBy: lf.Order.DESC },
-          { column: table['time'], orderBy: lf.Order.ASC }
-        ]
+        20,
+        20,
+        [{ column: table['priority'], orderBy: lf.Order.DESC }, { column: table['time'], orderBy: lf.Order.ASC }],
       )
 
       const newName = 'new test name'
@@ -473,178 +508,205 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], newName)
         .where(table['_id'].eq('_id:921'))
         .exec()
 
-      yield signal
-        .subscribeOn(Scheduler.async)
-        .take(1)
-        .do((r: any) => {
+      yield signal.pipe(
+        subscribeOn(asyncScheduler),
+        take(1),
+        tap((r: any) => {
           expect(r[0].name).to.equal(newName)
-        })
+        }),
+      )
 
       const row = { _id: '_id:939.5', name: 'name:939.5', time: 939.5, priority: 10 }
 
-      yield db.insert()
+      yield db
+        .insert()
         .into(table)
         .values([table.createRow(row)])
         .exec()
 
-      yield signal
-        .subscribeOn(Scheduler.async)
-        .take(1)
-        .do((r: any) => {
+      yield signal.pipe(
+        subscribeOn(asyncScheduler),
+        take(1),
+        tap((r: any) => {
           expect(r[r.length - 1]).to.deep.equal(row)
-        })
+        }),
+      )
 
-      yield db.delete()
+      yield db
+        .delete()
         .from(table)
         .where(table['_id'].eq('_id:930'))
         .exec()
 
-      yield signal.take(1)
-        .subscribeOn(Scheduler.async)
-        .do((r: any) => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap((r: any) => {
           expect(r[r.length - 1]._id).to.equal('_id:940')
-        })
+        }),
+      )
     })
 
-    it('predicate should be clone before use when skip and limit', function* () {
-      const selector = new Selector(db,
+    it('predicate should be clone before use when skip and limit', function*() {
+      const selector = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gt: 50 } }),
-        20, 20
+        20,
+        20,
       )
 
       const newName = 'new test name'
 
       const signal = selector.changes()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
       subscription = signal.subscribe()
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], newName)
         .where(table['_id'].eq('_id:71'))
         .exec()
 
-      yield signal
-        .subscribeOn(Scheduler.async)
-        .take(1)
-        .do(([ r ]) => {
+      yield signal.pipe(
+        subscribeOn(asyncScheduler),
+        take(1),
+        tap(([r]) => {
           expect(r['name']).to.equal(newName)
-        })
+        }),
+      )
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], newName + newName)
         .where(table['_id'].eq('_id:71'))
         .exec()
 
-      yield signal
-        .subscribeOn(Scheduler.async)
-        .take(1)
-        .do(([ r ]) => {
+      yield signal.pipe(
+        subscribeOn(asyncScheduler),
+        take(1),
+        tap(([r]) => {
           expect(r['name']).to.equal(newName + newName)
-        })
+        }),
+      )
     })
 
-    it('should observe changes when prefetched data changed', function* () {
-      const selector = new Selector(db,
+    it('should observe changes when prefetched data changed', function*() {
+      const selector = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gt: 50 } }),
-        20, 20
+        20,
+        20,
       )
 
       const signal = selector.changes()
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
-      yield db.delete()
+      yield db
+        .delete()
         .from(table)
         .where(lf.op.and(table['time'].gte(71), table['time'].lte(80)))
         .exec()
 
-      yield signal.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(r => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap((r) => {
           expect(r).to.have.lengthOf(20)
           r.forEach((v: any) => {
             expect(v.time).to.gt(80)
             expect(v.time).to.lte(100)
           })
-        })
+        }),
+      )
     })
 
-    it('should observe changes when last page data changed', function* () {
-      const selector = new Selector(db,
+    it('should observe changes when last page data changed', function*() {
+      const selector = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gt: 960 } }),
-        20, 20
+        20,
+        20,
       )
 
       const signal = selector.changes()
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
-      yield db.delete()
+      yield db
+        .delete()
         .from(table)
         .where(lf.op.and(table['time'].gte(981), table['time'].lte(990)))
         .exec()
 
-      yield signal.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(r => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap((r) => {
           expect(r).to.have.lengthOf(9)
           r.forEach((v: any) => {
             expect(v.time).to.gt(990)
             expect(v.time).to.lt(1000)
           })
-        })
+        }),
+      )
     })
 
-    it('should observe updates to an inserted row', function* () {
-      const selector = new Selector(db,
+    it('should observe updates to an inserted row', function*() {
+      const selector = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $lt: 0 } }),
-        20
+        20,
       )
 
       const signal = selector.changes()
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
       const newRow = { _id: '_id:929.5', name: 'name:929.5', time: -1, priority: 10 }
       const row = table.createRow(newRow)
 
-      yield db.insert()
+      yield db
+        .insert()
         .into(table)
         .values([row])
         .exec()
 
       const newName = newRow.name + 'updated'
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], newName)
         .where(table['_id'].eq(newRow._id))
         .exec()
 
-      yield signal.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(r => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap((r) => {
           expect(r).to.have.lengthOf(1)
           const diff = r.filter((d: Fixture) => d._id === newRow._id)
           expect(diff).to.have.lengthOf(1)
@@ -653,51 +715,16 @@ export default describe('Selector test', () => {
             expect(diffRow._id).to.equal(newRow._id)
             expect(diffRow.name).to.equal(newName)
           }
-        })
-    })
-
-    it('query without prefetch should only emit one values when init', function* () {
-      const selector = new Selector(db,
-        db.select().from(table),
-        tableShape,
-        new PredicateProvider(table, { time: { $gt: 50 } })
+        }),
       )
-
-      const spy = sinon.spy()
-
-      const signal = selector.changes()
-
-      subscription = signal.subscribe(spy)
-
-      yield signal.take(1)
-
-      expect(spy.callCount).to.equal(1)
     })
 
-    it('query without prefetch and results is empty Array should only emit one values when init', function* () {
-      const selector = new Selector(db,
-        db.select().from(table),
-        tableShape,
-        new PredicateProvider(table, { time: { $gt: 10000 } })
-      )
-
-      const spy = sinon.spy()
-
-      const signal = selector.changes()
-
-      subscription = signal.subscribe(spy)
-
-      yield signal.take(1)
-
-      expect(spy.callCount).to.equal(1)
-    })
-
-    it('prefetch query should only emit one values when init', function* () {
-      const selector = new Selector(db,
+    it('query without prefetch should only emit one values when init', function*() {
+      const selector = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gt: 50 } }),
-        20, 20
       )
 
       const spy = sinon.spy()
@@ -706,7 +733,47 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe(spy)
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
+
+      expect(spy.callCount).to.equal(1)
+    })
+
+    it('query without prefetch and results is empty Array should only emit one values when init', function*() {
+      const selector = new Selector(
+        db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 10000 } }),
+      )
+
+      const spy = sinon.spy()
+
+      const signal = selector.changes()
+
+      subscription = signal.subscribe(spy)
+
+      yield signal.pipe(take(1))
+
+      expect(spy.callCount).to.equal(1)
+    })
+
+    it('prefetch query should only emit one values when init', function*() {
+      const selector = new Selector(
+        db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gt: 50 } }),
+        20,
+        20,
+      )
+
+      const spy = sinon.spy()
+
+      const signal = selector.changes()
+
+      subscription = signal.subscribe(spy)
+
+      yield signal.pipe(take(1))
 
       expect(spy.callCount).to.equal(1)
     })
@@ -720,37 +787,49 @@ export default describe('Selector test', () => {
     let dist: Selector<any>
 
     beforeEach(() => {
-      selector1 = new Selector(db,
+      selector1 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $lt: 50 } })
+        new PredicateProvider(table, { time: { $lt: 50 } }),
       )
-      selector2 = new Selector(db,
+      selector2 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, {
           time: {
             $gte: 50,
-            $lt: 100
-          }
-        })
+            $lt: 100,
+          },
+        }),
       )
 
       const select1And2 = selector1.combine(selector2)
 
-      selector3 = new Selector(db, db.select().from(table), tableShape, new PredicateProvider(table, {
-        time: {
-          $gte: 100,
-          $lt: 150
-        }
-      }))
+      selector3 = new Selector(
+        db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, {
+          time: {
+            $gte: 100,
+            $lt: 150,
+          },
+        }),
+      )
 
-      selector4 = new Selector(db, db.select().from(table), tableShape, new PredicateProvider(table, {
-        time: {
-          $gte: 150,
-          $lt: 200
-        }
-      }))
+      selector4 = new Selector(
+        db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, {
+          time: {
+            $gte: 150,
+            $lt: 200,
+          },
+        }),
+      )
 
       dist = select1And2.combine(selector3, selector4)
     })
@@ -759,15 +838,14 @@ export default describe('Selector test', () => {
       expect(dist).instanceof(Selector)
     })
 
-    it('result metadata should combine all results', done => {
-      dist.values()
-        .subscribe(r => {
-          expect(r).to.have.lengthOf(200)
-          done()
-        })
+    it('result metadata should combine all results', (done) => {
+      dist.values().subscribe((r) => {
+        expect(r).to.have.lengthOf(200)
+        done()
+      })
     })
 
-    it('result should be combined', function* () {
+    it('result should be combined', function*() {
       const result = yield dist.values()
       const count = 200
       expect(result).to.have.lengthOf(count)
@@ -776,11 +854,12 @@ export default describe('Selector test', () => {
       })
     })
 
-    it('changes should observe all values from original SelectMeta', function* () {
-      const changes$ = dist.changes()
-        .subscribeOn(Scheduler.async, 1)
-        .publish()
-        .refCount()
+    it('changes should observe all values from original SelectMeta', function*() {
+      const changes$ = dist.changes().pipe(
+        subscribeOn(asyncScheduler, 1),
+        publish(),
+        refCount(),
+      )
 
       changes$.subscribe()
 
@@ -788,132 +867,159 @@ export default describe('Selector test', () => {
       const update2 = 'test update name 2'
       const update3 = 'test update name 3'
 
-      yield changes$.take(1)
+      yield changes$.pipe(take(1))
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], update1)
         .where(table['_id'].eq('_id:15'))
         .exec()
 
-      yield changes$.take(1)
-        .do(r => expect(r[15].name).equal(update1))
+      yield changes$.pipe(
+        take(1),
+        tap((r) => expect(r[15].name).equal(update1)),
+      )
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], update2)
         .where(table['_id'].eq('_id:55'))
         .exec()
 
-      yield changes$.take(1)
-        .do(r => expect(r[55].name).equal(update2))
+      yield changes$.pipe(
+        take(1),
+        tap((r) => expect(r[55].name).equal(update2)),
+      )
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], update3)
         .where(table['_id'].eq('_id:125'))
         .exec()
 
-      yield changes$.take(1)
-        .do(r => expect(r[125].name).equal(update3))
+      yield changes$.pipe(
+        take(1),
+        tap((r) => expect(r[125].name).equal(update3)),
+      )
     })
 
-    it('changes should observe all values with limit and skip', function* () {
-      const selector5 = new Selector(db,
+    it('changes should observe all values with limit and skip', function*() {
+      const selector5 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gt: 50 } }),
-        20, 20
+        20,
+        20,
       )
-      const selector6 = new Selector(db,
+      const selector6 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gt: 100 } }),
-        20, 20
+        20,
+        20,
       )
 
-      const signal = selector5.combine(selector6)
+      const signal = selector5
+        .combine(selector6)
         .changes()
-        .subscribeOn(Scheduler.async, 1)
-        .publish()
-        .refCount()
+        .pipe(
+          subscribeOn(asyncScheduler, 1),
+          publish(),
+          refCount(),
+        )
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
-      yield db.delete()
+      yield db
+        .delete()
         .from(table)
         .where(table['time'].eq(81))
         .exec()
 
-      yield signal.take(1)
-        .do(r => {
+      yield signal.pipe(
+        take(1),
+        tap((r: any[]) => {
           expect(r).to.have.lengthOf(40)
-          r.forEach(v => expect(v['time']).not.equal(81))
-          Observable.from(r)
-            .skip(19)
-            .take(1)
-            .subscribe(v => expect(v['time']).to.equal(91))
-        })
+          r.forEach((v) => expect(v['time']).not.equal(81))
+          from(r)
+            .pipe(
+              skip(19),
+              take(1),
+            )
+            .subscribe((v) => expect(v['time']).to.equal(91))
+        }),
+      )
 
-      yield db.delete()
+      yield db
+        .delete()
         .from(table)
         .where(table['time'].eq(135))
         .exec()
 
-      yield signal.take(1)
-        .do(r => {
+      yield signal.pipe(
+        take(1),
+        tap((r: any[]) => {
           expect(r).to.have.lengthOf(40)
-          r.forEach(v => expect(v['time']).not.equal(135))
-          Observable.from(r)
-            .last()
-            .subscribe(v => expect(v['time']).to.equal(141))
-        })
+          r.forEach((v) => expect(v['time']).not.equal(135))
+          from(r)
+            .pipe(last())
+            .subscribe((v) => expect(v['time']).to.equal(141))
+        }),
+      )
 
       const newName = 'xxx'
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], newName)
         .where(table['time'].eq(82))
         .exec()
 
-      yield signal.take(1)
-        .do(r => {
-          r.filter(v => v['time'] === 82)
-            .forEach(v => expect(v['name']).to.equal(newName))
-        })
+      yield signal.pipe(
+        take(1),
+        tap((r: any[]) => {
+          r.filter((v) => v['time'] === 82).forEach((v) => expect(v['name']).to.equal(newName))
+        }),
+      )
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], newName)
         .where(table['time'].eq(136))
         .exec()
 
-      yield signal.take(1)
-        .do(r => {
-          r.filter(v => v['time'] === 136)
-            .forEach(v => expect(v['name']).to.equal(newName))
-        })
+      yield signal.pipe(
+        take(1),
+        tap((r: any[]) => {
+          r.filter((v) => v['time'] === 136).forEach((v) => expect(v['name']).to.equal(newName))
+        }),
+      )
     })
 
     it('combined Selector#toString should return query String', () => {
-      const _selector1 = new Selector(db,
+      const _selector1 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } })
+        new PredicateProvider(table, { time: { $gte: 50 } }),
       )
 
-      const _selector2 = new Selector(db,
+      const _selector2 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
-        new PredicateProvider(table, { time: { $lte: 250 } })
+        new PredicateProvider(table, { time: { $lte: 250 } }),
       )
 
       const selector = _selector1.combine(_selector2)
 
       const sql = selector.toString()
 
-      expect(sql).to.deep.equal(JSON.stringify([
-        _selector1.toString(),
-        _selector2.toString()
-      ], null, 2))
+      expect(sql).to.deep.equal(JSON.stringify([_selector1.toString(), _selector2.toString()], null, 2))
     })
   })
 
@@ -926,38 +1032,48 @@ export default describe('Selector test', () => {
     let dist: Selector<any>
 
     beforeEach(() => {
-      selector1 = new Selector(db,
+      selector1 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gte: 50 } }),
-        20, 0
+        20,
+        0,
       )
-      selector2 = new Selector(db,
+      selector2 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gte: 50 } }),
-        20, 20
-      )
-
-      selector3 = new Selector(db,
-        db.select().from(table),
-        tableShape,
-        new PredicateProvider(table, { time: { $gte: 50 } }),
-        20, 40
+        20,
+        20,
       )
 
-      selector4 = new Selector(db,
+      selector3 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gte: 50 } }),
-        10, 60
+        20,
+        40,
       )
 
-      selector5 = new Selector(db,
+      selector4 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gte: 50 } }),
-        20, 70
+        10,
+        60,
+      )
+
+      selector5 = new Selector(
+        db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } }),
+        20,
+        70,
       )
 
       dist = selector1.concat(selector3, selector4, selector2, selector5)
@@ -967,15 +1083,14 @@ export default describe('Selector test', () => {
       expect(dist).instanceof(Selector)
     })
 
-    it('result metadata should concat all results', done => {
-      dist.values()
-        .subscribe(r => {
-          expect(r).to.have.lengthOf(90)
-          done()
-        })
+    it('result metadata should concat all results', (done) => {
+      dist.values().subscribe((r) => {
+        expect(r).to.have.lengthOf(90)
+        done()
+      })
     })
 
-    it('result should be concated', function* () {
+    it('result should be concated', function*() {
       const result = yield dist.values()
       const count = 90
       expect(result).to.have.lengthOf(count)
@@ -984,7 +1099,7 @@ export default describe('Selector test', () => {
       })
     })
 
-    it('changes should observe all values from original Selector', function* () {
+    it('changes should observe all values from original Selector', function*() {
       const changes$ = dist.changes()
 
       changes$.subscribe()
@@ -993,47 +1108,46 @@ export default describe('Selector test', () => {
       const update2 = 'test update name 2'
       const update3 = 'test update name 3'
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], update1)
         .where(table['_id'].eq('_id:51'))
         .exec()
 
-      yield changes$.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(r => expect(r[1].name).equal(update1))
+      yield changes$.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap((r) => expect(r[1].name).equal(update1)),
+      )
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], update2)
         .where(table['_id'].eq('_id:55'))
         .exec()
 
-      yield changes$.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(r => expect(r[5].name).equal(update2))
+      yield changes$.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap((r) => expect(r[5].name).equal(update2)),
+      )
 
-      yield db.update(table)
+      yield db
+        .update(table)
         .set(table['name'], update3)
         .where(table['_id'].eq('_id:125'))
         .exec()
 
-      yield changes$.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(r => expect(r[75].name).equal(update3))
+      yield changes$.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap((r) => expect(r[75].name).equal(update3)),
+      )
     })
 
-    it('concat selector should ok when neither selectors have predicateProvider', function* () {
-      selector1 = new Selector(db,
-        db.select().from(table),
-        tableShape,
-        null,
-        20, 0
-      )
-      selector2 = new Selector(db,
-        db.select().from(table),
-        tableShape,
-        null,
-        20, 20
-      )
+    it('concat selector should ok when neither selectors have predicateProvider', function*() {
+      selector1 = new Selector(db, db.select().from(table), tableShape, null, 20, 0)
+      selector2 = new Selector(db, db.select().from(table), tableShape, null, 20, 20)
       const result = yield selector1.concat(selector2).values()
       expect(result).to.have.lengthOf(40)
       result.forEach((r: any, index: number) => {
@@ -1041,26 +1155,24 @@ export default describe('Selector test', () => {
       })
     })
 
-    it('concat selector should ok with OrderDescription', function* () {
-      const selector6 = new Selector(db,
+    it('concat selector should ok with OrderDescription', function*() {
+      const selector6 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $lt: 930 } }),
-        20, 0,
-        [
-          { column: table['priority'], orderBy: lf.Order.DESC },
-          { column: table['time'], orderBy: lf.Order.DESC }
-        ]
+        20,
+        0,
+        [{ column: table['priority'], orderBy: lf.Order.DESC }, { column: table['time'], orderBy: lf.Order.DESC }],
       )
-      const selector7 = new Selector(db,
+      const selector7 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $lt: 930 } }),
-        20, 20,
-        [
-          { column: table['priority'], orderBy: lf.Order.DESC },
-          { column: table['time'], orderBy: lf.Order.DESC }
-        ]
+        20,
+        20,
+        [{ column: table['priority'], orderBy: lf.Order.DESC }, { column: table['time'], orderBy: lf.Order.DESC }],
       )
 
       const dest = selector6.concat(selector7)
@@ -1069,41 +1181,49 @@ export default describe('Selector test', () => {
 
       subscription = signal.subscribe()
 
-      yield signal.take(1)
+      yield signal.pipe(take(1))
 
       const newRow = { _id: '_id:929.5', name: 'name:929.5', time: 929.5, priority: 10 }
 
       const row = table.createRow(newRow)
 
-      yield db.insert()
+      yield db
+        .insert()
         .into(table)
         .values([row])
         .exec()
 
-      yield signal.take(1)
-        .subscribeOn(Scheduler.async)
-        .do(([r]) => {
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asyncScheduler),
+        tap(([r]) => {
           expect(r).to.deep.equal(newRow)
-        })
+        }),
+      )
 
-      yield db.delete()
+      yield db
+        .delete()
         .from(table)
         .where(table['_id'].eq(newRow._id))
         .exec()
     })
 
     it('concat two selector limit not match should throw', () => {
-      const selector6 = new Selector(db,
+      const selector6 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gte: 50 } }),
-        10, 0
+        10,
+        0,
       )
-      const selector7 = new Selector(db,
+      const selector7 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gte: 50 } }),
-        20, 11
+        20,
+        11,
       )
 
       const fn = () => selector6.concat(selector7)
@@ -1112,17 +1232,21 @@ export default describe('Selector test', () => {
     })
 
     it('concat two selector predicate not match should throw', () => {
-      const selector6 = new Selector(db,
+      const selector6 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gt: 50 } }),
-        20, 0
+        20,
+        0,
       )
-      const selector7 = new Selector(db,
+      const selector7 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gte: 50 } }),
-        20, 20
+        20,
+        20,
       )
 
       const fn = () => selector6.concat(selector7)
@@ -1132,31 +1256,25 @@ export default describe('Selector test', () => {
     })
 
     it('concat two selector with one of the them not having a predicateProvider should throw with correct error message', () => {
-      const selector6 = new Selector(db,
-        db.select().from(table),
-        tableShape,
-        null,
-        20, 0
-      )
-      const selector7 = new Selector(db,
+      const selector6 = new Selector(db, db.select().from(table), tableShape, null, 20, 0)
+      const selector7 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gte: 50 } }),
-        20, 20
+        20,
+        20,
       )
 
-      const selector6_1 = new Selector(db,
+      const selector6_1 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gt: 50 } }),
-        20, 0
+        20,
+        0,
       )
-      const selector7_1 = new Selector(db,
-        db.select().from(table),
-        tableShape,
-        null,
-        20, 20
-      )
+      const selector7_1 = new Selector(db, db.select().from(table), tableShape, null, 20, 20)
 
       const error = TokenConcatFailed()
 
@@ -1168,17 +1286,21 @@ export default describe('Selector test', () => {
     })
 
     it('concat two selector select not match should throw', () => {
-      const selector6 = new Selector(db,
+      const selector6 = new Selector(
+        db,
         db.select(table['name']).from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gt: 50 } }),
-        20, 0
+        20,
+        0,
       )
-      const selector7 = new Selector(db,
+      const selector7 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gt: 50 } }),
-        20, 20
+        20,
+        20,
       )
 
       const fn = () => selector6.concat(selector7)
@@ -1188,17 +1310,21 @@ export default describe('Selector test', () => {
     })
 
     it('concat two selector skip not serial should throw', () => {
-      const selector6 = new Selector(db,
+      const selector6 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gt: 50 } }),
-        20, 0
+        20,
+        0,
       )
-      const selector7 = new Selector(db,
+      const selector7 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gt: 50 } }),
-        20, 40
+        20,
+        40,
       )
 
       const fn = () => selector6.concat(selector7)
@@ -1214,105 +1340,108 @@ export default describe('Selector test', () => {
     let selector4: Selector<any>
     let concated: Selector<any>
     let combined: Selector<any>
-    const mapFn = (stream$: any) => stream$.map((v: any) => v.map(() => 1))
-    const mapFn2 = (stream$: any) => stream$.map((v: any) => v.map(() => 2))
-    const mapFn3 = (stream$: any) => stream$.map((v: any) => v.map(() => 3))
+    const mapFn = (stream$: any) => stream$.pipe(map((v: any) => v.map(() => 1)))
+    const mapFn2 = (stream$: any) => stream$.pipe(map((v: any) => v.map(() => 2)))
+    const mapFn3 = (stream$: any) => stream$.pipe(map((v: any) => v.map(() => 3)))
 
     mapFn.toString = () => 'TEST_MAP_FN'
 
     beforeEach(() => {
-      selector1 = new Selector(db,
+      selector1 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gte: 50 } }),
-        20, 0
-      )
-        .map(mapFn)
-      selector2 = new Selector(db,
+        20,
+        0,
+      ).map(mapFn)
+      selector2 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gte: 50 } }),
-        20, 20
-      )
-        .map(mapFn)
+        20,
+        20,
+      ).map(mapFn)
 
       concated = selector1.concat(selector2)
 
-      selector3 = new Selector(db,
+      selector3 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gte: 50 } }),
-        20, 40
-      )
-        .map(mapFn2)
+        20,
+        40,
+      ).map(mapFn2)
 
-      selector4 = new Selector(db,
+      selector4 = new Selector(
+        db,
         db.select().from(table),
         tableShape,
         new PredicateProvider(table, { time: { $gte: 50 } }),
-        20, 60
-      )
-        .map(mapFn3)
+        20,
+        60,
+      ).map(mapFn3)
 
       combined = selector3.combine(selector4)
     })
 
-    it('should map all result from value', function* () {
-
-      yield selector1.values()
-        .do(data => {
-          data.forEach(r => expect(r).to.equal(1))
-        })
+    it('should map all result from value', function*() {
+      yield selector1.values().pipe(
+        tap((data) => {
+          data.forEach((r) => expect(r).to.equal(1))
+        }),
+      )
     })
 
-    it('should map all result from changes', function* () {
-
-      yield selector1.changes()
-        .take(1)
-        .do(data => {
-          data.forEach(r => expect(r).to.equal(1))
-        })
+    it('should map all result from changes', function*() {
+      yield selector1.changes().pipe(
+        take(1),
+        tap((data) => {
+          data.forEach((r) => expect(r).to.equal(1))
+        }),
+      )
     })
 
-    it('should map all result from concated selector#value', function* () {
-      yield concated.values()
-        .do(data => {
-          data.forEach(r => expect(r).to.equal(1))
-        })
+    it('should map all result from concated selector#value', function*() {
+      yield concated.values().pipe(
+        tap((data) => {
+          data.forEach((r) => expect(r).to.equal(1))
+        }),
+      )
     })
 
-    it('should map all result from concated selector#change', function* () {
-      yield concated.changes()
-        .take(1)
-        .do(data => {
-          data.forEach(r => expect(r).to.equal(1))
-        })
+    it('should map all result from concated selector#change', function*() {
+      yield concated.changes().pipe(
+        take(1),
+        tap((data) => {
+          data.forEach((r) => expect(r).to.equal(1))
+        }),
+      )
     })
 
-    it('should map all result from combined selector#value', function* () {
-      yield combined.values()
-        .do(data => {
-          data.splice(0, 20)
-            .forEach(r => expect(r).to.equal(2))
-        })
-        .do(data => {
-          data.splice(20)
-            .forEach(r => expect(r).to.equal(3))
-        })
+    it('should map all result from combined selector#value', function*() {
+      yield combined.values().pipe(
+        tap((data) => {
+          data.splice(0, 20).forEach((r) => expect(r).to.equal(2))
+        }),
+        tap((data) => {
+          data.splice(20).forEach((r) => expect(r).to.equal(3))
+        }),
+      )
     })
 
-    it('should map all result from combined selector#changes', function* () {
-      yield combined.changes()
-        .take(1)
-        .do(data => {
-          data.splice(0, 20)
-            .forEach(r => expect(r).to.equal(2))
-        })
-        .do(data => {
-          data.splice(20)
-            .forEach(r => expect(r).to.equal(3))
-        })
+    it('should map all result from combined selector#changes', function*() {
+      yield combined.changes().pipe(
+        take(1),
+        tap((data) => {
+          data.splice(0, 20).forEach((r) => expect(r).to.equal(2))
+        }),
+        tap((data) => {
+          data.splice(20).forEach((r) => expect(r).to.equal(3))
+        }),
+      )
     })
   })
-
 })

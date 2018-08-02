@@ -5,24 +5,25 @@ import { fieldIdentifier } from '../symbols'
 import * as Exception from '../../exception'
 
 export class Mutation {
-
   private params: Object
-  private meta: {
-    key: string,
-    val: any
-  } | undefined
+  private meta:
+    | {
+        key: string
+        val: any
+      }
+    | undefined
 
-  constructor(
-    private db: lf.Database,
-    private table: lf.schema.Table,
-    initialParams: Object = {}
-  ) {
+  constructor(private db: lf.Database, private table: lf.schema.Table, initialParams: Object = {}) {
     this.params = {
-      ...initialParams
+      ...initialParams,
     }
   }
 
-  static aggregate(db: lf.Database, insert: Mutation[], update: Mutation[]): {
+  static aggregate(
+    db: lf.Database,
+    insert: Mutation[],
+    update: Mutation[],
+  ): {
     contextIds: any[]
     queries: lf.query.Insert[]
   } {
@@ -48,7 +49,10 @@ export class Mutation {
     if (map.size) {
       map.forEach((rows: lf.Row[], name) => {
         const target = db.getSchema().table(name)
-        const query = db.insertOrReplace().into(target).values(rows)
+        const query = db
+          .insertOrReplace()
+          .into(target)
+          .values(rows)
         insertQueries.push(query)
       })
     }
@@ -62,7 +66,7 @@ export class Mutation {
 
     return {
       contextIds: keys,
-      queries: insertQueries.concat(updateQueries as any[])
+      queries: insertQueries.concat(updateQueries as any[]),
     }
   }
 
@@ -89,8 +93,8 @@ export class Mutation {
       table: this.table,
       row: this.table.createRow({
         [meta.key]: meta.val,
-        ...this.params
-      })
+        ...this.params,
+      }),
     }
   }
 
@@ -107,5 +111,4 @@ export class Mutation {
   refId() {
     return this.meta ? this.meta.val : null
   }
-
 }

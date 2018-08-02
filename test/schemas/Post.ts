@@ -7,18 +7,19 @@ export interface PostSchema {
   created: Date
 }
 
-export default (db: Database) => db.defineSchema<PostSchema>('Post', {
-  _id: {
-    type: RDBType.STRING,
-    primaryKey: true
-  },
-  content: {
-    type: RDBType.BOOLEAN
-  },
-  belongTo: {
-    type: RDBType.STRING
-  },
-  created: {
-    type: RDBType.DATE_TIME
-  }
-})
+export default (db: Database) =>
+  db.defineSchema<PostSchema>('Post', {
+    _id: {
+      type: RDBType.STRING,
+      primaryKey: true,
+    },
+    content: {
+      type: RDBType.BOOLEAN,
+    },
+    belongTo: {
+      type: RDBType.STRING,
+    },
+    created: {
+      type: RDBType.DATE_TIME,
+    },
+  })

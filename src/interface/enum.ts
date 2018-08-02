@@ -6,13 +6,13 @@ export enum RDBType {
   NUMBER,
   OBJECT,
   STRING,
-  LITERAL_ARRAY
+  LITERAL_ARRAY,
 }
 
 export enum Relationship {
   oneToMany = 500,
   oneToOne = 501,
-  manyToMany = 502
+  manyToMany = 502,
 }
 
 export enum DataStoreType {
@@ -20,19 +20,19 @@ export enum DataStoreType {
   MEMORY = 1,
   LOCAL_STORAGE = 2,
   WEB_SQL = 3,
-  OBSERVABLE_STORE = 4
+  OBSERVABLE_STORE = 4,
 }
 
 export enum StatementType {
   Insert = 1001,
   Update = 1002,
   Delete = 1003,
-  Select = 1004
+  Select = 1004,
 }
 
 export enum JoinMode {
   imlicit = 2001,
-  explicit = 2002
+  explicit = 2002,
 }
 
 export enum LeafType {

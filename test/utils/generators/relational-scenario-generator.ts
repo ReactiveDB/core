@@ -10,7 +10,7 @@ export default function() {
   const engineers: EngineerSchema[] = Array.from({ length: random.number(0, engineerCount) }, () => {
     return {
       _id: uuid(),
-      name: random.string()
+      name: random.string(),
     }
   })
 
@@ -20,13 +20,13 @@ export default function() {
       _id: uuid(),
       name: random.string(),
       ownerId: engineers[random.number(0, engineers.length) - 1]._id,
-      parentId: index < moduleCount ? programId : uuid()
+      parentId: index < moduleCount ? programId : uuid(),
     }
   })
 
   const program: ProgramSchema = {
     _id: programId,
-    ownerId: engineers[random.number(0, engineers.length) - 1]._id
+    ownerId: engineers[random.number(0, engineers.length) - 1]._id,
   }
 
   return { program, modules, engineers }

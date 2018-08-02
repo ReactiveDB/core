@@ -23,11 +23,11 @@ const pkg = require('../package.json')
 const README = fs.readFileSync(resolve(process.cwd(), 'README.md'), 'utf8')
 
 const cjsPkg = { ...pkg, main: './index.js' }
-const esPkg  = { ...cjsPkg, name: 'reactivedb-es' }
+const esPkg = { ...cjsPkg, name: 'reactivedb-es', sideEffects: false }
 
 const write = (distPath: string, data: any) => {
   return new Promise((res, reject) => {
-    fs.writeFile(resolve(process.cwd(), distPath), data, 'utf8', err => {
+    fs.writeFile(resolve(process.cwd(), distPath), data, 'utf8', (err) => {
       if (!err) {
         return res()
       }
@@ -43,7 +43,7 @@ Promise.all([
   write('dist/cjs/package.json', cjsPkgData),
   write('dist/es/package.json', esPkgData),
   write('dist/es/README.md', README),
-  write('dist/cjs/README.md', README)
+  write('dist/cjs/README.md', README),
 ])
   .then(() => {
     const { stderr, stdout } = shelljs.exec('npm publish dist/cjs')

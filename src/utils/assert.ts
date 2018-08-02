@@ -3,11 +3,7 @@ import { Truthy } from './truthy'
 type FailureHandler<U extends any[]> = (...args: U) => Error
 
 export function assert(condition: boolean, failureMsg: string): void
-export function assert<U extends any[]>(
-  condition: boolean,
-  failure: FailureHandler<U>,
-  ...failureArgs: U
-): void
+export function assert<U extends any[]>(condition: boolean, failure: FailureHandler<U>, ...failureArgs: U): void
 export function assert<U extends any[]>(
   condition: boolean,
   failure: FailureHandler<U> | string,

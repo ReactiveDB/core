@@ -3,7 +3,7 @@ export enum Level {
   info = 20,
   warning = 30,
   error = 40,
-  test = 1000
+  test = 1000,
 }
 
 export interface LoggerAdapter {
@@ -16,7 +16,6 @@ export interface LoggerAdapter {
 export type Formatter = (name: string, level: Level, ...message: any[]) => string
 
 export class ContextLogger {
-
   public destroy = (): void => void 0
   private effects: Map<keyof LoggerAdapter, Function[]> = new Map()
 
@@ -24,8 +23,8 @@ export class ContextLogger {
     private name: string,
     private level: Level,
     private formatter?: Formatter,
-    private adapter: LoggerAdapter = console
-  ) { }
+    private adapter: LoggerAdapter = console,
+  ) {}
 
   private invoke(method: string, message: any[]) {
     let output = ''
@@ -34,7 +33,7 @@ export class ContextLogger {
       output = this.formatter.apply(this, params)
     }
     this.adapter[method].call(this.adapter, output)
-    const fns = (this.effects.get(method as (keyof LoggerAdapter)) || [])
+    const fns = this.effects.get(method as keyof LoggerAdapter) || []
     fns.forEach((fn) => fn(...message))
   }
 
@@ -92,19 +91,17 @@ export class ContextLogger {
   clearEffects() {
     this.effects.clear()
   }
-
 }
 
 export class Logger {
-
   private static contextMap = new Map<string, ContextLogger>()
   private static defaultLevel = Level.debug
   private static outputLogger = new ContextLogger('[ReactiveDB]', Logger.defaultLevel, (name, _, message) => {
-      const output = Array.isArray(message) ? message.join('') : message
-      const current = new Date()
-      const prefix = name ? `[${name}] ` : ''
-      return `${prefix}at ${current.toLocaleString()}: \r\n    ` + output
-    })
+    const output = Array.isArray(message) ? message.join('') : message
+    const current = new Date()
+    const prefix = name ? `[${name}] ` : ''
+    return `${prefix}at ${current.toLocaleString()}: \r\n    ` + output
+  })
 
   static get(name: string, formatter?: Formatter, level?: Level, adapter: LoggerAdapter = console) {
     const logger = Logger.contextMap.get(name)
@@ -141,7 +138,6 @@ export class Logger {
   static error(...message: string[]) {
     Logger.outputLogger.error(...message)
   }
-
 }
 
 const envifyLevel = () => {

@@ -4,7 +4,6 @@ import { graph } from '../../../../src/storage/helper'
 import { GraphFailed } from '../../../index'
 
 export default describe('Helper - Graph Testcase: ', () => {
-
   let data: Object[]
   let definition: Object
 
@@ -12,23 +11,23 @@ export default describe('Helper - Graph Testcase: ', () => {
     data = [
       {
         id: 1,
-        foo: 'foo'
+        foo: 'foo',
       },
       {
         id: 1,
-        foo: 'bar'
+        foo: 'bar',
       },
       {
         id: 2,
-        foo: 'baz'
-      }
+        foo: 'baz',
+      },
     ]
 
     definition = {
       id: {
         column: 'id',
       },
-      foo: [ { content: { column: 'foo' } } ]
+      foo: [{ content: { column: 'foo' } }],
     }
   })
 
@@ -39,21 +38,21 @@ export default describe('Helper - Graph Testcase: ', () => {
         id: 1,
         foo: [
           {
-            content: 'foo'
+            content: 'foo',
           },
           {
-            content: 'bar'
-          }
-        ]
+            content: 'bar',
+          },
+        ],
       },
       {
         id: 2,
         foo: [
           {
-            content: 'baz'
-          }
-        ]
-      }
+            content: 'baz',
+          },
+        ],
+      },
     ]
 
     expect(result).deep.equal(expectResult)
@@ -61,10 +60,9 @@ export default describe('Helper - Graph Testcase: ', () => {
 
   it('should throw when definition is unsuitable', () => {
     const check = () => graph(data, { baz: {} })
-    const err = new Error('invalid structPropToColumnMap format - property \'baz\' can not be an empty object')
+    const err = new Error("invalid structPropToColumnMap format - property 'baz' can not be an empty object")
     const standardErr = GraphFailed(err)
 
     expect(check).to.throw(standardErr.message)
   })
-
 })

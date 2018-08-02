@@ -11,12 +11,13 @@
     "clean_dist_cjs": "rm -rf ./dist/cjs",
     "clean_dist_es": "rm -rf ./dist/es",
     "check_circular_dependencies": "madge ./dist/cjs --circular",
-    "compile_cjs": "      tsc dist/cjs/src/index.ts dist/cjs/src/proxy/index.ts -m commonjs --outDir dist/cjs --sourcemap --target ES5 -d --diagnostics --pretty --strict --noImplicitReturns --noUnusedLocals --noUnusedParameters --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
-    "compile_module_es": "tsc dist/es/src/index.ts dist/es/src/proxy/index.ts   -m ES2015   --outDir dist/es  --sourcemap --target ES5 -d --diagnostics --pretty --strict --noImplicitReturns --noUnusedLocals --noUnusedParameters --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom",
+    "compile_cjs": "      tsc dist/cjs/src/index.ts dist/cjs/src/proxy/index.ts -m commonjs --outDir dist/cjs --sourcemap --target ES5 -d --diagnostics --pretty --strict --noImplicitReturns --noUnusedLocals --noUnusedParameters --strict --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --lib es5,es2015,es2016,es2017",
+    "compile_module_es": "tsc dist/es/src/index.ts dist/es/src/proxy/index.ts   -m ES2015   --outDir dist/es  --sourcemap --target ES5 -d --diagnostics --pretty --strict --noImplicitReturns --noUnusedLocals --noUnusedParameters --strict --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --importHelpers --lib es5,es2015,es2016,es2017",
     "copy_src_cjs": "shx mkdir -p ./dist/cjs/src && shx cp -r ./src/* ./dist/cjs/src",
     "copy_src_es": "shx mkdir -p ./dist/es/src && shx cp -r ./src/* ./dist/es/src",
     "cover": "rm -rf ./.nyc_output ./coverage && NODE_ENV=test nyc --reporter=html --reporter=lcov --exclude=node_modules --exclude=spec-js/test --exclude=spec-js/src/storage/lovefield.js --exclude=spec-js/src/shared/Logger.js --exclude=spec-js/src/utils/option.js --exclude=spec-js/src/utils/valid.js --exclude=spec-js/src/addons/aggresive-optimizer.js tman --mocha spec-js/test/run.js && nyc report",
     "lint": "tslint -c tslint.json src/*.ts --project ./tsconfig.json \"src/**/*.ts\" \"./test/**/*.ts\" -e \"./test/e2e/*.ts\"",
+    "precommit": "lint-staged",
     "publish_all": "ts-node ./tools/publish.ts",
     "start": "webpack-dev-server --inline --colors --progress --port 3000",
     "start-demo": "webpack-dev-server --config ./example/webpack.config.js --inline --colors --progress --port 3001 --open",
@@ -24,7 +25,7 @@
     "test_O1": "npm run lint && NODE_ENV=test optimize=true tman --mocha spec-js/test/run.js",
     "version": "ts-node tools/version.ts && git add .",
     "watch": "NODE_ENV=test ts-node ./tools/watch.ts & npm run watch_test",
-    "watch_cjs": "tsc src/index.ts -m commonjs --outDir dist --sourcemap --target ES5 -d --diagnostics --pretty --strict --noImplicitReturns --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --lib es5,es2015.iterable,es2015.collection,es2015.promise,dom -w",
+    "watch_cjs": "tsc src/index.ts -m commonjs --outDir dist --sourcemap --target ES5 -d --diagnostics --pretty --strict --noImplicitReturns --suppressImplicitAnyIndexErrors --moduleResolution node --noEmitHelpers --lib es5,es2015,es2016,es2017 -w",
     "watch_test": "tsc -p test/tsconfig.json -w --diagnostics --pretty"
   },
   "keywords": [
@@ -61,37 +62,40 @@
   "license": "MIT",
   "devDependencies": {
     "@types/chai": "^4.1.2",
-    "@types/node": "^9.4.7",
+    "@types/node": "^10.5.5",
     "@types/shelljs": "^0.8.0",
     "@types/sinon": "^5.0.0",
-    "@types/sinon-chai": "^2.7.29",
+    "@types/sinon-chai": "^3.2.0",
     "chai": "^4.1.2",
     "coveralls": "^3.0.0",
-    "css-loader": "^0.28.10",
+    "css-loader": "^1.0.0",
     "extract-text-webpack-plugin": "^4.0.0-beta.0",
     "html-webpack-plugin": "^3.0.6",
+    "husky": "^0.14.3",
+    "lint-staged": "^7.2.0",
     "madge": "^3.0.1",
     "moment": "^2.21.0",
     "node-watch": "^0.5.8",
     "npm-run-all": "^4.1.2",
     "nyc": "^12.0.1",
+    "prettier": "^1.14.0",
     "raw-loader": "^0.5.1",
-    "rxjs": "^5.5.6",
+    "rxjs": "^6.2.2",
     "shelljs": "^0.8.1",
     "shx": "^0.3.0",
-    "sinon": "^5.0.0",
+    "sinon": "^6.1.4",
     "sinon-chai": "^3.0.0",
     "source-map-loader": "^0.2.3",
     "style-loader": "^0.21.0",
     "tman": "^1.7.4",
     "ts-loader": "^4.0.1",
-    "ts-node": "^6.0.0",
+    "ts-node": "^7.0.0",
     "tslint": "^5.9.1",
     "tslint-eslint-rules": "^5.1.0",
     "tslint-loader": "^3.6.0",
     "typescript": "^3.0.1",
     "webpack": "^4.1.1",
-    "webpack-cli": "^2.0.10",
+    "webpack-cli": "^3.1.0",
     "webpack-dev-server": "^3.1.0"
   },
   "dependencies": {
@@ -100,8 +104,23 @@
     "nesthydrationjs": "^1.0.5"
   },
   "peerDependencies": {
-    "rxjs": "^5.3.0",
+    "rxjs": "^6.0.0",
     "tslib": "^1.9.0"
   },
-  "typings": "./index.d.ts"
+  "typings": "./index.d.ts",
+  "prettier": {
+    "printWidth": 120,
+    "semi": false,
+    "trailingComma": "all",
+    "singleQuote": true,
+    "arrowParens": "always",
+    "parser": "typescript"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "prettier --write",
+      "tslint -c tslint.json -p tsconfig.json --fix",
+      "git add"
+    ]
+  }
 }

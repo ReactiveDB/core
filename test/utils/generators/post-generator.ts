@@ -1,6 +1,6 @@
 import { uuid } from '../uuid'
 
-export default function (limit: number, belongTo: string) {
+export default function(limit: number, belongTo: string) {
   const result: any[] = []
   const created = new Date(1970, 0, 1).toISOString()
 
@@ -10,7 +10,7 @@ export default function (limit: number, belongTo: string) {
       _id: uuid(),
       content: 'posts content:' + uuid(),
       belongTo,
-      created
+      created,
     })
   }
   return result
