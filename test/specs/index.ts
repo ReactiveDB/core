@@ -9,3 +9,5 @@ export * from './shared/Traversable.spec'
 export * from './utils/utils.spec'
 export * from './storage/helper/definition.spec'
 export * from './storage/helper/graph.spec'
+
+import './exception.spec'

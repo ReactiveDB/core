@@ -7,7 +7,19 @@ import Version from '../version'
 import { Traversable } from '../shared'
 import { Mutation, Selector, QueryToken, PredicateProvider } from './modules'
 import { dispose, contextTableName, fieldIdentifier, hiddenColName } from './symbols'
-import { forEach, clone, contains, tryCatch, hasOwn, getType, assert, assertValue, warn, isNonNullable } from '../utils'
+import {
+  forEach,
+  clone,
+  contains,
+  tryCatch,
+  isException,
+  hasOwn,
+  getType,
+  assert,
+  assertValue,
+  warn,
+  isNonNullable,
+} from '../utils'
 import { createPredicate, createPkClause, mergeTransactionResult, predicatableQuery, lfFactory } from './helper'
 import { Relationship, RDBType, DataStoreType, LeafType, StatementType, JoinMode } from '../interface/enum'
 import { SchemaDef, ColumnDef, ParsedSchema, Association, ScopedHandler } from '../interface'
@@ -28,6 +40,8 @@ const transactionErrorHandler = {
   error: () => warn(`Execute failed, transaction is already marked for rollback.`),
 }
 
+const tryCatchCreatePredicate = tryCatch(createPredicate)
+
 export class Database {
   public static version = Version
 
@@ -46,14 +60,14 @@ export class Database {
   private storedIds = new Set<string>()
   private subscription: Subscription | null = null
 
-  private findPrimaryKey = (name: string) => {
-    return this.findSchema(name)!.pk
-  }
-
   private findSchema = (name: string): ParsedSchema => {
     const schema = this.schemas.get(name)
     return assertValue(schema, Exception.NonExistentTable, name)
   }
+  private tryCatchFindPrimaryKey = tryCatch((name: string) => {
+    return this.findSchema(name).pk
+  })
+  private tryCatchFindSchema = tryCatch(this.findSchema)
 
   /**
    * @method defineSchema
@@ -64,7 +78,7 @@ export class Database {
     assert(advanced, Exception.UnmodifiableTable)
 
     const hasPK = Object.keys(schema).some((key: string) => schema[key].primaryKey === true)
-    assert(hasPK, Exception.PrimaryKeyNotProvided)
+    assert(hasPK, Exception.PrimaryKeyNotProvided, { tableName })
 
     this.schemaDefs.set(tableName, schema)
     return this
@@ -104,14 +118,15 @@ export class Database {
     assert(!this.connected, Exception.DatabaseIsNotEmpty)
 
     const load = (db: lf.Database) => {
+      const findPrimaryKey = this.tryCatchFindPrimaryKey({ call: 'load', doThrow: true })
       forEach(data.tables, (entities: any[], name: string) => {
-        const schema = this.findSchema(name)
-        entities.forEach((entity: any) => this.storedIds.add(fieldIdentifier(name, entity[schema.pk])))
+        const { unwrapped: pk } = findPrimaryKey(name)
+        entities.forEach((entity: any) => this.storedIds.add(fieldIdentifier(name, entity[pk])))
       })
       return db.import(data).catch(() => {
         forEach(data.tables, (entities: any[], name: string) => {
-          const schema = this.findSchema(name)
-          entities.forEach((entity: any) => this.storedIds.delete(fieldIdentifier(name, entity[schema.pk])))
+          const { unwrapped: pk } = findPrimaryKey(name)
+          entities.forEach((entity: any) => this.storedIds.delete(fieldIdentifier(name, entity[pk])))
         })
       })
     }
@@ -126,7 +141,11 @@ export class Database {
 
   insert<T>(tableName: string, raw: T | T[]): Observable<ExecutorResult> {
     const insert = (db: lf.Database) => {
-      const schema = this.findSchema(tableName)
+      const maybeSchema = this.tryCatchFindSchema({ op: 'insert' })(tableName)
+      if (isException(maybeSchema)) {
+        return throwError(maybeSchema.unwrapped)
+      }
+      const schema = maybeSchema.unwrapped
       const pk = schema.pk
       const columnMapper = schema.mapper
       const [table] = Database.getTables(db, tableName)
@@ -180,20 +199,21 @@ export class Database {
       return throwError(Exception.InvalidType(['Object', type]))
     }
 
-    const [schema, err] = tryCatch<ParsedSchema>(this.findSchema)(tableName)
-    if (err) {
-      return throwError(err)
+    const maybeSchema = this.tryCatchFindSchema({ op: 'update' })(tableName)
+    if (isException(maybeSchema)) {
+      return throwError(maybeSchema.unwrapped)
     }
+    const schema = maybeSchema.unwrapped
 
     const update = (db: lf.Database) => {
       const entity = clone(raw)
       const [table] = Database.getTables(db, tableName)
-      const columnMapper = schema!.mapper
+      const columnMapper = schema.mapper
       const hiddenPayload = Object.create(null)
 
       columnMapper.forEach((mapper, key) => {
         // cannot create a hidden column for primary key
-        if (!hasOwn(entity, key) || key === schema!.pk) {
+        if (!hasOwn(entity, key) || key === schema.pk) {
           return
         }
 
@@ -208,7 +228,7 @@ export class Database {
 
       forEach(mut, (val, key) => {
         const column = table[key]
-        if (key === schema!.pk) {
+        if (key === schema.pk) {
           warn(`Primary key is not modifiable.`)
         } else if (!column) {
           warn(`Column: ${key} is not existent on table:${tableName}`)
@@ -223,24 +243,25 @@ export class Database {
   }
 
   delete<T>(tableName: string, clause: Predicate<T> = {}): Observable<ExecutorResult> {
-    const [pk, err] = tryCatch<string>(this.findPrimaryKey)(tableName)
-    if (err) {
-      return throwError(err)
+    const maybePK = this.tryCatchFindPrimaryKey({ op: 'delete' })(tableName)
+    if (isException(maybePK)) {
+      return throwError(maybePK.unwrapped)
     }
+    const pk = maybePK.unwrapped
 
     const deletion = (db: lf.Database): Observable<ExecutorResult> => {
       const [table] = Database.getTables(db, tableName)
-      const column = table[pk!]
+      const column = table[pk]
       const provider = new PredicateProvider(table, clause)
       const prefetch = predicatableQuery(db, table, provider.getPredicate(), StatementType.Select, column)
       const deleteByScopedIds = (scopedIds: Object[]) => {
         const query = predicatableQuery(db, table, provider.getPredicate(), StatementType.Delete)
 
-        scopedIds.forEach((entity) => this.storedIds.delete(fieldIdentifier(tableName, entity[pk!])))
+        scopedIds.forEach((entity) => this.storedIds.delete(fieldIdentifier(tableName, entity[pk])))
 
         const onError = {
           error: () => {
-            scopedIds.forEach((entity: object) => this.storedIds.add(fieldIdentifier(tableName, entity[pk!])))
+            scopedIds.forEach((entity: object) => this.storedIds.add(fieldIdentifier(tableName, entity[pk])))
           },
         }
 
@@ -290,11 +311,12 @@ export class Database {
   }
 
   remove<T>(tableName: string, clause: Clause<T> = {}): Observable<ExecutorResult> {
-    const [schema, err] = tryCatch<ParsedSchema>(this.findSchema)(tableName)
-    if (err) {
-      return throwError(err)
+    const maybeSchema = this.tryCatchFindSchema({ op: 'remove' })(tableName)
+    if (isException(maybeSchema)) {
+      return throwError(maybeSchema.unwrapped)
     }
-    const disposeHandler = schema!.dispose
+    const schema = maybeSchema.unwrapped
+    const disposeHandler = schema.dispose
 
     const remove = (db: lf.Database) => {
       const [table] = Database.getTables(db, tableName)
@@ -306,7 +328,7 @@ export class Database {
 
       const removeByRootEntities = (rootEntities: Object[]) => {
         rootEntities.forEach((entity) => {
-          removedIds.push(fieldIdentifier(tableName, entity[schema!.pk]))
+          removedIds.push(fieldIdentifier(tableName, entity[schema.pk]))
         })
 
         const onError = {
@@ -470,6 +492,8 @@ export class Database {
     // src: schemaDef; dest: uniques, indexes, primaryKey, nullable, associations, mapper
     // no short-curcuiting
     forEach(schemaDef, (def, key) => {
+      const currentPK: string | undefined = primaryKey[0]
+
       if (typeof def === 'function') {
         return
       }
@@ -479,7 +503,7 @@ export class Database {
         columns.set(key, def.type as RDBType)
 
         if (def.primaryKey) {
-          assert(!primaryKey[0], Exception.PrimaryKeyConflict)
+          assert(!currentPK, Exception.PrimaryKeyConflict, { tableName, currentPK, incomingPK: key })
           primaryKey.push(key)
         }
 
@@ -528,7 +552,10 @@ export class Database {
   }
 
   private buildSelector<T>(db: lf.Database, tableName: string, clause: Query<T>, mode: JoinMode) {
-    const schema = this.findSchema(tableName)
+    const { unwrapped: schema } = this.tryCatchFindSchema({
+      call: 'buildSelector',
+      doThrow: true,
+    })(tableName)
     const pk = schema.pk
     const containFields = !!clause.fields
 
@@ -616,7 +643,10 @@ export class Database {
     context: Record = {},
     mode: JoinMode,
   ) {
-    const schema = this.findSchema(tableName)
+    const { unwrapped: schema } = this.tryCatchFindSchema({
+      call: 'traverseQueryFields',
+      doThrow: true,
+    })(tableName)
     const rootDefinition = Object.create(null)
     const navigators: string[] = []
 
@@ -664,10 +694,13 @@ export class Database {
       } else {
         const { where, type } = defs as Association
         rootDefinition[key] = typeDefinition.revise(type!, ret.definition)
-        const [predicate, err] = tryCatch(createPredicate)(currentTable, where(ret.table))
-        if (err) {
-          warn(`Failed to build predicate, since ${err.message}` + `, on table: ${ret.table.getName()}`)
+        const maybePredicate = tryCatchCreatePredicate({
+          tableName: ret.table.getName(),
+        })(currentTable, where(ret.table))
+        if (isException(maybePredicate)) {
+          warn(`Failed to build predicate, since ${maybePredicate.unwrapped.message}`)
         }
+        const predicate = maybePredicate.unwrapped
         const joinLink = predicate ? [{ table: ret.table, predicate }, ...ret.joinInfo] : ret.joinInfo
 
         joinInfo.push(...joinLink)
@@ -750,10 +783,13 @@ export class Database {
       return
     }
 
-    const schema = this.findSchema(tableName)
+    const { unwrapped: schema } = this.tryCatchFindSchema({
+      call: 'traverseCompound',
+      doThrow: true,
+    })(tableName)
     const pk = schema.pk
     const pkVal = compoundEntites[pk]
-    assert(pkVal !== undefined, Exception.PrimaryKeyNotProvided)
+    assert(pkVal !== undefined, Exception.PrimaryKeyNotProvided, { tableName, pk, entry: compoundEntites })
 
     const [table] = Database.getTables(db, tableName)
     const identifier = fieldIdentifier(tableName, pkVal)
@@ -827,7 +863,10 @@ export class Database {
   }
 
   private navigatorLeaf(assocaiation: Association, _: string, val: any) {
-    const schema = this.findSchema(assocaiation.name)
+    const { unwrapped: schema } = this.tryCatchFindSchema({
+      call: 'navigatorLeaf',
+      doThrow: true,
+    })(assocaiation.name)
     const fields = typeof val === 'string' ? new Set(schema.columns.keys()) : val
 
     return {
@@ -839,7 +878,10 @@ export class Database {
 
   private createScopedHandler<T>(db: lf.Database, queryCollection: any[], keys: any[]) {
     return (tableName: string): ScopedHandler => {
-      const pk = this.findPrimaryKey(tableName)
+      const { unwrapped: pk } = this.tryCatchFindPrimaryKey({
+        call: 'createScopedHandler',
+        doThrow: true,
+      })(tableName)
 
       const remove = (entities: T[]) => {
         const [table] = Database.getTables(db, tableName)
@@ -856,11 +898,14 @@ export class Database {
 
       const get = (where: Predicate<any> | null = null) => {
         const [table] = Database.getTables(db, tableName)
-        const [predicate, err] = tryCatch(createPredicate)(table, where)
-        if (err) {
-          return throwError(err)
+        const maybePredicate = tryCatchCreatePredicate({
+          call: 'createScopedHandler',
+        })(table, where)
+        if (isException(maybePredicate)) {
+          return throwError(maybePredicate.unwrapped)
         }
-        const query = predicatableQuery(db, table, predicate!, StatementType.Select)
+        const predicate = maybePredicate.unwrapped
+        const query = predicatableQuery(db, table, predicate, StatementType.Select)
 
         return from<T[]>(query.exec() as any)
       }

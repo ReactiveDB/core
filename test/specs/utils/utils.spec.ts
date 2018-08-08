@@ -1,4 +1,4 @@
-import { forEach, clone, getType, assert, hash } from '../../index'
+import { forEach, clone, getType, assert, hash, tryCatch } from '../../index'
 import { describe, it } from 'tman'
 import { expect } from 'chai'
 
@@ -408,6 +408,70 @@ export default describe('Utils Testcase: ', () => {
       expect(hash('')).to.equal(0)
       expect(hash(' ')).to.equal(32)
       expect(hash('  ')).to.equal(1024)
+    })
+  })
+
+  describe('Func: tryCatch', () => {
+    const mayThrow = (flag: boolean): string => {
+      const value = String(flag)
+      if (flag) {
+        throw new Error(value)
+      } else {
+        return value
+      }
+    }
+
+    const tryCatchMayThrow = tryCatch(mayThrow)
+
+    it("should return correct Value if the unwrapped function doesn't throw", () => {
+      const args: [boolean] = [false]
+      const unwrappedResult = mayThrow(...args)
+
+      expect(tryCatchMayThrow()(...args)).to.deep.equal({
+        kind: 'value',
+        unwrapped: unwrappedResult,
+      })
+    })
+
+    it('should return correct Exception if the unwrapped function throws', () => {
+      const args: [boolean] = [true]
+
+      const result = tryCatchMayThrow()(...args)
+
+      expect(result.kind).to.equal('exception')
+      expect(result.unwrapped).to.be.instanceOf(Error)
+      expect((result.unwrapped as Error).message).to.equal('true')
+    })
+
+    it(`should return correct Value if the unwrapped function doesn't throw
+    \tand 'doThrow' option is true`, () => {
+      const args: [boolean] = [false]
+      const unwrappedResult = mayThrow(...args)
+
+      expect(tryCatchMayThrow({ doThrow: true })(...args)).to.deep.equal({
+        kind: 'value',
+        unwrapped: unwrappedResult,
+      })
+    })
+
+    it(`should throw correct Error if the unwrapped function throws
+    \tand 'doThrow' option is true`, () => {
+      const args: [boolean] = [true]
+
+      expect(() => tryCatchMayThrow({ doThrow: true })(...args)).to.throw('true\nMoreInfo: {}')
+    })
+
+    it(`should allow caller to pass in more related error info through options,
+    \tbeing utilized on exception`, () => {
+      const args: [boolean] = [true]
+
+      expect(() => tryCatchMayThrow({ doThrow: true, msg: 'hello' })(...args)).to.throw(
+        'true\nMoreInfo: {"msg":"hello"}',
+      )
+
+      const result = tryCatchMayThrow({ msg: 'world' })(...args)
+      expect(result.kind).to.equal('exception')
+      expect((result.unwrapped as Error).message).to.equal('true\nMoreInfo: {"msg":"world"}')
     })
   })
 })
