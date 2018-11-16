@@ -1,6 +1,6 @@
 {
   "name": "reactivedb",
-  "version": "0.10.3-alpha.1-lazyassert",
+  "version": "0.10.3-alpha.2-webworker",
   "description": "Reactive ORM for Lovefield",
   "main": "dist/cjs/index.js",
   "scripts": {
