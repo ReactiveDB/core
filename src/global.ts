@@ -1,6 +1,8 @@
 // lovefield nodejs polyfill
 if (typeof global !== 'undefined') {
-  global['self'] = global
+  if (!global['self']) {
+    global['self'] = global
+  }
   // shim for SinonJS
   if (!global['location']) {
     global['location'] = Object.create(null)
