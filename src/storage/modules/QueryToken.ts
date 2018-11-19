@@ -32,7 +32,10 @@ export class QueryToken<T> {
     assert(!this.consumed, TokenConsumed)
 
     this.consumed = true
-    return this.selector$.pipe(switchMap((s) => s.values()), take(1))
+    return this.selector$.pipe(
+      switchMap((s) => s.values()),
+      take(1),
+    )
   }
 
   changes(): Observable<T[]> {

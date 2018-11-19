@@ -185,11 +185,13 @@ export default describe('Selector test', () => {
     yield selector.values().pipe(
       tap((result) => {
         expect(result).to.have.lengthOf(950)
-        const expectResult = storeData.filter((r) => r.time >= 50).sort((a, b) => {
-          const higherPriority = Math.sign(a.priority - b.priority)
-          const earlier = -Math.sign(a.time - b.time)
-          return higherPriority * 10 + earlier
-        })
+        const expectResult = storeData
+          .filter((r) => r.time >= 50)
+          .sort((a, b) => {
+            const higherPriority = Math.sign(a.priority - b.priority)
+            const earlier = -Math.sign(a.time - b.time)
+            return higherPriority * 10 + earlier
+          })
 
         expect(result).to.deep.equal(expectResult)
       }),
