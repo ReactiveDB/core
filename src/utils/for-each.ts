@@ -17,7 +17,7 @@ export function forEach(target: any, eachFunc: (val: any, key: any) => any, inve
   let handler = eachFunc
   if (target instanceof Set || target instanceof Map) {
     // since we cannot use [[Set/Map]].entries() directly
-    (target as any).forEach((value: any, key: any) => {
+    ;(target as any).forEach((value: any, key: any) => {
       if (handler(value, key) === false) {
         handler = noop
       }

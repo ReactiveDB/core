@@ -16,7 +16,7 @@ export const lfFactory = (
   config: LfFactoryInit,
 ): ConnectableObservable<lf.Database> => {
   return Observable.create((observer: Observer<lf.Database>) => {
-    (config as any).onUpgrade = onUpgrade
+    ;(config as any).onUpgrade = onUpgrade
     if (config.storeType >= 3) {
       config.storeType = config.storeType + 1
     }

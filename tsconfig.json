@@ -25,7 +25,9 @@
     "tools/build",
     "dist",
     "coverage",
-    "example"
+    "example",
+    "spec-js",
+    "./webpack.config.js"
   ],
   "compileOnSave": false,
   "awesomeTypescriptLoaderOptions": {
