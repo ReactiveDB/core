@@ -279,6 +279,7 @@ export class Selector<T> {
 
   private buildPrefetchingObserve(): Observable<(string | number)[]> {
     return Observable.create((observer: Observer<(string | number)[]>) => {
+      let observed = false
       const { rangeQuery } = this
       const listener = () => {
         return rangeQuery
@@ -289,11 +290,15 @@ export class Selector<T> {
           .catch((e) => observer.error(e))
       }
 
-      listener().then(() => {
+      const subscription = from(listener()).subscribe(() => {
         this.db.observe(rangeQuery, listener)
+        observed = true
       })
 
-      return () => this.db.unobserve(rangeQuery, listener)
+      return () => {
+        subscription.unsubscribe()
+        observed && this.db.unobserve(rangeQuery, listener)
+      }
     })
   }
 }
