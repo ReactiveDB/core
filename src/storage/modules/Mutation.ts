@@ -97,7 +97,9 @@ export class Mutation {
   }
 
   patch(patch: Object) {
-    this.params = { ...this.params, ...patch }
+    forEach(patch, (val, key) => {
+      this.params[key] = val
+    })
     return this
   }
 
