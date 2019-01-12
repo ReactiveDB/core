@@ -1,6 +1,5 @@
-import { Observable, Observer, OperatorFunction, from, asyncScheduler } from 'rxjs'
+import { Observable, OperatorFunction, concat, from, asyncScheduler } from 'rxjs'
 import {
-  filter,
   combineAll,
   debounceTime,
   map,
@@ -8,16 +7,24 @@ import {
   publishReplay,
   reduce,
   refCount,
-  scan,
+  startWith,
   switchMap,
 } from 'rxjs/operators'
 import * as lf from 'lovefield'
 import * as Exception from '../../exception'
 import { predicatableQuery, graph } from '../helper'
-import { identity, forEach, assert, warn, isNonNullable } from '../../utils'
+import { identity, forEach, assert, warn } from '../../utils'
 import { PredicateProvider } from './PredicateProvider'
 import { ShapeMatcher, OrderInfo, StatementType } from '../../interface'
 import { mapFn } from './mapFn'
+
+const observeQuery = (db: lf.Database, query: lf.query.Select) => {
+  return new Observable<void>((observer) => {
+    const listener = () => observer.next()
+    db.observe(query, listener)
+    return () => db.unobserve(query, listener)
+  })
+}
 
 export class Selector<T> {
   private static concatFactory<U>(...metaDatas: Selector<U>[]) {
@@ -105,24 +112,23 @@ export class Selector<T> {
     let { skip } = this
     skip = limit && !skip ? 0 : skip
 
-    const observeOn = (query: lf.query.Select) =>
-      Observable.create((observer: Observer<T[]>) => {
-        const listener = () => {
-          this.getValue(query)
-            .then((r) => observer.next(r as T[]))
-            .catch((e) => observer.error(e))
-        }
-        db.observe(query, listener)
-        listener()
-        return () => this.db.unobserve(query, listener)
-      }) as Observable<T[]>
+    const observeOn = (query: lf.query.Select) => {
+      const queryOnce = () => from(this.getValue(query))
+      // 下面的语句针对两个 lovefield issue 做了特殊调整：
+      // issue#209: 确保 db.observe 之后立即执行一次查询；
+      // issue#215: 确保 db.observe “不正确地”立即调用回调的行为，不会给消费方造成初始的重复推送。
+      return observeQuery(db, query).pipe(
+        startWith(void 0),
+        switchMap(queryOnce),
+      )
+    }
 
     const changesOnQuery =
       limit || skip
         ? this.buildPrefetchingObserve().pipe(switchMap((pks) => observeOn(this.getQuery(this.inPKs(pks)))))
         : observeOn(this.getQuery())
 
-    return lfIssueFix(changesOnQuery).pipe(
+    return changesOnQuery.pipe(
       publishReplay(1),
       refCount(),
     )
@@ -278,37 +284,9 @@ export class Selector<T> {
   }
 
   private buildPrefetchingObserve(): Observable<(string | number)[]> {
-    return Observable.create((observer: Observer<(string | number)[]>) => {
-      const { rangeQuery } = this
-      const listener = () => {
-        return rangeQuery
-          .exec()
-          .then((r) => {
-            observer.next(r.map((v) => v[this.shape.pk.name]))
-          })
-          .catch((e) => observer.error(e))
-      }
-
-      listener().then(() => {
-        this.db.observe(rangeQuery, listener)
-      })
-
-      return () => this.db.unobserve(rangeQuery, listener)
-    })
+    const { rangeQuery } = this
+    const queryOnce = () => from(rangeQuery.exec())
+    const update$ = observeQuery(this.db, rangeQuery).pipe(switchMap(queryOnce))
+    return concat(queryOnce(), update$).pipe(map((r) => r.map((v) => v[this.shape.pk.name])))
   }
-}
-
-/**
- * Lovefield observe 出来的推送，第一次和第二次在它们的值不为空
- * 的时候是重复的，这里做优化，省去重复；但不是简单的 skip(1)，因为
- * 那样会导致不能推出空结果集。详见：Lovefield issue#215
- */
-const lfIssueFix = <T>(changes: Observable<T[]>) => {
-  const doKeep = (prev: T[] | null, curr: T[] | null, idx: number) =>
-    idx === 1 && prev && prev.length && curr && curr.length ? null : curr
-
-  return changes.pipe(
-    scan(doKeep, null),
-    filter(isNonNullable),
-  )
 }

@@ -1,4 +1,4 @@
-import { Subscription, of, defer, range, from, asyncScheduler, asapScheduler } from 'rxjs'
+import { Subscription, of, defer, range, from, asyncScheduler, asapScheduler, timer } from 'rxjs'
 import * as lf from 'lovefield'
 import { expect, use } from 'chai'
 import * as sinon from 'sinon'
@@ -199,7 +199,35 @@ export default describe('Selector test', () => {
   })
 
   describe('Selector.prototype.changes', () => {
-    it('observe should ok', (done) => {
+    it('should allow immediate unsubscribe', () => {
+      const selector = new Selector(
+        db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } }),
+      )
+
+      const signal = selector.changes().subscribe()
+
+      expect(() => signal.unsubscribe()).to.not.throw()
+    })
+
+    it('should allow immediate unsubscribe, for range query (with limit, skip)', () => {
+      const selector = new Selector(
+        db,
+        db.select().from(table),
+        tableShape,
+        new PredicateProvider(table, { time: { $gte: 50 } }),
+        10,
+        0,
+      )
+
+      const signal = selector.changes().subscribe()
+
+      expect(() => signal.unsubscribe()).to.not.throw()
+    })
+
+    it('observe should ok', function*() {
       const selector = new Selector(
         db,
         db.select().from(table),
@@ -209,18 +237,30 @@ export default describe('Selector test', () => {
 
       const newName = 'test name change'
 
-      subscription = selector
-        .changes()
-        .pipe(skip(1))
-        .subscribe((r: any[]) => {
-          expect(r[0].name).to.equal(newName)
-          done()
-        })
+      const signal = selector.changes()
+      subscription = signal.subscribe()
 
-      db.update(table)
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asapScheduler),
+        tap((r: any[]) => {
+          expect(r[0].name).to.equal('name:50') // before update
+        }),
+      )
+
+      yield db
+        .update(table)
         .set(table['name'], newName)
         .where(table['_id'].eq('_id:50'))
         .exec()
+
+      yield signal.pipe(
+        take(1),
+        subscribeOn(asapScheduler),
+        tap((r: any[]) => {
+          expect(r[0].name).to.equal(newName) // after update
+        }),
+      )
     })
 
     it('observe asynchronous insertions completely', function*() {
@@ -307,13 +347,21 @@ export default describe('Selector test', () => {
 
       const newName = 'test name change'
 
-      const _subscription = selector.changes().subscribe(spy)
+      const _subscription = selector
+        .changes()
+        .pipe(subscribeOn(asapScheduler))
+        .subscribe(spy)
 
       yield db
         .update(table)
         .set(table['name'], newName)
         .where(table['_id'].eq('_id:50'))
         .exec()
+
+      yield timer(0) // 从 update 执行完成，到 changes 推出，是异步的，需要等待
+
+      const countFollowFirstUpdate = spy.callCount
+      expect(countFollowFirstUpdate).to.equal(1)
 
       _subscription.unsubscribe()
 
@@ -323,7 +371,9 @@ export default describe('Selector test', () => {
         .where(table['_id'].eq('_id:50'))
         .exec()
 
-      expect(spy.callCount).to.equal(1)
+      yield timer(0) // 从 update 执行完成，到 changes 推出，是异步的，需要等待
+
+      expect(spy.callCount).to.equal(countFollowFirstUpdate)
     })
 
     it('predicate should be clone before use', function*() {
