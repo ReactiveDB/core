@@ -58,7 +58,7 @@ export class Traversable<T> {
       if (ret !== false) {
         const ctx = typeof ret === 'object' ? { ...defaultCtx, ...ret } : defaultCtx
 
-        eachFunc.call(null, ctx, node)
+        eachFunc.call(null, ctx as any, node)
       }
 
       if (!advanced) {
