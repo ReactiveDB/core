@@ -140,6 +140,48 @@ export default describe('Incremental Testcase: ', () => {
       })
   })
 
+  it('should not skip if length is changed 1', (done) => {
+    let count = 0
+    let ret = {}
+    const first = [{ _id: 1 }, { _id: 2 }, { _id: 3 }]
+    const second = [{ _id: 1 }, { _id: 2 }]
+
+    from([first, second])
+      .pipe(incremental())
+      .subscribe({
+        next(v) {
+          count++
+          ret = v
+        },
+        complete() {
+          expect(count).to.equal(2)
+          expect(ret).to.deep.equal(second)
+          done()
+        },
+      })
+  })
+
+  it('should not skip if length is changed 2', (done) => {
+    let count = 0
+    let ret = {}
+    const first = [{ _id: 1 }, { _id: 2 }, { _id: 3 }]
+    const second: any[] = []
+
+    from([first, second])
+      .pipe(incremental())
+      .subscribe({
+        next(v) {
+          count++
+          ret = v
+        },
+        complete() {
+          expect(count).to.equal(2)
+          expect(ret).to.deep.equal(second)
+          done()
+        },
+      })
+  })
+
   it('should be able to enable feat: auto-throttle', (done) => {
     let count = 0
     let value: any = {}

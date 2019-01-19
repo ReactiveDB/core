@@ -159,7 +159,7 @@ export default function diff(e: { data: { payload: Dataset<object[]>; chan: Mess
   }
 
   channel.postMessage({
-    type: reused === curr.length ? 2 : 1,
+    type: reused === curr.length && prev.length === curr.length ? 2 : 1,
     ops: ret,
     sequence,
   })
