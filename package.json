@@ -119,7 +119,7 @@
     "parser": "typescript"
   },
   "lint-staged": {
-    "*.ts": [
+    "*.tsx?": [
       "prettier --write",
       "tslint -c tslint.json -p tsconfig.json --fix",
       "git add"
