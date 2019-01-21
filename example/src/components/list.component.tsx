@@ -1,24 +1,26 @@
 import * as React from 'react'
 
-import { source } from '../controller'
+import { source, Todo } from '../controller'
 import { useObservable } from '../hooks'
 import { TodoItem } from './item.component'
-// import { Todo } from '../schema'
 
-// interface TodoListProps {
-//   onRemove: (todo: Todo) => void
-//   onToggle: (todo: Todo) => void
-//   onUpdate: (todo: Todo) => void
-// }
+interface TodoListProps {
+  onRemove: (todo: Todo) => void
+  onToggle: (todo: Todo) => void
+  onUpdate: (todo: Todo) => void
+}
 
-export const TodoList = React.memo(() => {
+export const TodoList = React.memo((props: TodoListProps) => {
   const todos = useObservable(source.todo, [])
 
   const items = todos.map((item) => {
     return (
       <TodoItem
-        todo={ item }
         key={ item.id }
+        todo={ item }
+        onRemove={ props.onRemove }
+        onToggle={ props.onToggle }
+        onUpdate={ props.onUpdate }
       />
     )
   })
@@ -31,7 +33,3 @@ export const TodoList = React.memo(() => {
     </section>
   )
 })
-
-// onRemove={ props.onRemove }
-// onToggle={ props.onToggle }
-// onUpdate={ props.onUpdate }

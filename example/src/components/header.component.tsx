@@ -1,15 +1,12 @@
 import * as React from 'react'
-import { useState, useContext } from 'react'
-
-import { TodoContext } from '../controller'
+import { useState } from 'react'
 
 export interface HeaderProps {
   onAdd: (value: string) => void
 }
 
-export const Header = () => {
+export const Header = (props: HeaderProps) => {
   const [ newItem, setValue ] = useState('')
-  const context = useContext(TodoContext)
 
   const onInput = (e: React.SyntheticEvent<HTMLInputElement>) => {
     const target = e.target as HTMLInputElement
@@ -19,7 +16,7 @@ export const Header = () => {
   const onAdd = (e: React.KeyboardEvent<HTMLInputElement>) => {
     const target = e.target as HTMLInputElement
     if (e.key === 'Enter') {
-      context.addItem(target.value)
+      props.onAdd(target.value)
       setValue('')
     }
   }
