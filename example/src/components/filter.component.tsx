@@ -1,17 +1,19 @@
 import * as React from 'react'
-import { useContext } from 'react'
 import cx from 'classnames'
 
-import { source, TodoContext } from '../controller'
-import { useObservable } from '../hooks'
+import { FilterOptions } from '../controller'
 
-export const Filter = React.memo(() => {
-  const filter = useObservable(source.filter, 'all')
-  const context = useContext(TodoContext)
+export interface FilterProps {
+  current: FilterOptions
+  setFilter(filter: FilterOptions): void
+}
 
-  const setAll = () => context.setFilter('all')
-  const setActive = () => context.setFilter('active')
-  const setCompleted = () => context.setFilter('completed')
+export const Filter = React.memo((props: FilterProps) => {
+  const filter = props.current
+
+  const setAll = () => props.setFilter('all')
+  const setActive = () => props.setFilter('active')
+  const setCompleted = () => props.setFilter('completed')
 
   const handlers = [
     {

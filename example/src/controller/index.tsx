@@ -4,7 +4,7 @@ import { FilterOptions, Todo } from './schema'
 import { database, nextUid } from './database'
 import { filterSubject } from './source'
 
-class TodoController {
+export class TodoController {
 
   constructor() {
     this.addItem('Salut')
@@ -37,13 +37,17 @@ class TodoController {
     database.upsert('Todo', raw).subscribe()
   }
 
+  info() {
+    console.info('infoinfo')
+  }
+
 }
 
 export const controller = new TodoController()
 export { source } from './source'
 export { Todo, FilterOptions } from './schema'
 
-export const TodoContext = React.createContext(controller)
+export const TodoContext = React.createContext<TodoController>(controller)
 
 export const TodoProvider = (props: { children: any }) => {
   return (

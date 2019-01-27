@@ -2,10 +2,13 @@ import * as React from 'react'
 import { useState, useContext } from 'react'
 import cx from 'classnames'
 
-import { Todo, TodoContext } from '../controller'
+import { Todo } from '../controller'
 
 export interface TodoItemProps{
   todo: Todo
+  toggleItem(todo: Todo): void
+  removeItem(todo: Todo): void
+  updateTitle(todo: Todo): void
 }
 
 export interface TodoItemState {
@@ -15,18 +18,17 @@ export interface TodoItemState {
 
 export const TodoItem = React.memo((props: TodoItemProps) => {
   const { todo } = props
-  const context = useContext(TodoContext)
   const [ state, setState ] = useState<TodoItemState>({ editing: false, title: '' })
   const { editing, title } = state
 
   const cls = cx({ completed: todo.completed, editing })
 
   const toggle = () => {
-    context.toggleItem(todo)
+    props.toggleItem(todo)
   }
 
   const remove = () => {
-    context.removeItem(todo)
+    props.removeItem(todo)
   }
 
   const startEditing = () => {
@@ -34,7 +36,7 @@ export const TodoItem = React.memo((props: TodoItemProps) => {
   }
 
   const submit = () => {
-    context.updateTitle({ ...todo, title })
+    props.updateTitle({ ...todo, title })
     setState({ editing: false, title })
   }
 
