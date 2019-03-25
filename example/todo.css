@@ -4,7 +4,7 @@ body {
     padding: 0;
 }
 
-button {
+/* button {
     margin: 0;
     padding: 0;
     border: 0;
@@ -18,7 +18,7 @@ button {
     appearance: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-}
+} */
 
 body {
     font: 14px 'Helvetica Neue', Helvetica, Arial, sans-serif;
