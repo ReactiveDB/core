@@ -4,6 +4,7 @@ import { OperatorFunction } from 'rxjs/interfaces'
 import { combineAll } from 'rxjs/operators/combineAll'
 import { debounceTime } from 'rxjs/operators/debounceTime'
 import { map } from 'rxjs/operators/map'
+import { tap } from 'rxjs/operators/tap'
 import { mergeMap } from 'rxjs/operators/mergeMap'
 import { publishReplay } from 'rxjs/operators/publishReplay'
 import { reduce } from 'rxjs/operators/reduce'
@@ -17,6 +18,7 @@ import { identity, forEach, assert, warn } from '../../utils'
 import { PredicateProvider } from './PredicateProvider'
 import { ShapeMatcher, OrderInfo, StatementType } from '../../interface'
 import { mapFn } from './mapFn'
+import diff, { Ops } from '../../utils/diff'
 
 export class Selector <T> {
   private static concatFactory<U>(...metaDatas: Selector<U>[]) {
@@ -35,9 +37,15 @@ export class Selector <T> {
       `))
       return current
     })
+
+    const lastEmit = metaDatas.reduce((acc, selector) => {
+      return acc.concat(selector.getLastEmit() || [])
+    }, [] as U[])
+
     return new Selector(
       db, lselect, shape, predicateProvider,
-      maxLimit.limit! + maxLimit.skip!, minSkip.skip, meta.orderDescriptions
+      maxLimit.limit! + maxLimit.skip!, minSkip.skip, meta.orderDescriptions,
+      lastEmit
     )
       .map<U>(meta.mapFn)
   }
@@ -186,7 +194,8 @@ export class Selector <T> {
     public predicateProvider?: PredicateProvider<T>,
     private limit?: number,
     private skip?: number,
-    private orderDescriptions?: OrderInfo[]
+    private orderDescriptions?: OrderInfo[],
+    public lastEmit?: T[],
   ) {
     this.predicateProvider = this.normPredicateProvider(predicateProvider)
     this.select = lselect.toSql()
@@ -230,8 +239,24 @@ export class Selector <T> {
     return Selector.concatFactory(this, ...selectors)
   }
 
+  getLastEmit(): T[] | undefined {
+    return this.lastEmit
+  }
+
   changes(): Observable<T[]> | never {
-    return this.mapFn(this.change$)
+    return this.mapFn(this.change$.pipe(
+      tap((result: T[]) =>  this.lastEmit = result)
+    ))
+  }
+
+  changesWithOps(pk?: string): Observable<{ result: T[], ops: Ops}> | never {
+    return this.change$.pipe(
+      map((result: T[]) => {
+        const ops = diff(this.lastEmit || [], result, pk)
+        return { result, ops }
+      }),
+      tap(({ result }) => this.lastEmit = result)
+    )
   }
 
   map<K>(fn: OperatorFunction<T[], K[]>) {
