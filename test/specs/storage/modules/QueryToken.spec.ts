@@ -4,6 +4,7 @@ import { Observable } from 'rxjs/Observable'
 import { MockSelector } from '../../../utils/mocks'
 import { taskGen } from '../../../utils/generators'
 import { QueryToken, TaskSchema, clone, tokenErrMsg } from '../../../index'
+import { Op } from '../../../../src/utils/diff'
 
 export default describe('QueryToken Testcase', () => {
 
@@ -80,6 +81,33 @@ export default describe('QueryToken Testcase', () => {
         const fn = () => queryToken.changes().take(1)
 
         expect(fn).to.throw(tokenErrMsg.TokenConsumed())
+      })
+    })
+
+    describe('Method: traces', () => {
+      it('should get traces when updated', done => {
+        const task = tasks[0]
+        const newNote = 'new task note'
+
+        queryToken.traces('_id')
+          .skip(1)
+          .subscribe((r) => {
+            const { result, ops } = r
+            expect(result[0].note).to.equal(newNote)
+            expect(ops.type).to.equal(1)
+            ops.ops.forEach((op: Op, index: number) => {
+              if (index === 0) {
+                expect(op.type).to.equal(1)
+              } else {
+                expect(op.type).to.equal(0)
+              }
+            })
+            done()
+          })
+
+        MockSelector.update(task._id as string, {
+          note: newNote
+        })
       })
     })
 

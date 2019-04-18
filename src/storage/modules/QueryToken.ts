@@ -12,6 +12,7 @@ import { Selector } from './Selector'
 import { ProxySelector } from './ProxySelector'
 import { assert } from '../../utils/assert'
 import { TokenConsumed } from '../../exception/token'
+import diff, { Ops } from '../../utils/diff'
 
 export type SelectorMeta<T> = Selector<T> | ProxySelector<T>
 
@@ -21,13 +22,23 @@ const skipWhileProxySelector =
 export class QueryToken<T> {
   selector$: Observable<SelectorMeta<T>>
 
+  public lastEmit: T[] = []
   private consumed = false
 
-  constructor(selector$: Observable<SelectorMeta<T>>) {
+  constructor(selector$: Observable<SelectorMeta<T>>, lasEmit?: T[]) {
     this.selector$ = selector$.pipe(
       publishReplay(1),
       refCount()
     )
+    this.lastEmit = lasEmit || []
+  }
+
+  getLastEmit() {
+    return this.lastEmit
+  }
+
+  setLastEmit(data: T[]) {
+    this.lastEmit = data
   }
 
   map<K>(fn: OperatorFunction<T[], K[]>) {
@@ -56,6 +67,17 @@ export class QueryToken<T> {
     )
   }
 
+  traces(pk?: string): Observable<{ result: T[], ops: Ops}> {
+    return this.changes()
+      .pipe(
+        map((result: T[]) => {
+          const ops = diff(this.lastEmit, result, pk)
+          return { result, ops }
+        }),
+        tap(({ result }) => this.lastEmit = result),
+      )
+  }
+
   concat(...tokens: QueryToken<T>[]) {
     tokens.unshift(this)
     const newSelector$ = Observable.from(tokens).pipe(
@@ -66,7 +88,7 @@ export class QueryToken<T> {
         return first!.concat(...r)
       })
     )
-    return new QueryToken<T>(newSelector$)
+    return new QueryToken<T>(newSelector$, this.lastEmit)
   }
 
   combine(...tokens: QueryToken<any>[]) {
