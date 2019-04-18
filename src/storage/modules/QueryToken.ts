@@ -12,6 +12,8 @@ import { Selector } from './Selector'
 import { ProxySelector } from './ProxySelector'
 import { assert } from '../../utils/assert'
 import { TokenConsumed } from '../../exception/token'
+// import { patch } from '../../utils/patch'
+import { Ops } from '../../utils/diff'
 
 export type SelectorMeta<T> = Selector<T> | ProxySelector<T>
 
@@ -53,6 +55,17 @@ export class QueryToken<T> {
     this.consumed = true
     return this.selector$.pipe(
       switchMap(s => s.changes())
+    )
+  }
+
+  changesWithOps(): Observable<{ result: T[], ops: Ops}> {
+    assert(!this.consumed, TokenConsumed())
+    
+    console.log('changesWithOps')
+
+    this.consumed = true
+    return this.selector$.pipe(
+      switchMap((s) => s.changesWithOps()),
     )
   }
 
