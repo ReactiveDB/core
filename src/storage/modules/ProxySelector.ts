@@ -1,12 +1,15 @@
 import { Observable } from 'rxjs/Observable'
 import { OperatorFunction } from 'rxjs/interfaces'
 import { map } from 'rxjs/operators/map'
+import { tap } from 'rxjs/operators/tap'
 import { Query } from '../../interface'
 import { mapFn } from './mapFn'
+import diff, { Ops } from '../../utils/diff'
 
 export class ProxySelector<T> {
 
   public request$: Observable<T[]>
+  public lastEmit: T[] = []
 
   private mapFn: (stream$: Observable<T[]>) => Observable<any> = mapFn
 
@@ -25,7 +28,23 @@ export class ProxySelector<T> {
   }
 
   changes() {
-    return this.mapFn(this.request$)
+    return this.mapFn(this.request$.pipe(
+      tap((data: T[]) => this.lastEmit = data)
+    ))
+  }
+
+  getLastEmit(): T[] {
+    return this.lastEmit
+  }
+
+  changesWithOps(): Observable<{ result: T[], ops: Ops}>  | never {
+    return this.request$.pipe(
+      map((result: T[]) => {
+        const pk = 'id'
+        const ops = diff(this.lastEmit || [], result, pk)
+        return { result, ops }
+      }),
+    )
   }
 
   map<K>(fn: OperatorFunction<T[], K[]>) {

@@ -173,6 +173,7 @@ export class Database {
     const selector$ = this.database$.pipe(
       map(db => this.buildSelector(db, tableName, query, mode))
     )
+
     return new QueryToken<T>(selector$)
   }
 
