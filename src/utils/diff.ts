@@ -174,7 +174,7 @@ export function diff<T>(oldList: T[], newList: T[], pk = '_id'): Ops {
     }
   }
 
-  const arrayIsSame = reused === curr.length && prev.length === curr.length
+  const arrayIsSame = reused === curr.length && prev.length === curr.length && reused !== 0
   return {
     type: arrayIsSame ? OpsType.SuccessAndSkip : OpsType.Success,
     ops: ret,
