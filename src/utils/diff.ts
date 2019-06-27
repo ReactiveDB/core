@@ -11,7 +11,7 @@ export type Op = {
 export enum OpsType {
   Error,
   Success,
-  SuccessAndSkip,
+  ShouldSkip,
 }
 
 export type Ops = {
@@ -41,7 +41,7 @@ export const getPatchResult = <T>(oldList: T[], newList: T[], ops: Ops): T[] => 
   switch (ops.type) {
     case OpsType.Error:
       return newList
-    case OpsType.SuccessAndSkip:
+    case OpsType.ShouldSkip:
       return oldList
     case OpsType.Success:
     default:
@@ -171,7 +171,7 @@ export function diff<T>(oldList: T[], newList: T[], pk = '_id'): Ops {
 
   const arrayIsSame = reused === curr.length && prev.length === curr.length && reused !== 0
   return {
-    type: arrayIsSame ? OpsType.SuccessAndSkip : OpsType.Success,
+    type: arrayIsSame ? OpsType.ShouldSkip : OpsType.Success,
     ops: ret,
   }
 }
