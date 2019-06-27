@@ -1,6 +1,7 @@
 import { Observable } from 'rxjs/Observable'
 import { OperatorFunction } from 'rxjs/interfaces'
 import { combineAll } from 'rxjs/operators/combineAll'
+import { filter } from 'rxjs/operators/filter'
 import { map } from 'rxjs/operators/map'
 import { publishReplay } from 'rxjs/operators/publishReplay'
 import { refCount } from 'rxjs/operators/refCount'
@@ -12,11 +13,10 @@ import { Selector } from './Selector'
 import { ProxySelector } from './ProxySelector'
 import { assert } from '../../utils/assert'
 import { TokenConsumed } from '../../exception/token'
-import { diff, Ops } from '../../utils/diff'
+import { diff, Ops, OpsType } from '../../utils/diff'
 
-export interface TraceResult<T> {
+export type TraceResult<T> = Ops & {
   result: T[]
-  ops: Ops
 }
 
 export type SelectorMeta<T> = Selector<T> | ProxySelector<T>
@@ -72,8 +72,9 @@ export class QueryToken<T> {
     return this.changes().pipe(
       map((result: T[]) => {
         const ops = diff(this.lastEmit, result, pk)
-        return { result, ops }
+        return { result, ...ops }
       }),
+      filter((xs) => xs.type !== OpsType.ShouldSkip),
       tap(({ result }) => (this.lastEmit = result)),
     )
   }
