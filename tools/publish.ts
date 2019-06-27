@@ -46,14 +46,14 @@ Promise.all([
   write('dist/cjs/README.md', README),
 ])
   .then(() => {
-    const { stderr, stdout } = shelljs.exec('npm publish dist/cjs')
+    const { stderr, stdout } = shelljs.exec('npm publish dist/cjs --tag=next')
     if (stderr) {
       throw stderr
     }
     console.info(stdout)
   })
   .then(() => {
-    const { stderr, stdout } = shelljs.exec('npm publish dist/es')
+    const { stderr, stdout } = shelljs.exec('npm publish dist/es --tag=next')
     if (stderr) {
       throw stderr
     }

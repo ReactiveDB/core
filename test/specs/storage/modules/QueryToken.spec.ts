@@ -95,10 +95,10 @@ export default describe('QueryToken Testcase', () => {
           .traces('_id')
           .pipe(skip(1))
           .subscribe((r) => {
-            const { result, ops } = r
+            const { result, type, ops } = r
             expect(result[0].note).to.equal(newNote)
-            expect(ops.type).to.equal(1)
-            ops.ops.forEach((op: Op, index: number) => {
+            expect(type).to.equal(1)
+            ops.forEach((op: Op, index: number) => {
               if (index === 0) {
                 expect(op.type).to.equal(1)
               } else {
@@ -123,10 +123,10 @@ export default describe('QueryToken Testcase', () => {
           .traces('_id')
           .pipe(skip(1))
           .subscribe((r) => {
-            const { result, ops } = r
+            const { result, type, ops } = r
             expect(result[0].note).to.equal(newNote)
-            expect(ops.type).to.equal(1)
-            ops.ops.forEach((op: Op, index: number) => {
+            expect(type).to.equal(1)
+            ops.forEach((op: Op, index: number) => {
               if (index === 0) {
                 expect(op.type).to.equal(1)
               } else {
@@ -241,8 +241,8 @@ export default describe('QueryToken Testcase', () => {
 
         const combined = queryToken.combine(queryToken2)
         combined.traces().subscribe((r) => {
-          expect(r.ops.type).to.equal(1)
-          r.ops.ops.forEach((op: Op, index: number) => {
+          expect(r.type).to.equal(1)
+          r.ops.forEach((op: Op, index: number) => {
             if (index < 25) {
               expect(op.type).to.equal(0)
             } else {
@@ -270,8 +270,8 @@ export default describe('QueryToken Testcase', () => {
 
         const combined = queryToken.combine(queryToken2)
         combined.traces().subscribe((r) => {
-          expect(r.ops.type).to.equal(1)
-          r.ops.ops.forEach((op: Op, index: number) => {
+          expect(r.type).to.equal(1)
+          r.ops.forEach((op: Op, index: number) => {
             if (index < 25) {
               expect(op.type).to.equal(0)
             } else {
@@ -374,8 +374,8 @@ export default describe('QueryToken Testcase', () => {
         queryToken.traces().subscribe()
         const concated = queryToken.concat(queryToken2)
         concated.traces().subscribe((r) => {
-          expect(r.ops.type).to.equal(1)
-          r.ops.ops.forEach((op: Op, index: number) => {
+          expect(r.type).to.equal(1)
+          r.ops.forEach((op: Op, index: number) => {
             if (index < 25) {
               expect(op.type).to.equal(0)
             } else {
