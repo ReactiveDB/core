@@ -4,6 +4,6 @@ const version = require('../package.json').version
 
 const filePath = 'src/version.ts'
 
-const replace = fs.readFileSync(filePath, 'utf-8').replace(/[\d\.]+/g, `${version}`)
+const replace = fs.readFileSync(filePath, 'utf-8').replace(/'.*'/g, `'${version}'`)
 
 fs.writeFileSync(filePath, replace)
