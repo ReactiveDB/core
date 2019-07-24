@@ -13,10 +13,18 @@ import { Selector } from './Selector'
 import { ProxySelector } from './ProxySelector'
 import { assert } from '../../utils/assert'
 import { TokenConsumed } from '../../exception/token'
-import { diff, Ops, OpsType } from '../../utils/diff'
+import { diff, Ops, OpsType, OpType } from '../../utils/diff'
 
 export type TraceResult<T> = Ops & {
-  result: T[]
+  result: ReadonlyArray<T>
+}
+
+function initialTraceResult<T>(list: ReadonlyArray<T>): TraceResult<T> {
+  return {
+    type: OpsType.Success,
+    ops: list.map((_value, index) => ({ type: OpType.New, index })),
+    result: list
+  }
 }
 
 export type SelectorMeta<T> = Selector<T> | ProxySelector<T>
@@ -28,14 +36,16 @@ export class QueryToken<T> {
   selector$: Observable<SelectorMeta<T>>
 
   private consumed = false
-  private lastEmit: T[] = []
 
-  constructor(selector$: Observable<SelectorMeta<T>>, lastEmit?: T[]) {
+  constructor(
+    selector$: Observable<SelectorMeta<T>>,
+    private lastEmit?: ReadonlyArray<T>
+  ) {
     this.selector$ = selector$.pipe(
       publishReplay(1),
       refCount()
     )
-    this.lastEmit = lastEmit || []
+    this.lastEmit = lastEmit
   }
 
   setLastEmit(data: T[]) {
@@ -71,6 +81,9 @@ export class QueryToken<T> {
   traces(pk?: string): Observable<TraceResult<T>> {
     return this.changes().pipe(
       map((result: T[]) => {
+        if (!this.lastEmit) {
+          return initialTraceResult(result)
+        }
         const ops = diff(this.lastEmit, result, pk)
         return { result, ...ops }
       }),
