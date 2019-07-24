@@ -26,7 +26,7 @@ export type Ops = {
 }
 
 // as an example, use diff to patch data
-export const patch = <T>(ops: Op[], oldList: T[], newList: T[]) => {
+export const patch = <T>(ops: ReadonlyArray<Op>, oldList: ReadonlyArray<T>, newList: ReadonlyArray<T>) => {
   if (!oldList.length) {
     return newList
   }
@@ -42,7 +42,7 @@ export const patch = <T>(ops: Op[], oldList: T[], newList: T[]) => {
   })
 }
 
-export const getPatchResult = <T>(oldList: T[], newList: T[], ops: Ops): T[] => {
+export const getPatchResult = <T>(oldList: ReadonlyArray<T>, newList: ReadonlyArray<T>, ops: Ops): ReadonlyArray<T> => {
   switch (ops.type) {
     case OpsType.Error:
       return newList
@@ -120,7 +120,7 @@ function fastEqual(left: object, right: object) {
   return left !== left && right !== right
 }
 
-export function diff<T>(oldList: T[], newList: T[], pk = '_id'): Ops {
+export function diff<T>(oldList: ReadonlyArray<T>, newList: ReadonlyArray<T>, pk = '_id'): Ops {
   const prev = oldList
   const curr = newList
 
