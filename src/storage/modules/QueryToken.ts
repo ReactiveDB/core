@@ -62,7 +62,7 @@ export class QueryToken<T> {
         const ops = diff(this.lastEmit, result, pk)
         return { result, ...ops }
       }),
-      filter((xs) => xs.type !== OpsType.ShouldSkip),
+      filter(({ type }) => type !== OpsType.ShouldSkip),
       tap(({ result }) => (this.lastEmit = result)),
     )
   }
