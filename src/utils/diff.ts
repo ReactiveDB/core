@@ -174,7 +174,7 @@ export function diff<T>(oldList: ReadonlyArray<T>, newList: ReadonlyArray<T>, pk
     }
   }
 
-  const arrayIsSame = reused === curr.length && prev.length === curr.length && reused !== 0
+  const arrayIsSame = reused === curr.length && prev.length === curr.length
   return {
     type: arrayIsSame ? OpsType.ShouldSkip : OpsType.Success,
     ops: ret,
