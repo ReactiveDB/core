@@ -328,13 +328,6 @@ export default describe('Diff Testcase: ', () => {
       const result = diff([{ id: 1, a: 1 }], [{ id: 1, a: 1 }], 'id')
       expect(result.type).to.equal(2)
     })
-
-    it('should be able to use old list except reused number is 0: 27', () => {
-      // when old list is empty & new list is empty
-      // should not return skip flag
-      const result = diff([], [], 'id')
-      expect(result.type).to.equal(1)
-    })
   })
 
   describe('Function: getPatchResult', () => {
