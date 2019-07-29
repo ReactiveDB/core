@@ -49,8 +49,8 @@ export default describe('QueryToken Testcase', () => {
       })
 
       it('should throw when reconsumed', function* () {
-        yield queryToken.values()
-        const fn = () => queryToken.values()
+        yield queryToken.values().subscribe()
+        const fn = () => queryToken.values().subscribe()
         expect(fn).to.throw(tokenErrMsg.TokenConsumed())
       })
     })
@@ -78,9 +78,9 @@ export default describe('QueryToken Testcase', () => {
       })
 
       it('should throw when reconsumed', function* () {
-        yield queryToken.changes().take(1)
+        yield queryToken.changes().take(1).subscribe()
 
-        const fn = () => queryToken.changes().take(1)
+        const fn = () => queryToken.changes().take(1).subscribe()
 
         expect(fn).to.throw(tokenErrMsg.TokenConsumed())
       })
@@ -204,77 +204,19 @@ export default describe('QueryToken Testcase', () => {
       })
 
       it('should throw when reconsumed values', function* () {
-        yield combined.values()
+        yield combined.values().subscribe()
 
-        const fn1 = () => combined.values()
+        const fn1 = () => combined.values().subscribe()
 
         expect(fn1).to.throw(tokenErrMsg.TokenConsumed())
       })
 
       it('should throw when reconsumed changes', function* () {
-        yield combined.changes().take(1)
+        yield combined.changes().take(1).subscribe()
 
-        const fn1 = () => combined.changes()
+        const fn1 = () => combined.changes().subscribe()
 
         expect(fn1).to.throw(tokenErrMsg.TokenConsumed())
-      })
-    })
-
-    describe('Method: combine with traces', () => {
-      let tasks2: TaskSchema[]
-      let mockSelector2: MockSelector<TaskSchema>
-      let queryToken2: QueryToken<TaskSchema>
-
-      beforeEach(() => {
-        tasks2 = taskGen(25)
-        mockSelector2 = new MockSelector(generateMockTestdata(tasks2))
-        queryToken2 = new QueryToken(of(mockSelector2) as any)
-      })
-
-      it('should use lastEmit values when combined', (done) => {
-        queryToken.traces().subscribe()
-
-        const combined = queryToken.combine(queryToken2)
-        combined.traces().subscribe((r) => {
-          expect(r.type).to.equal(1)
-          r.ops.forEach((op: Op, index: number) => {
-            if (index < 25) {
-              expect(op.type).to.equal(0)
-            } else {
-              expect(op.type).to.equal(1)
-            }
-          })
-          done()
-        })
-      })
-    })
-
-    describe('Method: combine with traces', () => {
-      let tasks2: TaskSchema[]
-      let mockSelector2: MockSelector<TaskSchema>
-      let queryToken2: QueryToken<TaskSchema>
-
-      beforeEach(() => {
-        tasks2 = taskGen(25)
-        mockSelector2 = new MockSelector(generateMockTestdata(tasks2))
-        queryToken2 = new QueryToken(of(mockSelector2) as any)
-      })
-
-      it('should use lastEmit values when combined', (done) => {
-        queryToken.traces().subscribe()
-
-        const combined = queryToken.combine(queryToken2)
-        combined.traces().subscribe((r) => {
-          expect(r.type).to.equal(1)
-          r.ops.forEach((op: Op, index: number) => {
-            if (index < 25) {
-              expect(op.type).to.equal(0)
-            } else {
-              expect(op.type).to.equal(1)
-            }
-          })
-          done()
-        })
       })
     })
 
@@ -333,17 +275,17 @@ export default describe('QueryToken Testcase', () => {
       })
 
       it('should throw when reconsumed values', function* () {
-        yield concated.values()
+        yield concated.values().subscribe()
 
-        const fn1 = () => concated.values()
+        const fn1 = () => concated.values().subscribe()
 
         expect(fn1).to.throw(tokenErrMsg.TokenConsumed())
       })
 
       it('should throw when reconsumed changes', function* () {
-        yield concated.changes().take(1)
+        yield concated.changes().take(1).subscribe()
 
-        const fn1 = () => concated.changes()
+        const fn1 = () => concated.changes().subscribe()
 
         expect(fn1).to.throw(tokenErrMsg.TokenConsumed())
       })
@@ -391,7 +333,7 @@ export default describe('QueryToken Testcase', () => {
         const q2 = queryToken.map(v => v.map(r => r.map(() => 2)))
 
         const signal = q2.changes()
-          .publish()
+          .publishReplay(1)
           .refCount()
 
         yield signal.take(1)
@@ -433,7 +375,7 @@ export default describe('QueryToken Testcase', () => {
 
         const distToken = q4.combine(queryToken1)
         const signal = distToken.changes()
-          .publish()
+          .publishReplay(1)
           .refCount()
 
         yield signal.take(1)

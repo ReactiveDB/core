@@ -15,7 +15,7 @@ import { tokenErrMsg } from '../../exception'
 import { predicatableQuery, graph } from '../helper'
 import { identity, forEach, assert, warn } from '../../utils'
 import { PredicateProvider } from './PredicateProvider'
-import { ShapeMatcher, OrderInfo, StatementType } from '../../interface'
+import { ShapeMatcher, OrderInfo, StatementType, ConcatInfo } from '../../interface'
 import { mapFn } from './mapFn'
 
 export class Selector <T> {
@@ -35,9 +35,12 @@ export class Selector <T> {
       `))
       return current
     })
+    const concatInfo = { length: meta.limit! - meta.skip!, consumed: meta.consumed }
+
     return new Selector(
       db, lselect, shape, predicateProvider,
-      maxLimit.limit! + maxLimit.skip!, minSkip.skip, meta.orderDescriptions
+      maxLimit.limit! + maxLimit.skip!, minSkip.skip, meta.orderDescriptions,
+      concatInfo,
     )
       .map<U>(meta.mapFn)
   }
@@ -186,7 +189,8 @@ export class Selector <T> {
     public predicateProvider?: PredicateProvider<T>,
     private limit?: number,
     private skip?: number,
-    private orderDescriptions?: OrderInfo[]
+    private orderDescriptions?: OrderInfo[],
+    readonly concatInfo?: ConcatInfo,
   ) {
     this.predicateProvider = this.normPredicateProvider(predicateProvider)
     this.select = lselect.toSql()

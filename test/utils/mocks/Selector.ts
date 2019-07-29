@@ -1,6 +1,11 @@
 import { ReplaySubject } from 'rxjs/ReplaySubject'
 import { Observable } from 'rxjs/Observable'
 
+interface ConcatInfo {
+  length: number
+  consumed: boolean
+}
+
 export class MockSelector<T> {
   static datas = new Map<string, any>()
   static selectMeta = new Map<string, MockSelector<any>>()
@@ -27,7 +32,9 @@ export class MockSelector<T> {
   private datas: T[]
   private mapFn = MockSelector.mapFn
 
-  constructor(datas: Map<string, T>) {
+  private consumed = false
+
+  constructor(datas: Map<string, T>, readonly concatInfo?: ConcatInfo) {
     const result: T[] = []
     datas.forEach((val, key) => {
       if (MockSelector.datas.has(key)) {
@@ -42,11 +49,11 @@ export class MockSelector<T> {
   }
 
   changes(): Observable<T[]> {
-    return this.mapFn(this.change$)
+    return this.mapFn(this.change$).do(() => this.consumed = true)
   }
 
   values () {
-    return this.mapFn(this.change$.take(1))
+    return this.mapFn(this.change$.take(1)).do(() => this.consumed = true)
   }
 
   concat(... metas: MockSelector<T>[]) {
@@ -57,7 +64,10 @@ export class MockSelector<T> {
 
   combine(... metas: MockSelector<T>[]) {
     metas.unshift(this)
-    const dist = new MockSelector(new Map)
+    const dist = new MockSelector(new Map, {
+      consumed: this.consumed,
+      length: this.datas.length,
+    })
     dist.values = () => {
       return Observable.from(metas)
         .flatMap(meta => meta.values())

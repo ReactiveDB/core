@@ -75,6 +75,11 @@ export interface JoinInfo {
   predicate: lf.Predicate
 }
 
+export interface ConcatInfo {
+  length: number
+  consumed: boolean
+}
+
 export interface Record {
   [property: string]: number
 }
