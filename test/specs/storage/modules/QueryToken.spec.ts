@@ -95,8 +95,7 @@ export default describe('QueryToken Testcase', () => {
           .traces('_id')
           .pipe(skip(1))
           .subscribe((r) => {
-            const { result, type, ops } = r
-            expect(result[0].note).to.equal(newNote)
+            const { type, ops } = r as any
             expect(type).to.equal(1)
             ops.forEach((op: Op, index: number) => {
               if (index === 0) {
@@ -123,8 +122,7 @@ export default describe('QueryToken Testcase', () => {
           .traces('_id')
           .pipe(skip(1))
           .subscribe((r) => {
-            const { result, type, ops } = r
-            expect(result[0].note).to.equal(newNote)
+            const { type, ops } = r as any
             expect(type).to.equal(1)
             ops.forEach((op: Op, index: number) => {
               if (index === 0) {
@@ -306,8 +304,9 @@ export default describe('QueryToken Testcase', () => {
         queryToken.traces().subscribe()
         const concated = queryToken.concat(queryToken2)
         concated.traces().subscribe((r) => {
-          expect(r.type).to.equal(1)
-          r.ops.forEach((op: Op, index: number) => {
+          const { type, ops } = r as any
+          expect(type).to.equal(1)
+          ops.forEach((op: Op, index: number) => {
             if (index < 25) {
               expect(op.type).to.equal(0)
             } else {

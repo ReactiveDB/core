@@ -15,11 +15,9 @@ import { Selector } from './Selector'
 import { ProxySelector } from './ProxySelector'
 import { assert } from '../../utils/assert'
 import { TokenConsumed } from '../../exception/token'
-import { diff, Ops, OpsType, OpType } from '../../utils/diff'
+import { diff, Ops, OpsType, concatDiff } from '../../utils/diff'
 
-export type TraceResult<T> = Ops & {
-  result: ReadonlyArray<T>
-}
+export type TraceResult<T> = Ops<T>
 
 export type SelectorMeta<T> = Selector<T> | ProxySelector<T>
 
@@ -38,6 +36,7 @@ export class QueryToken<T> {
 
   constructor(
     selector$: Observable<SelectorMeta<T>>,
+    public concatConsumed = false
   ) {
     this.selector$ = selector$.pipe(
       publishReplay(1),
@@ -71,18 +70,12 @@ export class QueryToken<T> {
     return this.selector$.pipe(
       tap(this.consume),
       switchMap(s => s.changes().pipe(
-        startWith([]),
+        startWith<T[]>([]),
         pairwise(),
-        map(([lastEmit, result], i) =>
-          i === 0 && !(s instanceof ProxySelector) && s.concatInfo && s.concatInfo.consumed
-            ? {
-              result,
-              type: OpsType.Success, ops: result.map((_, index) => ({
-                index,
-                type: index >= s.concatInfo!.length ? OpType.New : OpType.Reuse
-              }))
-            }
-            : { result, ...diff(lastEmit, result, pk) }
+        map(([lastEmit, result], i): TraceResult<T> =>
+          i === 0 && !(s instanceof ProxySelector) && s.concatInfo && (s.concatInfo.consumed || this.concatConsumed)
+            ? concatDiff(result, s.concatInfo!.length)
+            : diff(lastEmit, result, pk)
         ),
         filter(({ type }) => type !== OpsType.ShouldSkip),
       )),
@@ -99,7 +92,7 @@ export class QueryToken<T> {
         return first!.concat(...r)
       })
     )
-    return new QueryToken<T>(newSelector$)
+    return new QueryToken<T>(newSelector$, this.concatConsumed)
   }
 
   combine(...tokens: QueryToken<any>[]) {

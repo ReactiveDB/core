@@ -1,6 +1,6 @@
 import { describe, it } from 'tman'
 import { expect } from 'chai'
-import { diff, patch, getPatchResult } from '../../../src/utils/diff'
+import { diff, patch, getPatchResult, OpsType, Ops } from '../../../src/utils/diff'
 
 export default describe('Diff Testcase: ', () => {
   describe('Function: diff', () => {
@@ -70,8 +70,7 @@ export default describe('Diff Testcase: ', () => {
       const newList = [{ id: 1, a: [] as any[] }]
       const result = diff(oldList, newList, 'id')
 
-      expect(result.ops.length).to.equal(1)
-      expect(result.ops[0].type).to.equal(0)
+      expect(result.type).to.equal(OpsType.ShouldSkip)
     })
 
     it('should be able to detect changes between two list: 6', () => {
@@ -115,8 +114,7 @@ export default describe('Diff Testcase: ', () => {
       const newList = [{ id: 1, a: [{ a: 1 }, { b: 2 }] }]
       const result = diff(oldList, newList, 'id')
 
-      expect(result.ops.length).to.equal(1)
-      expect(result.ops[0].type).to.equal(0)
+      expect(result.type).to.equal(OpsType.ShouldSkip)
     })
 
     it('should be able to detect changes between two list: 11', () => {
@@ -151,8 +149,7 @@ export default describe('Diff Testcase: ', () => {
       const newList = [{ id: 1, a: [{ a: 1 }, { b: 'b' }, { c: new Date(1970) }] }]
       const result = diff(oldList, newList, 'id')
 
-      expect(result.ops.length).to.equal(1)
-      expect(result.ops[0].type).to.equal(0)
+      expect(result.type).to.equal(OpsType.ShouldSkip)
     })
 
     it('should be able to detect changes between two list: 15', () => {
@@ -170,8 +167,7 @@ export default describe('Diff Testcase: ', () => {
 
       const result = diff(oldList, newList as any, 'id')
 
-      expect(result.ops.length).to.equal(1)
-      expect(result.ops[0].type).to.equal(0)
+      expect(result.type).to.equal(OpsType.ShouldSkip)
     })
 
     it('should be able to detect changes between two list: 17', () => {
@@ -206,10 +202,7 @@ export default describe('Diff Testcase: ', () => {
         { id: 4, a: new Date(1970) },
       ]
       const result = diff(oldList, newList, 'id')
-      expect(result.ops.length).to.equal(4)
-      result.ops.forEach((op: any) => {
-        expect(op.type).to.equal(0)
-      })
+      expect(result.type).to.equal(OpsType.ShouldSkip)
     })
 
     it('should be able to detect changes between two list: 20', () => {
@@ -316,12 +309,12 @@ export default describe('Diff Testcase: ', () => {
       expect(result.ops[2].index).to.equal(0)
 
       expect(result.ops[3].type).to.equal(1)
-      expect(result.ops[3].index).to.equal(3)
+      expect(result.ops[3].value).to.equal(newList[3])
     })
 
     it('should be able to detect changes between two list: 25', () => {
       const result = diff([], [], 'id')
-      expect(result.ops.length).to.equal(0)
+      expect(result.type).to.equal(OpsType.ShouldSkip)
     })
 
     it('should be able to use old list when they are the same: 26', () => {
@@ -334,22 +327,21 @@ export default describe('Diff Testcase: ', () => {
     it('should return newList with errorType', () => {
       const oldList = {} as any
       const newList = [{ id: 1 }, { id: 2 }, { id: 3 }]
-      const ops = { type: 0, ops: [] as any[], message: '' }
-      expect(getPatchResult(oldList, newList, ops)).to.equal(newList)
+      const ops: Ops = { type: OpsType.Error, result: newList, message: '' }
+      expect(getPatchResult(oldList, ops)).to.equal(newList)
     })
 
     it('should return oldList with successAndSkipType', () => {
       const oldList = [{ id: 1 }, { id: 2 }]
-      const newList = [{ id: 1 }, { id: 2 }]
       const ops = { type: 2, ops: [] as any[], message: '' }
-      expect(getPatchResult(oldList, newList, ops)).to.equal(oldList)
+      expect(getPatchResult(oldList, ops)).to.equal(oldList)
     })
 
     it('should apply patch with successType', () => {
       const oldList = [{ id: 1 }, { id: 2 }]
       const newList = [{ id: 1 }, { id: 2 }, { id: 3 }]
-      const ops = { type: 1, ops: [{ type: 0, index: 0 }, { type: 0, index: 1 }, { type: 1, index: 2 }], message: '' }
-      const result = getPatchResult(oldList, newList, ops)
+      const ops = { type: 1, ops: [{ type: 0, index: 0 }, { type: 0, index: 1 }, { type: 1, value: newList[2] }], message: '' }
+      const result = getPatchResult(oldList, ops)
       expect(result.length).to.equal(3)
       expect(result[0]).to.equal(oldList[0])
       expect(result[1]).to.equal(oldList[1])
@@ -362,7 +354,7 @@ export default describe('Diff Testcase: ', () => {
       const oldList = [{ id: 1 }, { id: 2 }]
       const newList = [{ id: 1 }, { id: 2 }, { id: 3 }]
       const { ops } = diff(oldList, newList, 'id')
-      const result = patch(ops, oldList, newList)
+      const result = patch(ops, oldList)
       expect(result[0]).to.equal(oldList[0])
       expect(result[1]).to.equal(oldList[1])
       expect(result[2]).to.equal(newList[2])
@@ -372,7 +364,7 @@ export default describe('Diff Testcase: ', () => {
       const oldList = [] as any
       const newList = [{ id: 1 }, { id: 2 }, { id: 3 }]
       const { ops } = diff(oldList, newList, 'id')
-      const result = patch(ops, oldList, newList)
+      const result = patch(ops, oldList)
       expect(result[0]).to.equal(newList[0])
       expect(result[1]).to.equal(newList[1])
       expect(result[2]).to.equal(newList[2])
