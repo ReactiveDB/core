@@ -9,6 +9,7 @@ import { publishReplay } from 'rxjs/operators/publishReplay'
 import { reduce } from 'rxjs/operators/reduce'
 import { refCount } from 'rxjs/operators/refCount'
 import { switchMap } from 'rxjs/operators/switchMap'
+import { tap } from 'rxjs/operators/tap'
 import { async } from 'rxjs/scheduler/async'
 import * as lf from 'lovefield'
 import { tokenErrMsg } from '../../exception'
@@ -85,6 +86,10 @@ export class Selector <T> {
       orderStr += `${name}:${o}`
     })
     return orderStr
+  }
+
+  private consume = () => {
+    this.consumed = true
   }
 
   private mapFn: (stream$: Observable<T[]>) => Observable<any[]> = mapFn
@@ -201,14 +206,18 @@ export class Selector <T> {
   }
 
   values(): Observable<T[]> | never {
+    let values$
     if (typeof this.limit !== 'undefined' || typeof this.skip !== 'undefined') {
       const p = this.rangeQuery.exec()
         .then(r => r.map(v => v[this.shape.pk.name]))
         .then(pks => this.getValue(this.getQuery(this.inPKs(pks))))
-      return this.mapFn(Observable.fromPromise(p))
+      values$ = this.mapFn(Observable.fromPromise(p))
     } else {
-      return this.mapFn(Observable.fromPromise(this.getValue(this.getQuery()) as Promise<T[]>))
+      values$ = this.mapFn(Observable.fromPromise(this.getValue(this.getQuery()) as Promise<T[]>))
     }
+    return values$.pipe(
+      tap(this.consume)
+    )
   }
 
   combine(... selectors: Selector<T>[]): Selector<T> {
@@ -235,7 +244,9 @@ export class Selector <T> {
   }
 
   changes(): Observable<T[]> | never {
-    return this.mapFn(this.change$)
+    return this.mapFn(this.change$).pipe(
+      tap(this.consume),
+    )
   }
 
   map<K>(fn: OperatorFunction<T[], K[]>) {

@@ -1,4 +1,5 @@
 import { Observable } from 'rxjs/Observable'
+import { Observer } from 'rxjs/Observer'
 import { OperatorFunction } from 'rxjs/interfaces'
 import { combineAll } from 'rxjs/operators/combineAll'
 import { filter } from 'rxjs/operators/filter'
@@ -15,11 +16,9 @@ import { Selector } from './Selector'
 import { ProxySelector } from './ProxySelector'
 import { assert } from '../../utils/assert'
 import { TokenConsumed } from '../../exception/token'
-import { diff, Ops, OpsType, OpType } from '../../utils/diff'
+import { diff, Ops, OpsType, concatDiff } from '../../utils/diff'
 
-export type TraceResult<T> = Ops & {
-  result: ReadonlyArray<T>
-}
+export type TraceResult<T> = Ops<T>
 
 export type SelectorMeta<T> = Selector<T> | ProxySelector<T>
 
@@ -31,13 +30,10 @@ export class QueryToken<T> {
 
   private consumed = false
 
-  private consume = () => {
-    assert(!this.consumed, TokenConsumed())
-    this.consumed = true
-  }
-
   constructor(
     selector$: Observable<SelectorMeta<T>>,
+    private readonly concatSyncFlag = { subscribed: false },
+    private readonly concatConsumed = false
   ) {
     this.selector$ = selector$.pipe(
       publishReplay(1),
@@ -53,40 +49,54 @@ export class QueryToken<T> {
   }
 
   values(): Observable<T[]> {
+    assert(!this.consumed, TokenConsumed())
+
+    this.consumed = true
     return this.selector$.pipe(
-      tap(this.consume),
       switchMap(s => s.values()),
       take(1)
     )
   }
 
   changes(): Observable<T[]> {
+    assert(!this.consumed, TokenConsumed())
+
+    this.consumed = true
     return this.selector$.pipe(
-      tap(this.consume),
       switchMap(s => s.changes()),
     )
   }
 
   traces(pk?: string): Observable<TraceResult<T>> {
-    return this.selector$.pipe(
-      tap(this.consume),
-      switchMap(s => s.changes().pipe(
-        startWith([]),
-        pairwise(),
-        map(([lastEmit, result], i) =>
-          i === 0 && !(s instanceof ProxySelector) && s.concatInfo && s.concatInfo.consumed
-            ? {
-              result,
-              type: OpsType.Success, ops: result.map((_, index) => ({
-                index,
-                type: index >= s.concatInfo!.length ? OpType.New : OpType.Reuse
-              }))
-            }
-            : { result, ...diff(lastEmit, result, pk) }
-        ),
-        filter(({ type }) => type !== OpsType.ShouldSkip),
-      )),
-    )
+    assert(!this.consumed, TokenConsumed())
+    this.consumed = true
+
+    return Observable.create((observer: Observer<TraceResult<T>>) => {
+      const subscribedSync = this.concatSyncFlag.subscribed
+
+      const subs = this.selector$.pipe(
+        switchMap(s => s.changes().pipe(
+          startWith<T[]>([]),
+          pairwise(),
+          map(([lastEmit, result], i): TraceResult<T> =>
+            i === 0 && !(s instanceof ProxySelector)
+            && s.concatInfo && (s.concatInfo.consumed || this.concatConsumed)
+            && subscribedSync
+              ? concatDiff(result, s.concatInfo!.length)
+              : diff(lastEmit, result, pk)
+          ),
+          filter(({ type }) => type !== OpsType.ShouldSkip),
+        )),
+      ).subscribe(observer)
+      this.concatSyncFlag.subscribed = true
+
+      return () => {
+        subs.unsubscribe()
+        window.setTimeout(() => {
+          this.concatSyncFlag.subscribed = false
+        }, 0)
+      }
+    })
   }
 
   concat(...tokens: QueryToken<T>[]) {
@@ -99,7 +109,7 @@ export class QueryToken<T> {
         return first!.concat(...r)
       })
     )
-    return new QueryToken<T>(newSelector$)
+    return new QueryToken<T>(newSelector$, this.concatSyncFlag, this.concatConsumed)
   }
 
   combine(...tokens: QueryToken<any>[]) {

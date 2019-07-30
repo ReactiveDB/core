@@ -5,9 +5,14 @@ export enum OpType {
   New,
 }
 
-export type Op = {
-  type: OpType
+export type Op<T = any> = {
+  type: OpType.Reuse
   index: number
+  value?: undefined
+} | {
+  type: OpType.New
+  value: T
+  index?: undefined
 }
 
 export enum OpsType {
@@ -19,38 +24,43 @@ export enum OpsType {
   ShouldSkip,
 }
 
-export type Ops = {
-  type: OpsType
-  ops: Op[]
+export type Ops<T = any> = {
+  type: OpsType.Error
+  result: ReadonlyArray<T>
+  ops?: undefined
+  message?: string
+} | {
+  type: OpsType.Success
+  ops: Op<T>[]
+  result?: undefined
+  message?: string
+} | {
+  type: OpsType.ShouldSkip
+  ops?: undefined
+  result?: undefined
   message?: string
 }
 
 // as an example, use diff to patch data
-export const patch = <T>(ops: ReadonlyArray<Op>, oldList: ReadonlyArray<T>, newList: ReadonlyArray<T>) => {
-  if (!oldList.length) {
-    return newList
-  }
-
-  return newList.map((data, i) => {
-    const op = ops[i]
-
+export const patch = <T>(ops: ReadonlyArray<Op>, oldList: ReadonlyArray<T>) => {
+  return ops.map(op => {
     if (op.type === OpType.Reuse) {
       return oldList[op.index]
+    } else {
+      return op.value
     }
-
-    return data
   })
 }
 
-export const getPatchResult = <T>(oldList: ReadonlyArray<T>, newList: ReadonlyArray<T>, ops: Ops): ReadonlyArray<T> => {
+export const getPatchResult = <T>(oldList: ReadonlyArray<T>, ops: Ops): ReadonlyArray<T> => {
   switch (ops.type) {
     case OpsType.Error:
-      return newList
+      return ops.result
     case OpsType.ShouldSkip:
       return oldList
     case OpsType.Success:
     default:
-      return patch(ops.ops, oldList, newList)
+      return patch(ops.ops, oldList)
   }
 }
 
@@ -70,7 +80,7 @@ function fastEqual(left: object, right: object) {
         return false
       }
 
-      for (let i = length; i-- !== 0; ) {
+      for (let i = length; i-- !== 0;) {
         if (!fastEqual(left[i], right[i])) {
           return false
         }
@@ -101,13 +111,13 @@ function fastEqual(left: object, right: object) {
       return false
     }
 
-    for (let k = LeftLen; k-- !== 0; ) {
+    for (let k = LeftLen; k-- !== 0;) {
       if (!right.hasOwnProperty(keys[k])) {
         return false
       }
     }
 
-    for (let j = LeftLen; j-- !== 0; ) {
+    for (let j = LeftLen; j-- !== 0;) {
       const key = keys[j]
       if (!fastEqual(left[key], right[key])) {
         return false
@@ -120,14 +130,14 @@ function fastEqual(left: object, right: object) {
   return left !== left && right !== right
 }
 
-export function diff<T>(oldList: ReadonlyArray<T>, newList: ReadonlyArray<T>, pk = '_id'): Ops {
+export function diff<T>(oldList: ReadonlyArray<T>, newList: ReadonlyArray<T>, pk = '_id'): Ops<T> {
   const prev = oldList
   const curr = newList
 
   if (!Array.isArray(prev) || !Array.isArray(curr)) {
     return {
       type: OpsType.Error,
-      ops: [],
+      result: newList,
       message: `cannot compare non-list object`,
     }
   }
@@ -138,14 +148,14 @@ export function diff<T>(oldList: ReadonlyArray<T>, newList: ReadonlyArray<T>, pk
     if (value === undefined) {
       return {
         type: OpsType.Error,
-        ops: [],
+        result: newList,
         message: `cannot find pk: ${pk} at prev.${i}`,
       }
     }
     index[value] = i
   }
 
-  const ret: Op[] = []
+  const ret: Op<T>[] = []
   let reused = 0
 
   for (let k = 0; k < curr.length; k++) {
@@ -153,7 +163,7 @@ export function diff<T>(oldList: ReadonlyArray<T>, newList: ReadonlyArray<T>, pk
     if (key === undefined) {
       return {
         type: OpsType.Error,
-        ops: [],
+        result: newList,
         message: `cannot find pk: ${pk} at curr.${k}`,
       }
     }
@@ -161,22 +171,32 @@ export function diff<T>(oldList: ReadonlyArray<T>, newList: ReadonlyArray<T>, pk
     const prevIndex = index[key]
 
     if (prevIndex !== undefined) {
-      const isEqual = fastEqual((curr as any)[k], (prev as any)[prevIndex])
+      const isEqual = fastEqual(curr[k], prev[prevIndex])
       // if equal then reuse the previous data otherwise use the new data
-      const op: Op = isEqual ? { type: OpType.Reuse, index: prevIndex } : { type: OpType.New, index: k }
+      const op: Op<T> = isEqual ? { type: OpType.Reuse, index: prevIndex } : { type: OpType.New, value: curr[k] }
 
       if (prevIndex === k && isEqual) {
         reused++
       }
       ret.push(op)
     } else {
-      ret.push({ type: OpType.New, index: k })
+      ret.push({ type: OpType.New, value: curr[k] })
     }
   }
 
   const arrayIsSame = reused === curr.length && prev.length === curr.length
+  return arrayIsSame
+    ? { type: OpsType.ShouldSkip }
+    : { type: OpsType.Success, ops: ret }
+}
+
+export const concatDiff = <T>(newList: ReadonlyArray<T>, concatLength: number) => {
   return {
-    type: arrayIsSame ? OpsType.ShouldSkip : OpsType.Success,
-    ops: ret,
-  }
+    type: OpsType.Success,
+    ops: newList.map((value, index) => {
+      return index >= concatLength
+        ? { type: OpType.New, value }
+        : { type: OpType.Reuse, index }
+    })
+  } as Ops<T>
 }
