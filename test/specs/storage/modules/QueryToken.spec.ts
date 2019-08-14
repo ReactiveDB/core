@@ -112,33 +112,17 @@ export default describe('QueryToken Testcase', () => {
           note: newNote,
         })
       })
-    })
 
-    describe('Method: traces', () => {
-      it('should get traces when updated', (done) => {
-        const task = tasks[0]
-        const newNote = 'new task note'
+      it('should emit result when the returning observable is re-subscribed', function*() {
+        const data$ = queryToken.traces('_id')
 
-        queryToken
-          .traces('_id')
-          .pipe(skip(1))
-          .subscribe((r) => {
-            const { result, type, ops } = r
-            expect(result[0].note).to.equal(newNote)
-            expect(type).to.equal(1)
-            ops.forEach((op: Op, index: number) => {
-              if (index === 0) {
-                expect(op.type).to.equal(1)
-              } else {
-                expect(op.type).to.equal(0)
-              }
-            })
-            done()
-          })
+        yield data$.pipe(take(1)).toPromise()
 
-        MockSelector.update(task._id as string, {
-          note: newNote,
-        })
+        let emittedOnResubscribe = false
+
+        yield data$.pipe(take(1)).subscribe(() => (emittedOnResubscribe = true))
+
+        expect(emittedOnResubscribe).to.be.true
       })
     })
 
