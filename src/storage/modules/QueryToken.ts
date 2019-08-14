@@ -3,9 +3,11 @@ import { OperatorFunction } from 'rxjs/interfaces'
 import { combineAll } from 'rxjs/operators/combineAll'
 import { filter } from 'rxjs/operators/filter'
 import { map } from 'rxjs/operators/map'
+import { pairwise } from 'rxjs/operators/pairwise'
 import { publishReplay } from 'rxjs/operators/publishReplay'
 import { refCount } from 'rxjs/operators/refCount'
 import { skipWhile } from 'rxjs/operators/skipWhile'
+import { startWith } from 'rxjs/operators/startWith'
 import { switchMap } from 'rxjs/operators/switchMap'
 import { take } from 'rxjs/operators/take'
 import { tap } from 'rxjs/operators/tap'
@@ -23,7 +25,7 @@ function initialTraceResult<T>(list: ReadonlyArray<T>): TraceResult<T> {
   return {
     type: OpsType.Success,
     ops: list.map((_value, index) => ({ type: OpType.New, index })),
-    result: list
+    result: list,
   }
 }
 
@@ -36,20 +38,19 @@ export class QueryToken<T> {
   selector$: Observable<SelectorMeta<T>>
 
   private consumed = false
+  private lastEmit: ReadonlyArray<T> | undefined
+  private trace: ReadonlyArray<T> | undefined
 
-  constructor(
-    selector$: Observable<SelectorMeta<T>>,
-    private lastEmit?: ReadonlyArray<T>
-  ) {
+  constructor(selector$: Observable<SelectorMeta<T>>, trace?: ReadonlyArray<T>) {
     this.selector$ = selector$.pipe(
       publishReplay(1),
       refCount()
     )
-    this.lastEmit = lastEmit
+    this.trace = trace
   }
 
-  setLastEmit(data: T[]) {
-    this.lastEmit = data
+  setTrace(data: T[]) {
+    this.trace = data
   }
 
   map<K>(fn: OperatorFunction<T[], K[]>) {
@@ -80,11 +81,14 @@ export class QueryToken<T> {
 
   traces(pk?: string): Observable<TraceResult<T>> {
     return this.changes().pipe(
-      map((result: T[]) => {
-        if (!this.lastEmit) {
+      startWith<undefined | ReadonlyArray<T>>(this.trace),
+      pairwise(),
+      map(([prev, curr]) => {
+        const result = curr!
+        if (!prev) {
           return initialTraceResult(result)
         }
-        const ops = diff(this.lastEmit, result, pk)
+        const ops = diff(prev, result, pk)
         return { result, ...ops }
       }),
       filter(({ type }) => type !== OpsType.ShouldSkip),
