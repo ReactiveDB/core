@@ -1,0 +1,27 @@
+    describe('Method: traces', () => {
+      it('should get traces when updated', (done) => {
+        const task = tasks[0]
+        const newNote = 'new task note'
+
+        queryToken
+          .traces('_id')
+          .pipe(skip(1))
+          .subscribe((r) => {
+            const { result, type, ops } = r
+            expect(result[0].note).to.equal(newNote)
+            expect(type).to.equal(1)
+            ops.forEach((op: Op, index: number) => {
+              if (index === 0) {
+                expect(op.type).to.equal(1)
+              } else {
+                expect(op.type).to.equal(0)
+              }
+            })
+            done()
+          })
+
+        MockSelector.update(task._id as string, {
+          note: newNote,
+        })
+      })
+    })
