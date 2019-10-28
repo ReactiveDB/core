@@ -93,7 +93,7 @@ export class PredicateProvider<T> {
 
     const predicates: lf.Predicate[] = []
 
-    forEach(meta, (val, key) => {
+    forEach(meta, (val: Partial<PredicateMeta<T>> | ValueLiteral, key) => {
       let nestedPreds: lf.Predicate[]
       let resultPred: lf.Predicate
 

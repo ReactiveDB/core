@@ -824,7 +824,7 @@ export default describe('Database Testcase: ', () => {
         },
       })
 
-      const errSpy = sinon.spy((): void => void 0)
+      const errSpy: any = sinon.spy((): void => void 0)
 
       tmpDB.connect()
       tmpDB

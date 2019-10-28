@@ -42,8 +42,10 @@ const esPkgData = JSON.stringify(esPkg, null, 2)
 Promise.all([
   write('dist/cjs/package.json', cjsPkgData),
   write('dist/es/package.json', esPkgData),
+  write('dist/next/package.json', esPkgData),
   write('dist/es/README.md', README),
   write('dist/cjs/README.md', README),
+  write('dist/next/README.md', README),
 ])
   .then(() => {
     const { stderr, stdout } = shelljs.exec('npm publish dist/cjs')
