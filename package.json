@@ -62,7 +62,7 @@
   "devDependencies": {
     "@types/chai": "^4.1.7",
     "@types/chai-string": "^1.4.1",
-    "@types/node": "^12.7.1",
+    "@types/node": "^12.12.9",
     "@types/shelljs": "^0.8.2",
     "@types/sinon": "^7.0.5",
     "@types/sinon-chai": "^3.2.2",
