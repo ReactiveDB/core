@@ -4366,9 +4366,9 @@ node-source-walk@^4.2.0:
     "@babel/parser" "^7.0.0"
 
 node-watch@^0.6.0:
-  version "0.6.0"
-  resolved "http://registry.npm.taobao.org/node-watch/download/node-watch-0.6.0.tgz#ab0703b60cd270783698e57a428faa0010ed8fd0"
-  integrity sha1-qwcDtgzScHg2mOV6Qo+qABDtj9A=
+  version "0.6.3"
+  resolved "https://registry.npmjs.org/node-watch/-/node-watch-0.6.3.tgz#9abf739ae0638435be6c0d1c99d4dc2e53df7317"
+  integrity sha512-InVPsg51EemnMVH3fvrrSVgqVBMlksZ/mK7ZDWx/NuWdNQi28wcVJX1/BP38alraPFXbRi9jZ35OfK4Ra7l8Bg==
 
 nopt@^4.0.1:
   version "4.0.1"
