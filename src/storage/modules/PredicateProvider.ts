@@ -93,7 +93,7 @@ export class PredicateProvider<T> {
 
     const predicates: lf.Predicate[] = []
 
-    forEach(meta, (val, key) => {
+    forEach(meta, (val: Partial<PredicateMeta<T>> | ValueLiteral, key) => {
       let nestedPreds: lf.Predicate[]
       let resultPred: lf.Predicate
 
@@ -127,9 +127,9 @@ export class PredicateProvider<T> {
     return typeof compoundPredicateFactory[methodName] === 'function'
   }
 
-  private checkPredicate(val: Partial<PredicateMeta<T>> | ValueLiteral) {
+  private checkPredicate(val: Partial<PredicateMeta<T>> | ValueLiteral): boolean {
     return (
-      val &&
+      !!val &&
       typeof val === 'object' &&
       !(val instanceof Array) &&
       !(val instanceof RegExp) &&

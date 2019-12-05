@@ -1,15 +1,15 @@
 import { forEach } from './for-each'
 
-export const clone = <T>(origin: T, target: T | null = null): T | null => {
+export const clone = <T = unknown>(origin: T, target: T | null = null): T | null => {
   if (origin == null) {
     return origin
   }
 
-  if (origin.constructor === Date) {
+  if (((origin as unknown) as Date).constructor === Date) {
     return new Date((origin as any).valueOf()) as any
   }
 
-  if (origin.constructor === RegExp) {
+  if (origin instanceof RegExp) {
     const pattern = origin.valueOf() as RegExp
     let flags = ''
     flags += pattern.global ? 'g' : ''
@@ -20,10 +20,10 @@ export const clone = <T>(origin: T, target: T | null = null): T | null => {
   }
 
   if (
-    origin.constructor === Function ||
-    origin.constructor === String ||
-    origin.constructor === Number ||
-    origin.constructor === Boolean
+    ((origin as unknown) as Function).constructor === Function ||
+    ((origin as unknown) as Function).constructor === String ||
+    ((origin as unknown) as Function).constructor === Number ||
+    ((origin as unknown) as Function).constructor === Boolean
   ) {
     return origin
   }

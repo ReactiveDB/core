@@ -364,7 +364,9 @@ export default describe('Database Testcase: ', () => {
     })
 
     it('should get empty array if no record matched query', function*() {
-      const result = yield database.get<TaskSchema>('Task', { where: { _id: 'testtask' } }).values()
+      const result = yield database
+        .get<TaskSchema>('Task', { where: { _id: 'testtask' } })
+        .values()
 
       expect(result).to.deep.equal([])
     })
@@ -449,7 +451,10 @@ export default describe('Database Testcase: ', () => {
 
       const result = yield database
         .get('Task', {
-          orderBy: [{ orderBy: 'ASC', fieldName: 'subtasksCount' }, { orderBy: 'DESC', fieldName: 'created' }],
+          orderBy: [
+            { orderBy: 'ASC', fieldName: 'subtasksCount' },
+            { orderBy: 'DESC', fieldName: 'created' },
+          ],
         })
         .values()
 
@@ -824,7 +829,7 @@ export default describe('Database Testcase: ', () => {
         },
       })
 
-      const errSpy = sinon.spy((): void => void 0)
+      const errSpy = sinon.spy()
 
       tmpDB.connect()
       tmpDB
