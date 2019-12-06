@@ -62,7 +62,8 @@ export class Database {
 
   private findSchema = (name: string): ParsedSchema => {
     const schema = this.schemas.get(name)
-    return assertValue(schema, Exception.NonExistentTable, name)
+    assertValue(schema, Exception.NonExistentTable, name)
+    return schema
   }
   private tryCatchFindPrimaryKey = tryCatch((name: string) => {
     return this.findSchema(name).pk

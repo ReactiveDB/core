@@ -17,10 +17,7 @@ export class QueryToken<T> {
   private consumed = false
 
   constructor(selector$: Observable<SelectorMeta<T>>) {
-    this.selector$ = selector$.pipe(
-      publishReplay(1),
-      refCount(),
-    )
+    this.selector$ = selector$.pipe(publishReplay(1), refCount())
   }
 
   map<K>(fn: OperatorFunction<T[], K[]>) {
