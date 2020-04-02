@@ -71,7 +71,7 @@
     "codecov": "^3.6.1",
     "css-loader": "^3.2.1",
     "extract-text-webpack-plugin": "^4.0.0-beta.0",
-    "html-webpack-plugin": "^4.0.3",
+    "html-webpack-plugin": "^4.0.4",
     "husky": "^4.2.3",
     "lint-staged": "^10.1.1",
     "madge": "^3.8.0",
