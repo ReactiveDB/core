@@ -82,7 +82,7 @@
     "prettier": "^2.0.5",
     "raw-loader": "^4.0.1",
     "rxjs": "^6.5.5",
-    "shelljs": "^0.8.3",
+    "shelljs": "^0.8.4",
     "shx": "^0.3.2",
     "sinon": "^9.0.2",
     "sinon-chai": "^3.5.0",
