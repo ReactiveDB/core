@@ -73,7 +73,7 @@
     "extract-text-webpack-plugin": "^4.0.0-beta.0",
     "html-webpack-plugin": "^4.2.1",
     "husky": "^4.2.5",
-    "lint-staged": "^10.2.0",
+    "lint-staged": "^10.2.2",
     "madge": "^3.8.0",
     "moment": "^2.24.0",
     "node-watch": "^0.6.3",
