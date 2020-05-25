@@ -89,7 +89,7 @@
     "source-map-loader": "^0.2.4",
     "style-loader": "^1.2.1",
     "tman": "^1.10.0",
-    "ts-loader": "^7.0.4",
+    "ts-loader": "^7.0.5",
     "ts-node": "^8.10.1",
     "tslint": "^5.20.1",
     "tslint-config-prettier": "^1.18.0",
