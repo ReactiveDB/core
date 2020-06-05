@@ -91,7 +91,7 @@
     "tman": "^1.10.0",
     "ts-loader": "^7.0.5",
     "ts-node": "^8.10.2",
-    "tslint": "^5.20.1",
+    "tslint": "^6.1.2",
     "tslint-config-prettier": "^1.18.0",
     "tslint-eslint-rules": "^5.4.0",
     "tslint-loader": "^3.6.0",
