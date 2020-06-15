@@ -69,7 +69,7 @@
     "chai": "^4.2.0",
     "chai-string": "^1.5.0",
     "codecov": "^3.7.0",
-    "css-loader": "^3.5.3",
+    "css-loader": "^3.6.0",
     "extract-text-webpack-plugin": "^4.0.0-beta.0",
     "html-webpack-plugin": "^4.3.0",
     "husky": "^4.2.5",
