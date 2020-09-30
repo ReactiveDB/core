@@ -84,7 +84,7 @@
     "rxjs": "^6.6.3",
     "shelljs": "^0.8.4",
     "shx": "^0.3.2",
-    "sinon": "^9.0.3",
+    "sinon": "^9.1.0",
     "sinon-chai": "^3.5.0",
     "source-map-loader": "^1.1.0",
     "style-loader": "^1.2.1",
