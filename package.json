@@ -80,7 +80,7 @@
     "npm-run-all": "^4.1.5",
     "nyc": "^15.1.0",
     "prettier": "^2.1.2",
-    "raw-loader": "^4.0.1",
+    "raw-loader": "^4.0.2",
     "rxjs": "^6.6.3",
     "shelljs": "^0.8.4",
     "shx": "^0.3.2",
