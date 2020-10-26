@@ -83,7 +83,7 @@
     "raw-loader": "^4.0.2",
     "rxjs": "^6.6.3",
     "shelljs": "^0.8.4",
-    "shx": "^0.3.2",
+    "shx": "^0.3.3",
     "sinon": "^9.2.0",
     "sinon-chai": "^3.5.0",
     "source-map-loader": "^1.1.1",
