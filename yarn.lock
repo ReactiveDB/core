@@ -1134,10 +1134,10 @@ chai-string@^1.5.0:
   resolved "https://registry.npmjs.org/chai-string/-/chai-string-1.5.0.tgz#0bdb2d8a5f1dbe90bc78ec493c1c1c180dd4d3d2"
   integrity sha512-sydDC3S3pNAQMYwJrs6dQX0oBQ6KfIPuOZ78n7rocW0eJJlsHPh2t3kwW7xfwYA/1Bf6/arGtSUo16rxR2JFlw==
 
-chai@^4.2.0:
-  version "4.2.0"
-  resolved "https://registry.npmjs.org/chai/-/chai-4.2.0.tgz#760aa72cf20e3795e84b12877ce0e83737aa29e5"
-  integrity sha512-XQU3bhBukrOsQCuwZndwGcCVQHyZi53fQ6Ys1Fym7E4olpIqqZZhhoFJoaKVvV17lWQoXYwgWN2nF5crA8J2jw==
+chai@^4.3.0:
+  version "4.3.0"
+  resolved "https://registry.npmjs.org/chai/-/chai-4.3.0.tgz#5523a5faf7f819c8a92480d70a8cccbadacfc25f"
+  integrity sha512-/BFd2J30EcOwmdOgXvVsmM48l0Br0nmZPlO0uOW4XKh6kpsUumRXBgPV+IlaqFaqr9cYbeoZAM1Npx0i4A+aiA==
   dependencies:
     assertion-error "^1.1.0"
     check-error "^1.0.2"
