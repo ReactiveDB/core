@@ -68,7 +68,7 @@
     "@types/sinon-chai": "^3.2.5",
     "chai": "^4.3.0",
     "chai-string": "^1.5.0",
-    "codecov": "^3.8.1",
+    "codecov": "^3.8.2",
     "css-loader": "^5.0.1",
     "extract-text-webpack-plugin": "^4.0.0-beta.0",
     "html-webpack-plugin": "^4.5.1",
