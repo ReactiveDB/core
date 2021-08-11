@@ -1,7 +1,7 @@
 defaults: &defaults
   working_directory: ~/ReactiveDB
   docker:
-    - image: circleci/node:14
+    - image: circleci/node:16
 
 version: 2
 jobs:
