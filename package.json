@@ -101,7 +101,7 @@
     "webpack-dev-server": "^3.11.2"
   },
   "dependencies": {
-    "@types/lovefield": "^2.1.3",
+    "@types/lovefield": "^2.1.4",
     "lovefield": "2.1.12",
     "nesthydrationjs": "^2.0.0"
   },
