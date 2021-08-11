@@ -248,10 +248,10 @@
   resolved "https://registry.npmjs.org/@types/json-schema/-/json-schema-7.0.6.tgz#f4c7ec43e81b319a9815115031709f26987891f0"
   integrity sha512-3c+yGKvVP5Y9TYBEibGNR+kLtijnj7mYrXRg+WpFb2X9xm04g/DXYkfg4hmzJQosc9snFNUPkbYIhu+KAm6jJw==
 
-"@types/lovefield@^2.1.3":
-  version "2.1.3"
-  resolved "https://registry.npmjs.org/@types/lovefield/-/lovefield-2.1.3.tgz#6b3c4abe663625c4b32b20dcedeb29c9eea05a04"
-  integrity sha512-LaMHENSO3MOcAgYD+iYsbuvEjDBQ0a5GmYyjca99MlHli0A5tcOTEy03UHiRk5cfubdPhVYCfCTXYN7/CLvnWA==
+"@types/lovefield@^2.1.4":
+  version "2.1.4"
+  resolved "https://registry.npmjs.org/@types/lovefield/-/lovefield-2.1.4.tgz#d4afc4c2b90a0af09396e41e13b157e502f34656"
+  integrity sha512-qisli81I9dlyeVf593O63BSU4uuTarT4R5mCKM7D/E3z9iJn7sRHo26ked3g5rt/etMV0fwNIBVsmdbwVfWynA==
 
 "@types/minimatch@*":
   version "3.0.3"
