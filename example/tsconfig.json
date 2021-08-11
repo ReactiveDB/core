@@ -1,33 +1,15 @@
 {
-  "compilerOptions": {
-    "target": "ES2015",
-    "experimentalDecorators": true,
-    "sourceMap": true,
-    "module": "commonjs",
-    "emitDecoratorMetadata": true,
-    "suppressImplicitAnyIndexErrors": true,
-    "noImplicitThis": true,
-    "noImplicitAny": true,
-    "noUnusedLocals": true,
-    "noImplicitReturns": true,
-    "noUnusedParameters": true,
-    "baseUrl": "../",
-    "paths": {
-      "*": [
-        "*"
-      ],
-      "reactivedb": [ "./dist/cjs" ]
-    },
-    "allowJs": true,
-    "typeRoots": [
-      "../node_modules/@types"
-    ]
-  },
-  "exclude": [
-    "node_modules"
+  "files": [
+    "src/main.tsx"
   ],
-  "compileOnSave": false,
-  "awesomeTypescriptLoaderOptions": {
-    "useCache": true
-  }
+  "compilerOptions": {
+    "target": "es5",
+    "module": "es2015",
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "strict": true,
+    "allowJs": true,
+    "jsx": "react"
+  },
+  "exclude": ["node_modules"]
 }
