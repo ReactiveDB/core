@@ -22,7 +22,7 @@
   },
   "homepage": "https://github.com/teambition/ReactiveDB#readme",
   "dependencies": {
-    "antd": "^2.7.3",
+    "antd": "^4.0.0",
     "react": "^17.0.0",
     "react-dom": "^17.0.0"
   },
