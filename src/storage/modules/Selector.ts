@@ -117,10 +117,7 @@ export class Selector<T> {
       // 下面的语句针对两个 lovefield issue 做了特殊调整：
       // issue#209: 确保 db.observe 之后立即执行一次查询；
       // issue#215: 确保 db.observe “不正确地”立即调用回调的行为，不会给消费方造成初始的重复推送。
-      return observeQuery(db, query).pipe(
-        startWith(void 0),
-        switchMap(queryOnce),
-      )
+      return observeQuery(db, query).pipe(startWith(void 0), switchMap(queryOnce))
     }
 
     const changesOnQuery =
@@ -128,10 +125,7 @@ export class Selector<T> {
         ? this.buildPrefetchingObserve().pipe(switchMap((pks) => observeOn(this.getQuery(this.inPKs(pks)))))
         : observeOn(this.getQuery())
 
-    return changesOnQuery.pipe(
-      publishReplay(1),
-      refCount(),
-    )
+    return changesOnQuery.pipe(publishReplay(1), refCount())
   }
 
   private set change$(dist$: Observable<T[]>) {
