@@ -6,6 +6,7 @@ import { combineLatest, take, skip, publishReplay, refCount, tap, map, publish }
 import { MockSelector } from '../../../utils/mocks'
 import { taskGen } from '../../../utils/generators'
 import { QueryToken, TaskSchema, clone, TokenConsumed } from '../../../index'
+import { Op } from '../../../../src/utils/diff'
 
 export default describe('QueryToken Testcase', () => {
   const generateMockTestdata = (_tasks: TaskSchema[]) => {
@@ -82,6 +83,46 @@ export default describe('QueryToken Testcase', () => {
         const fn = () => queryToken.changes().pipe(take(1))
 
         expect(fn).to.throw(TokenConsumed().message)
+      })
+    })
+
+    describe('Method: traces', () => {
+      it('should get traces when updated', (done) => {
+        const task = tasks[0]
+        const newNote = 'new task note'
+
+        queryToken
+          .traces('_id')
+          .pipe(skip(1))
+          .subscribe((r) => {
+            const { result, type, ops } = r
+            expect(result[0].note).to.equal(newNote)
+            expect(type).to.equal(1)
+            ops.forEach((op: Op, index: number) => {
+              if (index === 0) {
+                expect(op.type).to.equal(1)
+              } else {
+                expect(op.type).to.equal(0)
+              }
+            })
+            done()
+          })
+
+        MockSelector.update(task._id as string, {
+          note: newNote,
+        })
+      })
+
+      it('should emit result when the returning observable is re-subscribed', function*() {
+        const data$ = queryToken.traces('_id')
+
+        yield data$.pipe(take(1)).toPromise()
+
+        let emittedOnResubscribe = false
+
+        yield data$.pipe(take(1)).subscribe(() => (emittedOnResubscribe = true))
+
+        expect(emittedOnResubscribe).to.be.true
       })
     })
 
@@ -168,6 +209,64 @@ export default describe('QueryToken Testcase', () => {
       })
     })
 
+    describe('Method: combine with traces', () => {
+      let tasks2: TaskSchema[]
+      let mockSelector2: MockSelector<TaskSchema>
+      let queryToken2: QueryToken<TaskSchema>
+
+      beforeEach(() => {
+        tasks2 = taskGen(25)
+        mockSelector2 = new MockSelector(generateMockTestdata(tasks2))
+        queryToken2 = new QueryToken(of(mockSelector2) as any)
+      })
+
+      it('should use lastEmit values when combined', (done) => {
+        queryToken.traces().subscribe()
+
+        const combined = queryToken.combine(queryToken2)
+        combined.traces().subscribe((r) => {
+          expect(r.type).to.equal(1)
+          r.ops.forEach((op: Op, index: number) => {
+            if (index < 25) {
+              expect(op.type).to.equal(0)
+            } else {
+              expect(op.type).to.equal(1)
+            }
+          })
+          done()
+        })
+      })
+    })
+
+    describe('Method: combine with traces', () => {
+      let tasks2: TaskSchema[]
+      let mockSelector2: MockSelector<TaskSchema>
+      let queryToken2: QueryToken<TaskSchema>
+
+      beforeEach(() => {
+        tasks2 = taskGen(25)
+        mockSelector2 = new MockSelector(generateMockTestdata(tasks2))
+        queryToken2 = new QueryToken(of(mockSelector2) as any)
+      })
+
+      it('should use lastEmit values when combined', (done) => {
+        queryToken.traces().subscribe()
+
+        const combined = queryToken.combine(queryToken2)
+        combined.traces().subscribe((r) => {
+          expect(r.type).to.equal(1)
+          r.ops.forEach((op: Op, index: number) => {
+            if (index < 25) {
+              expect(op.type).to.equal(0)
+            } else {
+              expect(op.type).to.equal(1)
+            }
+          })
+          done()
+        })
+      })
+    })
+
     describe('Method: concat', () => {
       let tasks2: TaskSchema[]
       let mockSelector2: MockSelector<TaskSchema>
@@ -241,6 +340,34 @@ export default describe('QueryToken Testcase', () => {
         const fn1 = () => concated.changes()
 
         expect(fn1).to.throw(TokenConsumed().message)
+      })
+    })
+
+    describe('Method: concat with traces', () => {
+      let tasks2: TaskSchema[]
+      let mockSelector2: MockSelector<TaskSchema>
+      let queryToken2: QueryToken<TaskSchema>
+
+      beforeEach(() => {
+        tasks2 = taskGen(25)
+        mockSelector2 = new MockSelector(generateMockTestdata(tasks2))
+        queryToken2 = new QueryToken(of(mockSelector2) as any)
+      })
+
+      it('should use lastEmit values when concated', (done) => {
+        queryToken.traces().subscribe()
+        const concated = queryToken.concat(queryToken2)
+        concated.traces().subscribe((r) => {
+          expect(r.type).to.equal(1)
+          r.ops.forEach((op: Op, index: number) => {
+            if (index < 25) {
+              expect(op.type).to.equal(0)
+            } else {
+              expect(op.type).to.equal(1)
+            }
+          })
+          done()
+        })
       })
     })
 

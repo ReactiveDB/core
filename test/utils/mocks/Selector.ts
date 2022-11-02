@@ -10,8 +10,14 @@ export class MockSelector<T> {
       throw new TypeError(`Patch target is not exist: ${_id}`)
     }
     const data = MockSelector.datas.get(_id)
-    Object.assign(data, patch)
-    MockSelector.selectMeta.get(_id).notify()
+    const newData = Object.assign({}, data, patch)
+    MockSelector.datas.set(_id, newData)
+    const mockSelector = MockSelector.selectMeta.get(_id)
+    mockSelector.datas = mockSelector.datas.map((d) => {
+      return d === data ? newData : d
+    })
+
+    mockSelector.notify()
   }
 
   private static mapFn = <U>(dist$: Observable<U>) => dist$
