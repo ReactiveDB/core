@@ -490,12 +490,24 @@
     "@types/chai" "*"
     "@types/sinon" "*"
 
-"@types/sinon@*", "@types/sinon@^10.0.2":
+"@types/sinon@*":
   version "10.0.2"
   resolved "https://registry.npmjs.org/@types/sinon/-/sinon-10.0.2.tgz#f360d2f189c0fd433d14aeb97b9d705d7e4cc0e4"
   integrity sha512-BHn8Bpkapj8Wdfxvh2jWIUoaYB/9/XhsL0oOvBfRagJtKlSl9NWPcFOz2lRukI9szwGxFtYZCTejJSqsGDbdmw==
   dependencies:
     "@sinonjs/fake-timers" "^7.1.0"
+
+"@types/sinon@^17.0.0":
+  version "17.0.0"
+  resolved "https://registry.npmjs.org/@types/sinon/-/sinon-17.0.0.tgz#c5e5ee3ca6ab825fe18ef4b0aa74fedf1250baa1"
+  integrity sha512-oN4AeDMFCeNZrAffCjhLcwwVymRZL2c9mljUmhPnd0eiM06d4ELDg0Q0TSvnZXrCIFlSA859qIdcfu1HapswPQ==
+  dependencies:
+    "@types/sinonjs__fake-timers" "*"
+
+"@types/sinonjs__fake-timers@*":
+  version "8.1.4"
+  resolved "https://registry.npmjs.org/@types/sinonjs__fake-timers/-/sinonjs__fake-timers-8.1.4.tgz#663bb44e01f6bae4eaae3719d8b037411217c992"
+  integrity sha512-GDV68H0mBSN449sa5HEj51E0wfpVQb8xNSMzxf/PrypMFcLTMwJMOM/cgXiv71Mq5drkOQmUGvL1okOZcu6RrQ==
 
 "@typescript-eslint/types@4.29.1":
   version "4.29.1"
